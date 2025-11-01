@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, MessageSquare, Users2, Wand2 } from 'lucide-react';
+import { Home, Users, Users2, MessageSquare, Wand2 } from 'lucide-react';
 import { useAuth } from '../App';
 import SuggestionModal from './SuggestionModal';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
-import { useUnreadMessages } from './UnreadMessagesProvider'; // Nouveau
+import { useUnreadMessages } from './UnreadMessagesProvider';
 
 const TabBar: React.FC = () => {
     const { session } = useAuth();
     const navigate = useNavigate();
-    const { unreadCount } = useUnreadMessages(); // Nouveau
+    const { unreadCount: unreadMessagesCount } = useUnreadMessages();
     const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
 
@@ -24,7 +24,7 @@ const TabBar: React.FC = () => {
             if (data) setCurrentUserProfile(data);
         }
         setSuggestionModalOpen(true);
-    }
+    };
 
     const navLinkClasses = "relative flex flex-col items-center justify-center text-slate-500 hover:text-isig-blue transition-colors";
     const activeNavLinkClasses = "text-isig-blue";
@@ -38,18 +38,18 @@ const TabBar: React.FC = () => {
                         <span className="text-xs mt-1">Accueil</span>
                     </NavLink>
                     <NavLink to={session ? "/groups" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-                        <Users2 size={24} />
+                        <Users size={24} />
                         <span className="text-xs mt-1">Groupes</span>
                     </NavLink>
                     <NavLink to={session ? "/users" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-                        <Users size={24} />
+                        <Users2 size={24} />
                         <span className="text-xs mt-1">Membres</span>
                     </NavLink>
                     <NavLink to={session ? "/chat" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
                         <MessageSquare size={24} />
-                        {unreadCount > 0 && (
+                        {unreadMessagesCount > 0 && (
                              <span className="absolute top-3 right-1/2 translate-x-4 block h-4 w-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white">
-                                {unreadCount > 9 ? '9+' : unreadCount}
+                                {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
                             </span>
                         )}
                         <span className="text-xs mt-1">Messages</span>

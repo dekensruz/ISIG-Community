@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Avatar from './Avatar';
-import { Heart, MessageCircle, MessageSquare } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, Users } from 'lucide-react';
 
 interface NotificationsDropdownProps {
     notifications: Notification[];
@@ -20,7 +20,7 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
         if (unreadIds.length > 0) {
             const markAsRead = async () => {
                 await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
-                setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: true } : n));
+                setNotifications(prev => prev.map(n => ({...n, is_read: unreadIds.includes(n.id) ? true : n.is_read })));
             };
             const timer = setTimeout(markAsRead, 2000);
             return () => clearTimeout(timer);
@@ -28,16 +28,30 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
     }, [notifications, setNotifications]);
     
     const getNotificationLink = (notification: Notification): string => {
-        if (notification.type === 'new_message' && notification.conversation_id) {
-            return `/chat/${notification.conversation_id}`;
+        switch(notification.type) {
+            case 'new_like':
+            case 'new_comment':
+            case 'new_comment_reply':
+                return notification.post_id ? `/post/${notification.post_id}?openModal=true` : '#';
+            case 'new_message':
+                return notification.conversation_id ? `/chat/${notification.conversation_id}` : '/chat';
+            case 'new_group_post':
+            case 'new_group_comment':
+            case 'new_group_comment_reply':
+            case 'new_group_like':
+                const baseGroupPath = notification.group_id ? `/group/${notification.group_id}` : '/groups';
+                if (notification.group_post_id) {
+                    return `${baseGroupPath}?postId=${notification.group_post_id}&openModal=true`;
+                }
+                return baseGroupPath;
+            case 'group_join_request':
+            case 'group_member_joined':
+                 return notification.group_id ? `/group/${notification.group_id}` : '/groups';
+            case 'new_follower':
+                return `/profile/${notification.actor_id}`;
+            default:
+                return '#';
         }
-        if (notification.post_id) {
-            return `/post/${notification.post_id}`;
-        }
-        if (notification.group_post_id && notification.group_id) {
-            return `/group/${notification.group_id}`;
-        }
-        return `/profile/${notification.actor_id}`;
     };
 
     const getNotificationText = (notification: Notification): React.ReactNode => {
@@ -45,12 +59,24 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
         switch (notification.type) {
             case 'new_like':
                 return <>{actorName} a aimé votre publication.</>;
+            case 'new_group_like':
+                return <>{actorName} a aimé votre publication dans un groupe.</>;
             case 'new_comment':
                 return <>{actorName} a commenté votre publication.</>;
+            case 'new_comment_reply':
+                return <>{actorName} a répondu à votre commentaire.</>;
             case 'new_group_post':
-                return <>{actorName} a publié dans un groupe.</>;
+                return <>{actorName} a publié dans un de vos groupes.</>;
+            case 'new_group_comment':
+                return <>{actorName} a commenté votre publication dans un groupe.</>;
+            case 'new_group_comment_reply':
+                return <>{actorName} a répondu à votre commentaire dans un groupe.</>;
             case 'new_message':
                 return <>{actorName} vous a envoyé un message.</>;
+            case 'group_join_request':
+                return <>{actorName} souhaite rejoindre un de vos groupes.</>;
+            case 'group_member_joined':
+                return <>{actorName} a rejoint un de vos groupes.</>;
             default:
                 return <>Vous avez une nouvelle notification.</>;
         }
@@ -60,11 +86,18 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
         const iconBaseClasses = "absolute bottom-0 right-0 bg-white p-0.5 rounded-full ring-2 ring-white";
         switch (notification.type) {
             case 'new_like':
+            case 'new_group_like':
                 return <div className={iconBaseClasses}><Heart className="h-4 w-4 text-isig-orange" fill="#FF8C00" /></div>;
             case 'new_comment':
+            case 'new_group_comment':
+            case 'new_comment_reply':
+            case 'new_group_comment_reply':
                  return <div className={iconBaseClasses}><MessageCircle className="h-4 w-4 text-isig-blue" fill="#00AEEF" /></div>;
             case 'new_message':
                  return <div className={iconBaseClasses}><MessageSquare className="h-4 w-4 text-green-500" fill="#22c55e" /></div>;
+            case 'group_join_request':
+            case 'group_member_joined':
+                 return <div className={iconBaseClasses}><Users className="h-4 w-4 text-green-500" /></div>;
             default:
                 return null;
         }
@@ -99,6 +132,11 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
                 ) : (
                     <p className="text-center text-slate-500 p-8">Aucune notification pour le moment.</p>
                 )}
+            </div>
+            <div className="p-2 border-t text-center">
+                <Link to="/notifications" onClick={onClose} className="text-sm font-semibold text-isig-blue hover:underline">
+                    Voir toutes les notifications
+                </Link>
             </div>
         </div>
     );

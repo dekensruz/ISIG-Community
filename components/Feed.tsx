@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Post as PostType } from '../types';
 import CreatePost from './CreatePost';
@@ -6,6 +6,10 @@ import PostCard from './Post';
 import Spinner from './Spinner';
 import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
+import { RotateCw } from 'lucide-react';
+
+const REFRESH_THRESHOLD = 80;
+const LOADING_POSITION = 60;
 
 const LoginPrompt = () => (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -24,8 +28,12 @@ const Feed: React.FC = () => {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State for filtering and searching from context
   const { searchQuery, filterType, sortOrder } = useSearchFilter();
+
+  // State for pull-to-refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullPosition, setPullPosition] = useState(0);
+  const startY = useRef<number | null>(null);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -48,6 +56,8 @@ const Feed: React.FC = () => {
     } catch (error: any) {
       console.error('Erreur de récupération des posts:', error.message);
     }
+    // Return a promise to allow chaining .finally()
+    return Promise.resolve();
   }, []);
 
   useEffect(() => {
@@ -93,14 +103,12 @@ const Feed: React.FC = () => {
   const filteredAndSortedPosts = useMemo(() => {
     return posts
       .filter(post => {
-        // Search filter (content and user name)
         const lowercasedQuery = searchQuery.toLowerCase();
         const matchesSearch = lowercasedQuery === '' ? true : (
             post.content.toLowerCase().includes(lowercasedQuery) ||
             (post.profiles && post.profiles.full_name.toLowerCase().includes(lowercasedQuery))
         );
         
-        // Type filter
         let matchesType = true;
         if (filterType !== 'all') {
           if (filterType === 'link') {
@@ -113,15 +121,77 @@ const Feed: React.FC = () => {
         return matchesSearch && matchesType;
       })
       .sort((a, b) => {
-        // Sort order
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
         return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
   }, [posts, searchQuery, filterType, sortOrder]);
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && !isRefreshing) {
+        startY.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY.current === null || isRefreshing) return;
+
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY.current;
+
+    if (diff < 0) return;
+
+    e.preventDefault();
+
+    const newPullPosition = Math.min(Math.pow(diff, 0.85), 150);
+    setPullPosition(newPullPosition);
+  };
+
+  const handleTouchEnd = () => {
+    if (startY.current === null || isRefreshing) return;
+    
+    startY.current = null;
+
+    if (pullPosition > REFRESH_THRESHOLD) {
+        setIsRefreshing(true);
+        setPullPosition(LOADING_POSITION);
+        fetchPosts().finally(() => {
+            setTimeout(() => {
+                setIsRefreshing(false);
+                setPullPosition(0);
+            }, 600);
+        });
+    } else {
+        setPullPosition(0);
+    }
+  };
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div
+      className="max-w-2xl mx-auto relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 flex justify-center items-center pointer-events-none"
+        style={{
+            transform: `translateY(${pullPosition - 50}px)`,
+            transition: isRefreshing || startY.current !== null ? 'none' : 'transform 0.3s ease-out',
+            opacity: pullPosition / LOADING_POSITION,
+        }}
+      >
+        <div
+            className={`p-2 bg-white rounded-full shadow-md flex items-center justify-center transition-transform duration-200 ${isRefreshing ? 'animate-spin' : ''}`}
+            style={{ transform: `rotate(${isRefreshing ? 0 : pullPosition * 2.5}deg)` }}
+        >
+            <RotateCw
+                size={24}
+                className={`transition-colors ${pullPosition > REFRESH_THRESHOLD ? 'text-isig-blue' : 'text-slate-400'}`}
+            />
+        </div>
+      </div>
+
       {!session && <LoginPrompt />}
       {session && <CreatePost onPostCreated={onPostCreated} />}
 

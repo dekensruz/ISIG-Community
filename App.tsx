@@ -15,7 +15,8 @@ import ChatPage from './components/ChatPage';
 import UsersPage from './components/UsersPage';
 import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
-import SearchResultsPage from './components/SearchResultsPage'; // Nouveau
+import SearchResultsPage from './components/SearchResultsPage';
+import NotificationsPage from './components/NotificationsPage'; // Nouveau
 
 type AuthContextType = {
   session: Session | null;
@@ -88,7 +89,8 @@ const AppContent: React.FC = () => {
                     <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
                     <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
                     <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
-                    <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} /> {/* Nouveau */}
+                    <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
+                    <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} /> {/* Nouveau */}
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
             </main>

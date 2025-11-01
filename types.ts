@@ -58,8 +58,18 @@ export interface Group {
     description?: string;
     created_by: string;
     avatar_url?: string;
+    is_private: boolean; // Nouveau champ
     profiles: Profile; // Créateur du groupe
     group_members: GroupMember[]; // Liste des membres
+    group_join_requests: GroupJoinRequest[]; // Liste des demandes
+}
+
+export interface GroupJoinRequest {
+    id: string;
+    group_id: string;
+    user_id: string;
+    created_at: string;
+    profiles: Profile; // User making the request
 }
 
 export interface GroupMember {
@@ -125,13 +135,12 @@ export interface Message {
     media_type?: string;
 }
 
-// Fix: Add missing Notification type.
 // Types for Notifications
 export interface Notification {
     id: string;
     user_id: string; // The user who receives the notification
     actor_id: string; // The user who triggered the notification
-    type: 'new_like' | 'new_comment' | 'new_group_post' | 'new_message' | 'new_follower';
+    type: 'new_like' | 'new_group_like' | 'new_comment' | 'new_group_post' | 'new_message' | 'new_follower' | 'group_join_request' | 'group_member_joined' | 'new_group_comment' | 'new_comment_reply' | 'new_group_comment_reply';
     post_id?: string;
     group_id?: string;
     group_post_id?: string;

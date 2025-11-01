@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
-import { X, Upload, Trash2 } from 'lucide-react';
+import { X, Upload, Trash2, Lock, Globe } from 'lucide-react';
 import { Group } from '../types';
 
 interface EditGroupModalProps {
@@ -14,6 +14,7 @@ interface EditGroupModalProps {
 const EditGroupModal: React.FC<EditGroupModalProps> = ({ group, onClose, onGroupUpdated, onGroupDeleted }) => {
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description || '');
+  const [isPrivate, setIsPrivate] = useState(group.is_private);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(group.avatar_url || null);
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,8 @@ const EditGroupModal: React.FC<EditGroupModalProps> = ({ group, onClose, onGroup
             .update({
                 name,
                 description,
-                avatar_url: avatarUrl
+                avatar_url: avatarUrl,
+                is_private: isPrivate,
             })
             .eq('id', group.id);
         
@@ -118,6 +120,19 @@ const EditGroupModal: React.FC<EditGroupModalProps> = ({ group, onClose, onGroup
             <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="groupDescription">Description</label>
                 <textarea id="groupDescription" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5 resize-none"/>
+            </div>
+            <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2">Confidentialité</label>
+                 <div className="flex rounded-md shadow-sm">
+                    <button type="button" onClick={() => setIsPrivate(false)} className={`relative inline-flex items-center space-x-2 px-4 py-2 rounded-l-md border text-sm font-medium ${!isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                        <Globe size={16} />
+                        <span>Public</span>
+                    </button>
+                    <button type="button" onClick={() => setIsPrivate(true)} className={`relative -ml-px inline-flex items-center space-x-2 px-4 py-2 rounded-r-md border text-sm font-medium ${isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                         <Lock size={16} />
+                         <span>Privé</span>
+                    </button>
+                </div>
             </div>
              <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">Avatar du groupe</label>

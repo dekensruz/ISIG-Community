@@ -12,13 +12,14 @@ import GroupPostDetailModal from './GroupPostDetailModal';
 
 interface GroupPostCardProps {
   post: GroupPost;
+  startWithModalOpen?: boolean;
 }
 
-const GroupPostCard: React.FC<GroupPostCardProps> = ({ post }) => {
+const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen = false }) => {
   const { session } = useAuth();
   const [copied, setCopied] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [showPostDetailModal, setShowPostDetailModal] = useState(false);
+  const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
 
   // Local state for immediate UI updates
   const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes);

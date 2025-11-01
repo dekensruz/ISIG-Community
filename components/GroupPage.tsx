@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Group as GroupType, GroupPost as GroupPostType, GroupMember } from '../types';
+import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest } from '../types';
 import Spinner from './Spinner';
 import GroupPostCard from './GroupPostCard';
-import { Users, LogIn, LogOut, Edit, X } from 'lucide-react';
+import { Users, LogIn, LogOut, Edit, X, Clock, Check } from 'lucide-react';
 import CreateGroupPost from './CreateGroupPost';
 import EditGroupModal from './EditGroupModal';
 import Avatar from './Avatar';
@@ -15,20 +15,27 @@ const GroupPage: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
   const { session } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const openModalPostId = searchParams.get('openModal') === 'true' ? searchParams.get('postId') : null;
   
   const [group, setGroup] = useState<GroupType | null>(null);
   const [posts, setPosts] = useState<GroupPostType[]>([]);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [isMember, setIsMember] = useState(false);
+  const [userRequestStatus, setUserRequestStatus] = useState<'none' | 'pending'>('none');
   
   const [loadingGroup, setLoadingGroup] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   
   const isOwner = session?.user.id === group?.created_by;
+  const isAdmin = members.find(m => m.user_id === session?.user.id)?.role === 'admin';
 
   const fetchGroupData = useCallback(async () => {
     if (!groupId) return;
@@ -51,8 +58,26 @@ const GroupPage: React.FC = () => {
       if (memberError) throw memberError;
       setMembers(memberData as any);
 
-      if (session?.user) {
-        setIsMember(memberData.some((m: any) => m.profiles.id === session.user.id));
+      const currentUserIsMember = memberData.some((m: any) => m.user_id === session?.user.id);
+      setIsMember(currentUserIsMember);
+
+      const currentUserIsAdmin = memberData.find(m => m.user_id === session?.user.id)?.role === 'admin';
+
+      if (currentUserIsAdmin) {
+        const { data: requestsData, error: requestsError } = await supabase
+          .from('group_join_requests')
+          .select('*, profiles(*)')
+          .eq('group_id', groupId);
+        if (requestsError) throw requestsError;
+        setJoinRequests(requestsData as any);
+      } else if (session?.user && !currentUserIsMember) {
+        const { data: requestData, error: requestError } = await supabase
+          .from('group_join_requests')
+          .select('id')
+          .eq('group_id', groupId)
+          .eq('user_id', session.user.id)
+          .single();
+        setUserRequestStatus(requestData ? 'pending' : 'none');
       }
 
     } catch (error: any) {
@@ -85,43 +110,48 @@ const GroupPage: React.FC = () => {
   
   useEffect(() => {
     fetchGroupData();
-    if (isMember) fetchPosts();
+  }, [fetchGroupData]);
 
-    const channelFilter = `group_id=eq.${groupId}`;
-    const postsSubscription = supabase
-      .channel(`public:group_posts:${groupId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_posts', filter: channelFilter }, 
-        () => fetchPosts()
-      ).subscribe();
-      
-    const membersSubscription = supabase
-      .channel(`public:group_members:${groupId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: channelFilter }, 
-        () => fetchGroupData()
-      ).subscribe();
+  useEffect(() => {
+      if (isMember || (group && !group.is_private)) {
+          fetchPosts();
+      }
+  }, [isMember, group, fetchPosts]);
 
-    return () => {
-        supabase.removeChannel(postsSubscription);
-        supabase.removeChannel(membersSubscription);
-    };
+  useEffect(() => {
+    const groupUpdatesChannel = supabase.channel(`public:groups:${groupId}`);
+    groupUpdatesChannel
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${groupId}` }, () => fetchGroupData())
+        .subscribe();
+        
+    return () => { supabase.removeChannel(groupUpdatesChannel) };
+  }, [groupId, fetchGroupData]);
+  
+  const handleJoinAction = async () => {
+    if (!session?.user || !groupId || !group || actionLoading) return;
+    setActionLoading(true);
 
-  }, [groupId, fetchGroupData, fetchPosts, isMember]);
-
-  const handleJoinLeave = async () => {
-    if (!session?.user || !groupId || isOwner) return;
-
-    if (isMember) {
-      const { error } = await supabase
-        .from('group_members')
-        .delete()
-        .match({ group_id: groupId, user_id: session.user.id });
-      if (!error) setIsMember(false);
-    } else {
-      const { error } = await supabase
-        .from('group_members')
-        .insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
-      if (!error) setIsMember(true);
+    if (isMember) { // Leave group
+        const { error } = await supabase.from('group_members').delete().match({ group_id: groupId, user_id: session.user.id });
+        if (!error) {
+            setIsMember(false);
+            fetchGroupData();
+        }
+    } else { // Join or request to join
+        if (group.is_private) {
+            if (userRequestStatus === 'none') {
+                 const { error } = await supabase.from('group_join_requests').insert({ group_id: groupId, user_id: session.user.id });
+                 if (!error) setUserRequestStatus('pending');
+            }
+        } else { // Public group, join directly
+            const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
+            if (!error) {
+                setIsMember(true);
+                fetchGroupData();
+            }
+        }
     }
+    setActionLoading(false);
   };
   
   if (loadingGroup) {
@@ -131,6 +161,25 @@ const GroupPage: React.FC = () => {
   if (!group) {
     return <div className="text-center mt-8 text-xl text-slate-600">Groupe introuvable.</div>;
   }
+  
+  const renderJoinButton = () => {
+    if (isAdmin) {
+        return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-slate-200 text-slate-600 cursor-default" disabled><Check size={18}/><span>Admin</span></button>;
+    }
+    if (isMember) {
+         return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"><LogOut size={18}/><span>Quitter</span></button>;
+    }
+    if (group.is_private) {
+        if (userRequestStatus === 'pending') {
+            return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-slate-200 text-slate-600 cursor-default" disabled><Clock size={18}/><span>Demande envoyée</span></button>;
+        } else {
+            return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-blue text-white hover:bg-blue-600"><LogIn size={18}/><span>Demander à rejoindre</span></button>;
+        }
+    }
+    // Public group and not a member
+    return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-blue text-white hover:bg-blue-600"><LogIn size={18}/><span>Rejoindre</span></button>;
+  };
+  
 
   return (
     <>
@@ -153,7 +202,7 @@ const GroupPage: React.FC = () => {
                     </div>
                 </div>
                  <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
-                    {isOwner && (
+                    {isAdmin && (
                          <button 
                             onClick={() => setShowEditModal(true)} 
                             className="flex items-center space-x-2 font-semibold py-2 px-4 rounded-lg transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -162,20 +211,18 @@ const GroupPage: React.FC = () => {
                             <span>Modifier</span>
                         </button>
                     )}
-                    <button 
-                      onClick={handleJoinLeave}
-                      className={`flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isOwner ? 'bg-slate-200 text-slate-600 cursor-default' : isMember ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-isig-blue text-white hover:bg-blue-600'}`}
-                      disabled={!session || isOwner}
-                      title={isOwner ? "Vous êtes le créateur de ce groupe" : ""}
-                    >
-                      {isMember ? <LogOut size={18}/> : <LogIn size={18}/>}
-                      <span>{isOwner ? 'Admin' : (isMember ? 'Quitter' : 'Rejoindre')}</span>
-                    </button>
+                    {renderJoinButton()}
                 </div>
             </div>
              <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-100">
                 <p className="text-slate-600 flex-1">{group.description}</p>
-                <button onClick={() => setShowMembersModal(true)} className="flex items-center space-x-3 text-left p-2 rounded-lg hover:bg-slate-100 self-start md:self-end">
+                <button onClick={() => setShowMembersModal(true)} className="relative flex items-center space-x-3 text-left p-2 rounded-lg hover:bg-slate-100 self-start md:self-end">
+                    {isAdmin && joinRequests.length > 0 && 
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-isig-orange opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-isig-orange text-white text-xs items-center justify-center">{joinRequests.length}</span>
+                        </span>
+                    }
                     <div className="flex -space-x-3">
                         {members.slice(0, 3).map(member => (
                            <Avatar key={member.user_id} avatarUrl={member.profiles.avatar_url} name={member.profiles.full_name} size="sm" className="ring-2 ring-white" />
@@ -183,7 +230,11 @@ const GroupPage: React.FC = () => {
                     </div>
                     <div className="text-sm">
                         <p className="font-semibold text-slate-700">{members.length} Membre{members.length > 1 ? 's' : ''}</p>
-                        <p className="text-slate-500">Voir tout</p>
+                        {isAdmin ? (
+                            <p className="text-isig-blue font-semibold">Gérer</p>
+                        ) : (
+                            <p className="text-slate-500">Voir tout</p>
+                        )}
                     </div>
                 </button>
              </div>
@@ -191,23 +242,25 @@ const GroupPage: React.FC = () => {
       </div>
       
         <div className="space-y-6">
-            {isMember ? (
-                <CreateGroupPost groupId={groupId!} onPostCreated={fetchPosts} />
+            {isMember || !group.is_private ? (
+                <>
+                    {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={fetchPosts} />}
+                    {loadingPosts ? (
+                        <div className="flex justify-center"><Spinner /></div>
+                    ) : posts.length > 0 ? (
+                        posts.map(post => <GroupPostCard key={post.id} post={post} startWithModalOpen={post.id === openModalPostId} />)
+                    ) : (
+                        <div className="bg-white text-center p-8 rounded-xl shadow-sm border border-slate-200">
+                            <p className="text-slate-500">Aucune publication dans ce groupe pour le moment.</p>
+                        </div>
+                    )}
+                </>
             ) : (
                 <div className="bg-white text-center p-8 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-slate-600">Rejoignez le groupe pour voir les publications et participer.</p>
+                    <h3 className="text-xl font-bold text-slate-700">Ceci est un groupe privé</h3>
+                    <p className="text-slate-600 mt-2">Demandez à rejoindre le groupe pour voir les publications et participer.</p>
                 </div>
             )}
-          
-            {loadingPosts ? (
-                <div className="flex justify-center"><Spinner /></div>
-            ) : isMember && posts.length > 0 ? (
-                posts.map(post => <GroupPostCard key={post.id} post={post} />)
-            ) : isMember ? (
-                <div className="bg-white text-center p-8 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-slate-500">Aucune publication dans ce groupe pour le moment.</p>
-                </div>
-            ) : null}
         </div>
     </div>
     
@@ -223,8 +276,9 @@ const GroupPage: React.FC = () => {
     {showMembersModal && (
         <GroupMembersModal
             group={group}
-            members={members}
-            isOwner={isOwner}
+            initialMembers={members}
+            initialRequests={joinRequests}
+            isAdmin={isAdmin}
             onClose={() => setShowMembersModal(false)}
             onMembersUpdate={fetchGroupData}
         />

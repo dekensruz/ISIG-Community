@@ -13,15 +13,16 @@ import Avatar from './Avatar';
 
 interface PostProps {
   post: PostType;
+  startWithModalOpen?: boolean;
 }
 
-const PostCard: React.FC<PostProps> = ({ post }) => {
+const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => {
   const { session } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [showPostDetailModal, setShowPostDetailModal] = useState(false);
+  const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [copied, setCopied] = useState(false);
 
   // Local state for immediate UI updates

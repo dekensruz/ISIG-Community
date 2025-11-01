@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import Spinner from './Spinner';
-import { X, Upload } from 'lucide-react';
+import { X, Upload, Lock, Globe } from 'lucide-react';
 
 interface CreateGroupModalProps {
   onClose: () => void;
@@ -13,6 +13,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
   const { session } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +73,8 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
                 name,
                 description,
                 created_by: session.user.id,
-                avatar_url: avatarUrl
+                avatar_url: avatarUrl,
+                is_private: isPrivate,
             })
             .select()
             .single();
@@ -136,6 +138,20 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
                     rows={3}
                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5 resize-none"
                 />
+            </div>
+            <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2">Confidentialité</label>
+                <div className="flex rounded-md shadow-sm">
+                    <button type="button" onClick={() => setIsPrivate(false)} className={`relative inline-flex items-center space-x-2 px-4 py-2 rounded-l-md border text-sm font-medium ${!isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                        <Globe size={16} />
+                        <span>Public</span>
+                    </button>
+                    <button type="button" onClick={() => setIsPrivate(true)} className={`relative -ml-px inline-flex items-center space-x-2 px-4 py-2 rounded-r-md border text-sm font-medium ${isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                         <Lock size={16} />
+                         <span>Privé</span>
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{isPrivate ? "Les membres doivent être approuvés par un admin." : "Tout le monde peut rejoindre ce groupe."}</p>
             </div>
              <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">

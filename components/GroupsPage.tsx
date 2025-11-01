@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { Group } from '../types';
 import { Link } from 'react-router-dom';
 import Spinner from './Spinner';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Lock } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import Avatar from './Avatar';
 
@@ -75,7 +75,10 @@ const GroupsPage: React.FC = () => {
                 <div className="flex items-center space-x-4 mb-3">
                     <Avatar avatarUrl={group.avatar_url} name={group.name} shape="square" size="xl" />
                     <div>
-                        <h2 className="text-lg font-bold text-slate-800">{group.name}</h2>
+                        <h2 className="text-lg font-bold text-slate-800 flex items-center">
+                          {group.name}
+                          {group.is_private && <Lock size={14} className="ml-2 text-slate-400" />}
+                        </h2>
                         <p className="text-sm text-slate-500 flex items-center"><Users size={14} className="mr-1" /> {group.group_members.length} membres</p>
                     </div>
                 </div>

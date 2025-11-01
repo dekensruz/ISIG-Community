@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { useAuth, useSearchFilter } from '../App';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Profile } from '../types';
-import { User, LogOut, Settings, Search, Filter, X, Users as UsersIcon, FileText, ArrowLeft } from 'lucide-react';
+import { User, LogOut, Settings, Search, Filter, X, Users as UsersIcon, FileText, ArrowLeft, Bell } from 'lucide-react';
 import Avatar from './Avatar';
 import Spinner from './Spinner';
 
@@ -20,6 +20,9 @@ const Navbar: React.FC = () => {
   const [areFiltersOpen, setAreFiltersOpen] = useState(false);
 
   const { searchQuery, setSearchQuery, filterType, setFilterType, sortOrder, setSortOrder, isSearchActive, setIsSearchActive } = useSearchFilter();
+  
+  // State for notifications
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   type Suggestion = {
       id: string;
@@ -43,21 +46,18 @@ const Navbar: React.FC = () => {
 
   const isFeedPage = location.pathname === '/';
   
-  // Reset search state on major navigation changes, unless we are in an active search flow
   useEffect(() => {
     if (!location.pathname.startsWith('/search') && !location.pathname.startsWith('/profile/') && !location.pathname.startsWith('/group/') && !location.pathname.startsWith('/post/')) {
       setIsSearchActive(false);
     }
-    // Close dropdowns on any navigation
     setAreFiltersOpen(false);
     setDropdownOpen(false);
-    setShowSuggestions(false); // Hide suggestions on navigation
-    setIsSearchOpenOnFeed(false); // Close search bar on feed page when navigating
+    setShowSuggestions(false);
+    setIsSearchOpenOnFeed(false);
   }, [location.pathname, setIsSearchActive]);
 
 
   useEffect(() => {
-    // Debounce search suggestions
     const handler = setTimeout(async () => {
         if (searchQuery.trim().length > 1 && showSuggestions) {
             setSuggestionsLoading(true);
@@ -88,21 +88,15 @@ const Navbar: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         const target = event.target as Node;
-        if (dropdownRef.current && !dropdownRef.current.contains(target)) {
-            setDropdownOpen(false);
-        }
-        if (filterRef.current && !filterRef.current.contains(target)) {
-            setAreFiltersOpen(false);
-        }
+        if (dropdownRef.current && !dropdownRef.current.contains(target)) setDropdownOpen(false);
+        if (filterRef.current && !filterRef.current.contains(target)) setAreFiltersOpen(false);
 
         const clickedOnSearchToggle = searchToggleRef.current?.contains(target);
         const clickedInsideSearchContainer = searchContainerRef.current?.contains(target);
 
         if (!clickedOnSearchToggle && !clickedInsideSearchContainer) {
             setShowSuggestions(false);
-            if (isFeedPage && !isSearchActive) {
-                setIsSearchOpenOnFeed(false);
-            }
+            if (isFeedPage && !isSearchActive) setIsSearchOpenOnFeed(false);
         }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -114,12 +108,53 @@ const Navbar: React.FC = () => {
         searchInputRef.current?.focus();
     }
   }, [isSearchOpenOnFeed, isSearchActive]);
+  
+  useEffect(() => {
+    if (!session?.user) {
+        setUnreadNotificationsCount(0);
+        return;
+    }
+
+    const fetchUnreadCount = async () => {
+        const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', session.user.id)
+            .eq('is_read', false);
+        
+        if (error) {
+            console.error("Error fetching notifications count:", error.message);
+        } else {
+            setUnreadNotificationsCount(count || 0);
+        }
+    };
+
+
+    fetchUnreadCount();
+
+    const channel = supabase
+        .channel(`public:notifications:navbar:${session.user.id}`)
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${session.user.id}`
+        }, () => {
+            fetchUnreadCount();
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, [session]);
+
 
   const getProfile = async () => {
     if (!session?.user) return;
     try {
       const { data, error } = await supabase.from('profiles').select(`*`).eq('id', session.user.id).single();
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116: 0 rows
+      if (error && error.code !== 'PGRST116') throw error;
       if (data) setProfile(data);
     } catch (error: any) {
       console.error('Erreur de chargement du profil:', error.message);
@@ -135,7 +170,6 @@ const Navbar: React.FC = () => {
         setShowSuggestions(false);
         setIsSearchActive(true);
         setSuggestions([]);
-        // Do not clear searchQuery here
     };
 
     const handleSearchSubmit = (e?: React.FormEvent) => {
@@ -252,15 +286,31 @@ const Navbar: React.FC = () => {
                  )}
 
                 {session && profile && (
-                    <div className="relative" ref={dropdownRef}>
-                      <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center p-1 rounded-full hover:bg-slate-100"><Avatar avatarUrl={profile.avatar_url} name={profile.full_name} /></button>
-                      {dropdownOpen && (<div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-slate-100">
-                          <Link to={`/profile/${session?.user.id}`} className="flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><User size={16} className="mr-2"/>Mon Profil</Link>
-                          <a href="#" className="flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><Settings size={16} className="mr-2"/>Paramètres</a>
-                          <div className="border-t my-1"></div>
-                          <button onClick={handleSignOut} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"><LogOut size={16} className="mr-2"/>Se déconnecter</button>
-                      </div>)}
-                    </div>
+                    <>
+                        <Link
+                            to="/notifications"
+                            className="relative p-2 rounded-full hover:bg-slate-100 text-slate-600"
+                            aria-label="Notifications"
+                        >
+                            <Bell size={24} />
+                            {unreadNotificationsCount > 0 && (
+                                <span className="absolute top-1 right-1 flex h-4 w-4">
+                                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-white text-[10px] items-center justify-center">
+                                        {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                                    </span>
+                                </span>
+                            )}
+                        </Link>
+                        <div className="relative" ref={dropdownRef}>
+                          <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center p-1 rounded-full hover:bg-slate-100"><Avatar avatarUrl={profile.avatar_url} name={profile.full_name} /></button>
+                          {dropdownOpen && (<div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-slate-100">
+                              <Link to={`/profile/${session?.user.id}`} className="flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><User size={16} className="mr-2"/>Mon Profil</Link>
+                              <a href="#" className="flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><Settings size={16} className="mr-2"/>Paramètres</a>
+                              <div className="border-t my-1"></div>
+                              <button onClick={handleSignOut} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"><LogOut size={16} className="mr-2"/>Se déconnecter</button>
+                          </div>)}
+                        </div>
+                    </>
                 )}
             </div>
           </div>

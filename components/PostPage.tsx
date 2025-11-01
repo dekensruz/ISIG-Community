@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Post as PostType } from '../types';
 import PostCard from './Post';
@@ -10,6 +10,9 @@ const PostPage: React.FC = () => {
   const [post, setPost] = useState<PostType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  const openModal = searchParams.get('openModal') === 'true';
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -67,7 +70,7 @@ const PostPage: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto">
       {post ? (
-        <PostCard post={post} />
+        <PostCard post={post} startWithModalOpen={openModal} />
       ) : (
         <p>Publication introuvable.</p>
       )}

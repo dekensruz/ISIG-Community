@@ -1,0 +1,7 @@
+{
+  "name": "ISIG Community",
+  "description": "An intelligent academic social network for students of ISIG Goma to foster collaboration, knowledge sharing, and project creation. Features an AI-powered assistant for suggestions and summaries.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

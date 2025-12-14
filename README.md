@@ -1,1 +1,1 @@
-Réseau Social Intelligent de l'ISIG-Goma
+Un réseau social intelligent conçu pour les étudiants de l'ISIG Goma qui grâce à l'IA peut permettre aux étudiants partageant les même centres d'intérêt de se joindre et les étudiants cherchant une révision peuvent trouver un étudiant adapté à leurs besoins

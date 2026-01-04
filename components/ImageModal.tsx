@@ -78,11 +78,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ post, onClose, onOpenComments }
 
   return (
     <div 
-      className="fixed inset-0 w-screen h-screen bg-black/95 z-50 flex justify-center items-center backdrop-blur-md"
+      className="fixed inset-0 w-full h-full bg-black/95 z-[100] flex justify-center items-center backdrop-blur-md"
       onClick={handleBackdropClick}
     >
         <button 
-            className="absolute top-6 right-6 text-white/50 hover:text-white z-[60] bg-white/10 p-3 rounded-full transition-all"
+            className="absolute top-6 right-6 text-white/50 hover:text-white z-[110] bg-white/10 p-3 rounded-full transition-all"
             onClick={onClose}
         >
             <X size={24} />
@@ -100,7 +100,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ post, onClose, onOpenComments }
                 />
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 px-6 pt-12 pb-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+            <div className="absolute bottom-0 left-0 right-0 px-6 pt-12 pb-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
                 <div className="w-full max-w-3xl mx-auto text-white">
                     {post.content && (
                         <p className="mb-6 text-white/90 text-base font-medium leading-relaxed line-clamp-3">

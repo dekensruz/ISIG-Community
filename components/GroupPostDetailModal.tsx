@@ -224,7 +224,11 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                         onChange={(e) => setNewComment(e.target.value)}
                         className="flex-1 bg-slate-50 p-4 border border-slate-100 rounded-[1.5rem] focus:outline-none focus:ring-2 focus:ring-isig-blue text-sm font-medium transition-all"
                     />
-                    <button type="submit" disabled={isPostingComment || !newComment.trim()} className="bg-isig-blue text-white w-12 h-12 flex items-center justify-center rounded-2xl shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 shrink-0">
+                    <button 
+                        type="submit" 
+                        disabled={isPostingComment || !newComment.trim()} 
+                        className="bg-isig-blue text-white w-12 h-12 flex items-center justify-center rounded-2xl shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                    >
                         {isPostingComment ? <Spinner /> : <Send size={20} className="text-white" />}
                     </button>
                 </form>

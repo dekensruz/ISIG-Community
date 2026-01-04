@@ -4,15 +4,29 @@ import { Profile } from '../types';
 
 export const summarizeText = async (text: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Résume le texte suivant pour un étudiant universitaire. Sois concis et souligne les points clés :\n\n---\n\n${text}`,
+        contents: `Tu es un assistant académique pour les étudiants de l'ISIG Goma. Résume le texte suivant de manière structurée avec des puces. Sois concis et professionnel :\n\n---\n\n${text}`,
     });
     return response.text || "Résumé indisponible.";
   } catch (error) {
     console.error("Error summarizing text:", error);
     return "Impossible de générer un résumé pour le moment.";
+  }
+};
+
+export const improveAcademicPost = async (text: string): Promise<string> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Reformule ce brouillon de publication pour un réseau social académique (ISIG Community). Rends-le plus clair, professionnel et engageant pour des étudiants, tout en gardant le même sens. Propose aussi 3 hashtags pertinents à la fin :\n\n"${text}"`,
+    });
+    return response.text || text;
+  } catch (error) {
+    console.error("Error improving post:", error);
+    return text;
   }
 };
 
@@ -22,7 +36,6 @@ export interface SuggestionResult {
 }
 
 export const suggestPartners = async (query: string, currentUser: Profile, allUsers: Profile[]): Promise<SuggestionResult[]> => {
-    // On filtre pour ne pas se suggérer soi-même et s'assurer que les profils ont des infos
     const otherUsers = allUsers.filter(u => u.id !== currentUser.id);
     
     const userProfilesPrompt = otherUsers.map(user => 
@@ -34,23 +47,21 @@ export const suggestPartners = async (query: string, currentUser: Profile, allUs
         
         REQUÊTE DE L'ÉTUDIANT : "${query}"
         
-        LISTE DES ÉTUDIANTS (Priorité aux compétences/skills) :
+        LISTE DES ÉTUDIANTS :
         ${userProfilesPrompt}
 
         INSTRUCTIONS :
-        1. Analyse les mots-clés de la requête (ex: "Python", "Design", "Compta").
-        2. Compare ces mots-clés principalement avec la liste des "Compétences" de chaque étudiant.
-        3. Sois flexible : si quelqu'un cherche "Java", suggère aussi les profils "Android" ou "Backend" si pertinent.
-        4. Sélectionne les 3 meilleurs profils. 
-        5. Si AUCUN profil ne correspond vraiment, essaie quand même de trouver les plus proches ou ceux avec les compétences les plus larges.
+        1. Analyse les besoins de la requête.
+        2. Sélectionne les 3 meilleurs profils basés sur les compétences.
+        3. Explique pourquoi chaque profil est pertinent.
         
-        Réponds UNIQUEMENT sous forme d'un tableau JSON d'objets avec "userId" et "reason".
+        Réponds UNIQUEMENT en JSON (tableau d'objets avec "userId" et "reason").
     `;
     
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",

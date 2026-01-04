@@ -12,8 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // Polyfill vital pour éviter la page blanche et supporter VITE_API_KEY
-      window.process = { env: { API_KEY: '', VITE_API_KEY: '' } };
+      // Polyfill sécurisé : on n'écrase que si process.env n'existe pas déjà
+      window.process = window.process || { env: {} };
+      window.process.env = window.process.env || {};
       
       tailwind.config = {
         theme: {

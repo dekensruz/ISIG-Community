@@ -149,12 +149,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}`}, (payload) => {
             if (payload.eventType === 'INSERT') {
                 const msg = payload.new as Message;
-                // On récupère le profil pour l'affichage (car l'INSERT simple ne contient pas la jointure)
+                // Si le message est déjà présent via mise à jour optimiste, on l'ignore ou on le met à jour
                 supabase.from('profiles').select('*').eq('id', msg.sender_id).single().then(({data}) => {
                     if(data) {
                         setMessages(prev => {
-                            // Éviter les doublons si l'état local a déjà été mis à jour
-                            if (prev.some(m => m.id === msg.id)) return prev;
+                            const exists = prev.some(m => m.id === msg.id || (m.sender_id === msg.sender_id && m.created_at === msg.created_at));
+                            if (exists) {
+                                return prev.map(m => (m.sender_id === msg.sender_id && m.created_at === msg.created_at) ? { ...msg, profiles: data } : m);
+                            }
                             return [...prev, {...msg, profiles: data}];
                         });
                     }
@@ -183,9 +185,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         return;
     }
     
-    setIsUploading(true);
+    const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
+    // Mise à jour optimiste
+    const optimisticMsg: Message = {
+        id: `temp-${Date.now()}`,
+        conversation_id: conversationId,
+        sender_id: session.user.id,
+        content: content,
+        created_at: new Date().toISOString(),
+        profiles: otherParticipant as any, // On utilise n'importe quel profil pour éviter le crash visuel
+        replying_to_message_id: replyingToMessage?.id,
+        is_read: false
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setNewMessage('');
+    removeFile();
+    setReplyingToMessage(null);
+    scrollToBottom();
+
+    setIsUploading(true);
     try {
         let mediaUrl, mediaType;
         if (mediaFile) {
@@ -197,15 +217,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             mediaType = mediaFile.type;
         }
 
-        const msgData = { conversation_id: conversationId, sender_id: session.user.id, content: newMessage, media_url: mediaUrl, media_type: mediaType, replying_to_message_id: replyingToMessage?.id };
+        const msgData = { conversation_id: conversationId, sender_id: session.user.id, content: content, media_url: mediaUrl, media_type: mediaType, replying_to_message_id: optimisticMsg.replying_to_message_id };
         const { error } = await supabase.from('messages').insert(msgData);
         if (error) throw error;
-
-        setNewMessage('');
-        removeFile();
-        setReplyingToMessage(null);
     } catch (err: any) {
-        alert(err.message);
+        // En cas d'erreur, on retire le message optimiste
+        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        alert("Échec de l'envoi : " + err.message);
     } finally {
         setIsUploading(false);
     }
@@ -317,7 +335,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                     <div className="flex-1 relative">
                         <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Écrire..." className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-6 py-4 focus:ring-2 focus:ring-isig-blue outline-none transition-all font-medium text-slate-700" />
                     </div>
-                    {newMessage.trim() || file ? (
+                    {(newMessage.trim() || file) ? (
                          <button type="submit" disabled={isUploading} className="bg-isig-blue text-white w-14 h-14 flex items-center justify-center rounded-[1.5rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
                             {isUploading ? <Spinner /> : <Send size={24} />}
                         </button>

@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Profile } from '../types';
 
+// Configuration de l'API Key compatible avec Vercel/Vite et le SDK
+const getApiKey = () => {
+    return process.env.API_KEY || (process.env as any).VITE_API_KEY;
+};
+
 export const summarizeText = async (text: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Tu es un assistant académique pour les étudiants de l'ISIG Goma. Résume le texte suivant de manière structurée avec des puces. Sois concis et professionnel :\n\n---\n\n${text}`,
@@ -18,7 +23,7 @@ export const summarizeText = async (text: string): Promise<string> => {
 
 export const improveAcademicPost = async (text: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Reformule ce brouillon de publication pour un réseau social académique (ISIG Community). Rends-le plus clair, professionnel et engageant pour des étudiants, tout en gardant le même sens. Propose aussi 3 hashtags pertinents à la fin :\n\n"${text}"`,
@@ -59,7 +64,7 @@ export const suggestPartners = async (query: string, currentUser: Profile, allUs
     `;
     
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { GroupPost, GroupPostLike } from '../types';
 import { useAuth } from '../App';
@@ -15,6 +16,7 @@ const GroupImageModal: React.FC<GroupImageModalProps> = ({ post, onClose, onOpen
   const { session } = useAuth();
   const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes);
   const modalContentRef = useRef<HTMLDivElement>(null);
+  const modalRoot = document.getElementById('modal-root');
 
   const renderContentWithLinks = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -35,14 +37,13 @@ const GroupImageModal: React.FC<GroupImageModalProps> = ({ post, onClose, onOpen
   }, [post.group_post_likes]);
 
   useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = originalStyle;
+      document.body.style.overflow = 'auto';
     };
   }, []);
 
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleBackdropClick = (e: React.MouseEvent) => {
     if (modalContentRef.current && !modalContentRef.current.contains(e.target as Node)) {
       onClose();
     }
@@ -70,58 +71,53 @@ const GroupImageModal: React.FC<GroupImageModalProps> = ({ post, onClose, onOpen
     }
   };
 
-  const handleCommentClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onClose(); // Fermer l'image pour voir le modal de commentaire
-      onOpenComments();
-  };
+  if (!modalRoot) return null;
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 w-screen h-screen bg-black/95 z-50 flex justify-center items-center backdrop-blur-md"
+      className="fixed inset-0 w-full h-full bg-brand-dark/95 z-[999] flex justify-center items-center backdrop-blur-xl animate-fade-in"
       onClick={handleBackdropClick}
     >
         <button 
-            className="absolute top-6 right-6 text-white/50 hover:text-white z-[60] bg-white/10 p-3 rounded-full transition-all"
+            className="absolute top-6 right-6 text-white/50 hover:text-white z-[1000] bg-white/10 p-3 rounded-full transition-all"
             onClick={onClose}
         >
-            <X size={24} />
+            <X size={28} />
         </button>
 
         <div 
           ref={modalContentRef} 
-          className="relative w-full h-full flex flex-col items-center justify-center animate-fade-in-up"
+          className="relative w-full h-full flex flex-col items-center justify-center p-4 sm:p-10"
         >
-            <div className="flex-1 flex items-center justify-center h-full w-full p-4 sm:p-10">
+            <div className="flex-1 flex items-center justify-center w-full h-full">
                <img 
                     src={post.media_url} 
                     alt="Group view" 
-                    className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl shadow-black/50"
+                    className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
                 />
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 px-6 pt-12 pb-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                <div className="w-full max-w-3xl mx-auto text-white">
-                    {post.content && <p className="mb-6 text-white/90 text-base font-medium leading-relaxed line-clamp-3">{renderContentWithLinks(post.content)}</p>}
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center space-x-6 text-white/70">
-                            <button onClick={handleLike} className={`flex items-center space-x-2 transition-all hover:text-white ${userHasLiked ? 'text-isig-orange' : ''}`}>
-                                <Heart size={26} fill={userHasLiked ? '#FF8C00' : 'none'}/>
-                                <span className="font-black text-lg">{likes.length}</span>
-                            </button>
-                            <button onClick={handleCommentClick} className="flex items-center space-x-2 transition-all hover:text-white">
-                                <MessageCircle size={26} />
-                                <span className="font-black text-lg">{post.group_post_comments.length}</span>
-                            </button>
-                        </div>
-                        <button className="p-3 bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all">
-                            <Share2 size={24} />
+            <div className="w-full max-w-4xl mx-auto mt-6 text-white">
+                {post.content && <p className="mb-6 text-white/90 text-sm sm:text-base font-medium line-clamp-2">{renderContentWithLinks(post.content)}</p>}
+                <div className="flex justify-between items-center pb-8 sm:pb-0">
+                    <div className="flex items-center space-x-6 text-white/70">
+                        <button onClick={handleLike} className={`flex items-center space-x-2 transition-all hover:text-white ${userHasLiked ? 'text-isig-orange' : ''}`}>
+                            <Heart size={26} fill={userHasLiked ? '#FF8C00' : 'none'}/>
+                            <span className="font-black text-lg">{likes.length}</span>
+                        </button>
+                        <button onClick={() => { onClose(); onOpenComments(); }} className="flex items-center space-x-2 transition-all hover:text-white">
+                            <MessageCircle size={26} />
+                            <span className="font-black text-lg">{post.group_post_comments.length}</span>
                         </button>
                     </div>
+                    <button className="p-3 bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all">
+                        <Share2 size={24} />
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
+    </div>,
+    modalRoot
   );
 };
 

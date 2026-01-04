@@ -57,9 +57,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const visualizerFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [presenceStatus, setPresenceStatus] = useState<string>('');
@@ -152,12 +149,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}`}, (payload) => {
             if (payload.eventType === 'INSERT') {
                 const msg = payload.new as Message;
-                if (msg.sender_id !== session?.user.id) {
-                    supabase.from('profiles').select('*').eq('id', msg.sender_id).single().then(({data}) => {
-                         if(data) setMessages(prev => [...prev, {...msg, profiles: data}]);
-                    });
-                    markMessagesAsRead();
-                }
+                // On récupère le profil pour l'affichage (car l'INSERT simple ne contient pas la jointure)
+                supabase.from('profiles').select('*').eq('id', msg.sender_id).single().then(({data}) => {
+                    if(data) {
+                        setMessages(prev => {
+                            // Éviter les doublons si l'état local a déjà été mis à jour
+                            if (prev.some(m => m.id === msg.id)) return prev;
+                            return [...prev, {...msg, profiles: data}];
+                        });
+                    }
+                });
+                if (msg.sender_id !== session?.user.id) markMessagesAsRead();
             } else if (payload.eventType === 'UPDATE') {
                 setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
             } else if (payload.eventType === 'DELETE') {
@@ -210,7 +212,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   };
 
   const cleanupRecording = useCallback(() => {
-    if (visualizerFrameRef.current) cancelAnimationFrame(visualizerFrameRef.current);
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     setRecordingTime(0);
@@ -220,10 +221,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
         mediaRecorderRef.current = new MediaRecorder(stream);
         audioChunksRef.current = [];
         mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);

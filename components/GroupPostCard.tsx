@@ -73,6 +73,27 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     }
   };
 
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/#/group/${post.group_id}?postId=${post.id}&openModal=true`;
+    const shareData = {
+        title: `Post de ${post.profiles.full_name} dans un groupe ISIG`,
+        text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+        url: shareUrl,
+    };
+
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    } catch (err) {
+        console.error("Erreur de partage:", err);
+    }
+  };
+
   const handleDelete = async () => {
     if (window.confirm("Voulez-vous vraiment supprimer cette publication du groupe ?")) {
       const { error } = await supabase.from('group_posts').delete().eq('id', post.id);
@@ -176,11 +197,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           </button>
         </div>
         
-        <button onClick={() => {
-           navigator.clipboard.writeText(`${window.location.origin}/#/group/${post.group_id}`);
-           setCopied(true);
-           setTimeout(() => setCopied(false), 2000);
-        }} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all relative flex-shrink-0">
+        <button onClick={handleShare} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all relative flex-shrink-0">
            <Share2 size={20} />
            {copied && <span className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-slate-800 text-white text-[10px] rounded-lg font-bold shadow-xl">Lien copié</span>}
         </button>

@@ -39,7 +39,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
       const likerIds = likes.slice(0, 3).map(l => l.user_id);
       const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
       if (data) {
-        // Garder l'ordre original des likes pour les avatars
         const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
         setLikerProfiles(sorted);
       }
@@ -69,6 +68,26 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
       const tempLike = { id: Math.random().toString(), post_id: post.id, user_id: session.user.id };
       setLikes(prev => [tempLike as any, ...prev]);
       await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id });
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/#/post/${post.id}`;
+    const shareData = {
+        title: `Publication de ${post.profiles.full_name} sur ISIG Community`,
+        text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+        url: shareUrl,
+    };
+
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+            await navigator.clipboard.writeText(shareUrl);
+            alert("Lien copié dans le presse-papier !");
+        }
+    } catch (err) {
+        console.error("Erreur de partage:", err);
     }
   };
 
@@ -189,7 +208,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
           </button>
         </div>
 
-        <button className="flex items-center space-x-2 px-4 py-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
+        <button onClick={handleShare} className="flex items-center space-x-2 px-4 py-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
             <Share2 size={22} />
         </button>
       </div>

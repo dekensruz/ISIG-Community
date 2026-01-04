@@ -74,7 +74,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/#/group/${post.group_id}?postId=${post.id}&openModal=true`;
+    const shareUrl = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
     const shareData = {
         title: `Post de ${post.profiles.full_name} dans un groupe ISIG`,
         text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),

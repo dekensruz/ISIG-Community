@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
@@ -5,7 +6,7 @@ import AuthPage from './components/Auth';
 import Feed from './components/Feed';
 import Navbar from './components/Navbar';
 import Profile from './components/Profile';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Spinner from './components/Spinner';
 import PostPage from './components/PostPage';
 import GroupsPage from './components/GroupsPage';
@@ -17,7 +18,7 @@ import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import SearchResultsPage from './components/SearchResultsPage';
 import NotificationsPage from './components/NotificationsPage';
-import NotificationsProvider from './components/NotificationsProvider'; // Ajouté
+import NotificationsProvider from './components/NotificationsProvider';
 
 type AuthContextType = {
   session: Session | null;
@@ -36,8 +37,8 @@ type SearchFilterContextType = {
   setFilterType: React.Dispatch<React.SetStateAction<string>>;
   sortOrder: string;
   setSortOrder: React.Dispatch<React.SetStateAction<string>>;
-  isSearchActive: boolean; // Nouveau
-  setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>; // Nouveau
+  isSearchActive: boolean;
+  setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export const SearchFilterContext = createContext<SearchFilterContextType | undefined>(undefined);
@@ -53,7 +54,7 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('all');
     const [sortOrder, setSortOrder] = useState('desc');
-    const [isSearchActive, setIsSearchActive] = useState(false); // Nouveau
+    const [isSearchActive, setIsSearchActive] = useState(false);
 
     return (
         <SearchFilterContext.Provider value={{ searchQuery, setSearchQuery, filterType, setFilterType, sortOrder, setSortOrder, isSearchActive, setIsSearchActive }}>
@@ -75,10 +76,10 @@ const AppContent: React.FC = () => {
             {!isAuthPage && <Navbar />}
             <main className={
                 isAuthPage
-                ? "" // La page d'authentification gère sa propre mise en page
+                ? "" 
                 : isChatPage
-                ? "h-screen pt-[60px] pb-[80px]" // Mise en page pleine hauteur pour le chat
-                : "container mx-auto px-4 pt-24 pb-24" // Mise en page avec padding pour les autres pages
+                ? "h-screen pt-[60px] pb-[80px]" 
+                : "container mx-auto px-4 pt-24 pb-24" 
             }>
                 <Routes>
                     <Route path="/" element={<Feed />} />
@@ -91,7 +92,7 @@ const AppContent: React.FC = () => {
                     <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
                     <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
                     <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
-                    <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} /> {/* Nouveau */}
+                    <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
             </main>
@@ -128,7 +129,7 @@ const App: React.FC = () => {
 
   return (
     <AuthContext.Provider value={{ session, loading }}>
-        <HashRouter>
+        <BrowserRouter>
             <SearchFilterProvider>
                 <UnreadMessagesProvider>
                     <NotificationsProvider>
@@ -136,7 +137,7 @@ const App: React.FC = () => {
                     </NotificationsProvider>
                 </UnreadMessagesProvider>
             </SearchFilterProvider>
-        </HashRouter>
+        </BrowserRouter>
     </AuthContext.Provider>
   );
 };

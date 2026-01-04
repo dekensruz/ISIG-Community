@@ -12,7 +12,6 @@ import PostDetailModal from './PostDetailModal';
 import Avatar from './Avatar';
 import LikerListModal from './LikerListModal';
 import EditPostModal from './EditPostModal';
-// Add missing Spinner import
 import Spinner from './Spinner';
 
 interface PostProps {
@@ -75,7 +74,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/#/post/${post.id}`;
+    const shareUrl = `${window.location.origin}/post/${post.id}`;
     const shareData = {
         title: `Publication de ${post.profiles.full_name} sur ISIG Community`,
         text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
@@ -166,7 +165,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
         <div className="px-6 pb-6">
            {post.media_type === 'image' ? (
              <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative group/media ring-1 ring-slate-100">
-               {/* Skeleton / Placeholder while loading */}
                {!imageLoaded && <div className="absolute inset-0 bg-slate-100 animate-pulse-soft flex items-center justify-center"><Spinner /></div>}
                <img 
                  src={post.media_url} 

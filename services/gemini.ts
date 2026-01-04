@@ -1,13 +1,10 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Profile } from '../types';
-
-// Utilisation d'une fonction pour initialiser l'IA au besoin, évitant les crashs au chargement du module
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 export const summarizeText = async (text: string): Promise<string> => {
   try {
-    const ai = getAI();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Résume le texte suivant pour un étudiant universitaire. Sois concis et souligne les points clés :\n\n---\n\n${text}`,
@@ -19,36 +16,62 @@ export const summarizeText = async (text: string): Promise<string> => {
   }
 };
 
-export const suggestPartners = async (currentUser: Profile, allUsers: Profile[]): Promise<string> => {
+export interface SuggestionResult {
+    userId: string;
+    reason: string;
+}
+
+export const suggestPartners = async (query: string, currentUser: Profile, allUsers: Profile[]): Promise<SuggestionResult[]> => {
+    // On filtre pour ne pas se suggérer soi-même et s'assurer que les profils ont des infos
     const otherUsers = allUsers.filter(u => u.id !== currentUser.id);
+    
     const userProfilesPrompt = otherUsers.map(user => 
-        `Utilisateur: ${user.full_name}, Filière: ${user.major || 'N/A'}, Compétences: ${(user.skills || []).join(', ') || 'N/A'}`
+        `ID: ${user.id}, Nom: ${user.full_name}, Compétences: ${(user.skills || []).join(', ')}, Bio: ${user.bio || 'N/A'}`
     ).join('\n');
 
     const prompt = `
-        Tu es un assistant IA pour le réseau ISIG Community. Suggère 2-3 partenaires de projet pour cet étudiant.
+        Tu es l'expert en mise en relation d'ISIG Community.
         
-        Profil de l'utilisateur actuel :
-        Nom : ${currentUser.full_name}
-        Filière : ${currentUser.major || 'N/A'}
-        Compétences : ${(currentUser.skills || []).join(', ') || 'N/A'}
-
-        Liste des autres étudiants :
+        REQUÊTE DE L'ÉTUDIANT : "${query}"
+        
+        LISTE DES ÉTUDIANTS (Priorité aux compétences/skills) :
         ${userProfilesPrompt}
 
-        Explique brièvement pourquoi chaque personne est un bon match (compétences complémentaires, même filière, etc.). 
-        Formatte ta réponse en HTML simple (utilisant <p>, <strong>, <br/>).
+        INSTRUCTIONS :
+        1. Analyse les mots-clés de la requête (ex: "Python", "Design", "Compta").
+        2. Compare ces mots-clés principalement avec la liste des "Compétences" de chaque étudiant.
+        3. Sois flexible : si quelqu'un cherche "Java", suggère aussi les profils "Android" ou "Backend" si pertinent.
+        4. Sélectionne les 3 meilleurs profils. 
+        5. Si AUCUN profil ne correspond vraiment, essaie quand même de trouver les plus proches ou ceux avec les compétences les plus larges.
+        
+        Réponds UNIQUEMENT sous forme d'un tableau JSON d'objets avec "userId" et "reason".
     `;
     
     try {
-        const ai = getAI();
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            userId: { type: Type.STRING },
+                            reason: { type: Type.STRING }
+                        },
+                        required: ["userId", "reason"]
+                    }
+                }
+            }
         });
-        return response.text || "Suggestions indisponibles.";
+
+        const text = response.text || "[]";
+        return JSON.parse(text) as SuggestionResult[];
     } catch (error) {
         console.error("Error suggesting partners:", error);
-        return "Impossible de générer des suggestions pour le moment.";
+        return [];
     }
 };

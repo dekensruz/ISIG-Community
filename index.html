@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" style="scroll-behavior: smooth;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -29,6 +29,16 @@
             boxShadow: {
               'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
               'premium': '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)',
+            },
+            animation: {
+              'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+              'pulse-soft': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              fadeInUp: {
+                'from': { opacity: '0', transform: 'translateY(20px)' },
+                'to': { opacity: '1', transform: 'translateY(0)' },
+              }
             }
           }
         }
@@ -57,6 +67,7 @@
     background-color: #F8FAFC;
     color: #1E293B;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
   .glass {
     background: rgba(255, 255, 255, 0.85);
@@ -69,13 +80,20 @@
   .active-nav svg {
     fill: #00AEEF;
   }
-  /* Animation fade in up pour les modales */
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+  
+  /* Custom Scrollbar Premium */
+  ::-webkit-scrollbar {
+    width: 6px;
   }
-  .animate-fade-in-up {
-    animation: fadeInUp 0.3s ease-out forwards;
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #00AEEF;
   }
 </style>
 </head>

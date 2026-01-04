@@ -1,11 +1,13 @@
+
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest } from '../types';
+import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest, Profile } from '../types';
 import Spinner from './Spinner';
 import GroupPostCard from './GroupPostCard';
-import { Users, LogIn, LogOut, Edit, X, Clock, Check } from 'lucide-react';
+import { Users, LogIn, LogOut, Edit, X, Clock, Check, Crown } from 'lucide-react';
 import CreateGroupPost from './CreateGroupPost';
 import EditGroupModal from './EditGroupModal';
 import Avatar from './Avatar';
@@ -36,9 +38,10 @@ const GroupPage: React.FC = () => {
   
   const isOwner = session?.user.id === group?.created_by;
   const isAdmin = members.find(m => m.user_id === session?.user.id)?.role === 'admin';
+  const canManageGroup = isOwner || isAdmin;
 
   const fetchGroupData = useCallback(async () => {
-    if (!groupId) return;
+    if (!groupId || !session?.user) return;
     setLoadingGroup(true);
     try {
       const { data: groupData, error: groupError } = await supabase
@@ -58,26 +61,76 @@ const GroupPage: React.FC = () => {
       if (memberError) throw memberError;
       setMembers(memberData as any);
 
-      const currentUserIsMember = memberData.some((m: any) => m.user_id === session?.user.id);
+      const currentUserIsMember = memberData.some((m: any) => m.user_id === session.user.id);
       setIsMember(currentUserIsMember);
 
-      const currentUserIsAdmin = memberData.find(m => m.user_id === session?.user.id)?.role === 'admin';
+      const currentUserIsAdmin = memberData.find(m => m.user_id === session.user.id)?.role === 'admin';
+      const currentUserIsOwner = groupData.created_by === session.user.id;
 
-      if (currentUserIsAdmin) {
+      // **Robust Join Request Fetching**
+      if (currentUserIsAdmin || currentUserIsOwner) {
+        // Step 1: Fetch raw request data to avoid complex RLS issues with joins.
         const { data: requestsData, error: requestsError } = await supabase
           .from('group_join_requests')
-          .select('*, profiles(*)')
+          .select('id, group_id, user_id, created_at')
           .eq('group_id', groupId);
         if (requestsError) throw requestsError;
-        setJoinRequests(requestsData as any);
-      } else if (session?.user && !currentUserIsMember) {
+
+        if (requestsData && requestsData.length > 0) {
+          // Step 2: Fetch profiles for the users who made requests.
+          const userIds = requestsData.map(r => r.user_id);
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', userIds);
+          // We don't throw profilesError because RLS might be blocking it, which is the exact problem we want to handle gracefully.
+          if (profilesError) {
+              console.warn("Could not fetch all requester profiles, possibly due to RLS. Requests will be shown with fallback data.", profilesError);
+          }
+
+          // Step 3: Manually join them, providing a fallback if a profile is missing.
+          // This prevents a restrictive RLS policy on `profiles` from hiding requests.
+          const populatedRequests = requestsData.map(request => {
+            const profile = profilesData ? profilesData.find(p => p.id === request.user_id) : null;
+            return {
+                ...request,
+                profiles: profile || {
+                    id: request.user_id,
+                    full_name: `Utilisateur inconnu`,
+                    avatar_url: null,
+                    student_id: 'N/A',
+                    major: 'N/A',
+                    promotion: 'N/A',
+                    updated_at: new Date().toISOString(),
+                    skills: [],
+                    courses: [],
+                    bio: 'Impossible de charger le profil.',
+                    cover_url: '',
+                } as Profile
+            };
+          });
+
+          setJoinRequests(populatedRequests as GroupJoinRequest[]);
+        } else {
+          setJoinRequests([]);
+        }
+      } else {
+        // Non-admins should not see any join requests.
+        setJoinRequests([]);
+      }
+
+      // Logic for non-members to see their own request status
+      if (!currentUserIsMember) {
         const { data: requestData, error: requestError } = await supabase
           .from('group_join_requests')
           .select('id')
           .eq('group_id', groupId)
           .eq('user_id', session.user.id)
           .single();
+        if (requestError && requestError.code !== 'PGRST116') throw requestError;
         setUserRequestStatus(requestData ? 'pending' : 'none');
+      } else {
+          setUserRequestStatus('none');
       }
 
     } catch (error: any) {
@@ -119,16 +172,25 @@ const GroupPage: React.FC = () => {
   }, [isMember, group, fetchPosts]);
 
   useEffect(() => {
-    const groupUpdatesChannel = supabase.channel(`public:groups:${groupId}`);
-    groupUpdatesChannel
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${groupId}` }, () => fetchGroupData())
+    if (!groupId) return;
+    const channel = supabase.channel(`group-page-${groupId}`);
+    channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'groups', filter: `id=eq.${groupId}` }, () => {
+            fetchGroupData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${groupId}` }, () => {
+            fetchGroupData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests', filter: `group_id=eq.${groupId}` }, () => {
+            fetchGroupData();
+        })
         .subscribe();
         
-    return () => { supabase.removeChannel(groupUpdatesChannel) };
+    return () => { supabase.removeChannel(channel); };
   }, [groupId, fetchGroupData]);
   
   const handleJoinAction = async () => {
-    if (!session?.user || !groupId || !group || actionLoading) return;
+    if (!session?.user || !groupId || !group || actionLoading || isOwner) return;
     setActionLoading(true);
 
     if (isMember) { // Leave group
@@ -146,6 +208,7 @@ const GroupPage: React.FC = () => {
         } else { // Public group, join directly
             const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
             if (!error) {
+                // The database trigger now handles sending notifications to admins.
                 setIsMember(true);
                 fetchGroupData();
             }
@@ -163,6 +226,9 @@ const GroupPage: React.FC = () => {
   }
   
   const renderJoinButton = () => {
+    if (isOwner) {
+        return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-orange/10 text-isig-orange cursor-default" disabled><Crown size={18}/><span>Créateur</span></button>;
+    }
     if (isAdmin) {
         return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-slate-200 text-slate-600 cursor-default" disabled><Check size={18}/><span>Admin</span></button>;
     }
@@ -202,7 +268,7 @@ const GroupPage: React.FC = () => {
                     </div>
                 </div>
                  <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
-                    {isAdmin && (
+                    {canManageGroup && (
                          <button 
                             onClick={() => setShowEditModal(true)} 
                             className="flex items-center space-x-2 font-semibold py-2 px-4 rounded-lg transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -217,7 +283,7 @@ const GroupPage: React.FC = () => {
              <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-100">
                 <p className="text-slate-600 flex-1">{group.description}</p>
                 <button onClick={() => setShowMembersModal(true)} className="relative flex items-center space-x-3 text-left p-2 rounded-lg hover:bg-slate-100 self-start md:self-end">
-                    {isAdmin && joinRequests.length > 0 && 
+                    {canManageGroup && joinRequests.length > 0 && 
                         <span className="absolute -top-1 -right-1 flex h-5 w-5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-isig-orange opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-5 w-5 bg-isig-orange text-white text-xs items-center justify-center">{joinRequests.length}</span>
@@ -230,7 +296,7 @@ const GroupPage: React.FC = () => {
                     </div>
                     <div className="text-sm">
                         <p className="font-semibold text-slate-700">{members.length} Membre{members.length > 1 ? 's' : ''}</p>
-                        {isAdmin ? (
+                        {canManageGroup ? (
                             <p className="text-isig-blue font-semibold">Gérer</p>
                         ) : (
                             <p className="text-slate-500">Voir tout</p>
@@ -264,7 +330,7 @@ const GroupPage: React.FC = () => {
         </div>
     </div>
     
-    {showEditModal && (
+    {showEditModal && canManageGroup && (
         <EditGroupModal 
             group={group}
             onClose={() => setShowEditModal(false)}
@@ -278,7 +344,7 @@ const GroupPage: React.FC = () => {
             group={group}
             initialMembers={members}
             initialRequests={joinRequests}
-            isAdmin={isAdmin}
+            isAdmin={canManageGroup}
             onClose={() => setShowMembersModal(false)}
             onMembersUpdate={fetchGroupData}
         />

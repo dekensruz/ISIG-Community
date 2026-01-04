@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { Upload } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap } from 'lucide-react';
 
 const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,17 +19,12 @@ const AuthPage: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setAvatarFile(file);
       setPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setAvatarFile(null);
-      setPreviewUrl(null);
     }
   };
-
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,181 +40,122 @@ const AuthPage: React.FC = () => {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
+          options: { data: { full_name: fullName } },
         });
         if (error) throw error;
         
         if(data.user) {
             let avatarUrl: string | undefined = undefined;
             if (avatarFile) {
-                const fileExt = avatarFile.name.split('.').pop();
-                const fileName = `${data.user.id}/${Date.now()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('avatars')
-                    .upload(fileName, avatarFile);
-                
-                if (uploadError) {
-                    console.error("Error uploading avatar:", uploadError.message);
-                } else {
-                    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                    avatarUrl = urlData.publicUrl;
-                }
+                const fileName = `avatars/${data.user.id}-${Date.now()}`;
+                await supabase.storage.from('avatars').upload(fileName, avatarFile);
+                const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                avatarUrl = urlData.publicUrl;
             }
 
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .update({ 
-                    student_id: studentId, 
-                    full_name: fullName,
-                    major: major,
-                    promotion: promotion,
-                    avatar_url: avatarUrl,
-                })
-                .eq('id', data.user.id);
-            if (profileError) console.error("Could not update profile with extra info:", profileError.message);
+            await supabase.from('profiles').update({ 
+                student_id: studentId, 
+                full_name: fullName,
+                major: major,
+                promotion: promotion,
+                avatar_url: avatarUrl,
+            }).eq('id', data.user.id);
         }
-        setMessage('Vérifiez votre email pour le lien de confirmation !');
+        setMessage('Vérifiez votre email pour confirmer votre inscription !');
       }
     } catch (err: any) {
-      setError(err.error_description || err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-sm mx-auto">
-        <div className="text-center mb-8">
-            <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="Logo ISIG" className="w-24 h-24 mx-auto mb-4"/>
-            <h1 className="text-2xl font-bold text-slate-800">ISIG Community</h1>
-            <p className="text-slate-500">{isLogin ? 'Content de vous revoir !' : 'Rejoignez la communauté étudiante'}</p>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
+      {/* Côté gauche - Visuel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-brand-dark p-12 flex-col justify-between relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
+        
+        <div className="relative z-10">
+          <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
+          <h1 className="text-5xl font-extrabold text-white leading-tight">
+            L'intelligence <br/><span className="text-isig-blue text-6xl">collective</span> <br/> de l'ISIG Goma.
+          </h1>
+          <p className="text-slate-400 mt-6 text-xl max-w-md">
+            Collaborez, apprenez et construisez l'avenir de la technologie avec vos pairs.
+          </p>
         </div>
-      
-        <div className="bg-white p-8 rounded-xl shadow-md border border-slate-200">
-            <h2 className="text-xl font-semibold text-center text-slate-700 mb-6">{isLogin ? 'Connexion' : 'Inscription'}</h2>
-            
-            {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
-            {message && <p className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm">{message}</p>}
 
-            <form onSubmit={handleAuth} className="space-y-4">
-            {!isLogin && (
-                <>
-                <div>
-                    <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="fullName">Nom complet</label>
-                    <input
-                    id="fullName"
-                    className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                    type="text"
-                    placeholder="Ex: Dekens Ruzuba"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    />
-                </div>
-                <div>
-                    <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="studentId">Matricule</label>
-                    <input
-                    id="studentId"
-                    className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                    type="text"
-                    placeholder="Ex: 24LGLLJ1071203"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    required
-                    />
-                </div>
-                 <div>
-                    <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="major">Filière</label>
-                    <input
-                    id="major"
-                    className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                    type="text"
-                    placeholder="Ex: Génie Logiciel"
-                    value={major}
-                    onChange={(e) => setMajor(e.target.value)}
-                    required
-                    />
-                </div>
-                 <div>
-                    <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="promotion">Promotion</label>
-                    <input
-                    id="promotion"
-                    className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                    type="text"
-                    placeholder="Ex: L1, L2..."
-                    value={promotion}
-                    onChange={(e) => setPromotion(e.target.value)}
-                    required
-                    />
-                </div>
-                <div>
-                    <label className="block text-slate-700 text-sm font-medium mb-1">
-                        Photo de profil (Optionnel)
-                    </label>
-                    <div className="mt-1 flex items-center">
-                        <span className="inline-block h-12 w-12 rounded-full overflow-hidden bg-slate-100">
-                           {previewUrl ? 
-                                <img src={previewUrl} alt="Aperçu de l'avatar" className="h-full w-full object-cover" /> :
-                                <svg className="h-full w-full text-slate-300" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M24 20.993V24H0v-2.993A2 2 0 002 18h20a2 2 0 002 2.007zM12 13a4 4 0 100-8 4 4 0 000 8z" />
-                                </svg>
-                            }
-                        </span>
-                        <label htmlFor="file-upload" className="ml-5 cursor-pointer bg-white py-2 px-3 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center">
-                           <Upload size={16} className="mr-2" />
-                           <span>Choisir</span>
-                           <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
-                        </label>
-                    </div>
-                </div>
-                </>
-            )}
-            <div>
-                <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="email">Adresse e-mail</label>
-                <input
-                id="email"
-                className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                type="email"
-                placeholder="votre.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                />
-            </div>
-            <div>
-                <label className="block text-slate-700 text-sm font-medium mb-1" htmlFor="password">Mot de passe</label>
-                <input
-                id="password"
-                className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                />
-            </div>
-            <div className="pt-2">
-                <button
-                className="w-full text-white bg-isig-blue hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors duration-300 disabled:bg-blue-300"
-                type="submit"
-                disabled={loading}
-                >
-                {loading ? 'Traitement...' : (isLogin ? 'Se connecter' : "S'inscrire")}
-                </button>
-            </div>
-            </form>
+        <div className="relative z-10 flex items-center space-x-4 text-slate-300">
+           <div className="flex -space-x-3">
+              {[1,2,3,4].map(i => <div key={i} className="w-10 h-10 rounded-full bg-slate-700 border-2 border-brand-dark"></div>)}
+           </div>
+           <p className="text-sm">Rejoignez plus de 500+ étudiants déjà inscrits.</p>
         </div>
-        <p className="text-center text-slate-500 text-sm mt-6">
-          {isLogin ? "Vous n'avez pas de compte ?" : 'Vous avez déjà un compte ?'}
-          <button onClick={() => {setIsLogin(!isLogin); setError(null);}} className="font-semibold text-isig-blue hover:underline ml-1">
-            {isLogin ? "S'inscrire" : 'Se connecter'}
-          </button>
-        </p>
+      </div>
+
+      {/* Côté droit - Formulaire */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center lg:text-left">
+            <h2 className="text-3xl font-extrabold text-slate-900">
+              {isLogin ? 'Bon retour parmi nous !' : 'Créer votre compte'}
+            </h2>
+            <p className="mt-2 text-slate-500">
+              {isLogin ? 'Entrez vos accès pour continuer' : 'Remplissez les informations ci-dessous'}
+            </p>
+          </div>
+
+          <form onSubmit={handleAuth} className="mt-8 space-y-4">
+            {error && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">{error}</div>}
+            {message && <div className="p-4 bg-green-50 text-green-600 rounded-xl text-sm font-medium border border-green-100">{message}</div>}
+
+            {!isLogin && (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue focus:border-transparent outline-none transition-all" required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input type="text" placeholder="Matricule" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue outline-none transition-all" required />
+                  </div>
+                  <div className="relative">
+                    <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input type="text" placeholder="Promotion" value={promotion} onChange={(e) => setPromotion(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue outline-none transition-all" required />
+                  </div>
+                </div>
+                <div className="relative">
+                   <input type="text" placeholder="Filière (Génie Logiciel, etc.)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue outline-none transition-all" required />
+                </div>
+              </div>
+            )}
+
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="email" placeholder="Adresse email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue outline-none transition-all" required />
+            </div>
+
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="password" placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-isig-blue outline-none transition-all" required />
+            </div>
+
+            <button type="submit" disabled={loading} className="w-full py-4 bg-isig-blue hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-1 active:scale-95">
+              <span>{loading ? 'Patientez...' : (isLogin ? 'Se connecter' : "S'inscrire maintenant")}</span>
+              {!loading && <ArrowRight size={20} />}
+            </button>
+          </form>
+
+          <p className="text-center text-slate-500 font-medium">
+            {isLogin ? "Nouveau ici ?" : "Déjà membre ?"}
+            <button onClick={() => setIsLogin(!isLogin)} className="ml-2 text-isig-blue hover:underline font-bold">
+              {isLogin ? "Créer un compte" : "Connectez-vous"}
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@
     "react-dom": "^19.2.0",
     "@google/genai": "^1.27.0",
     "react-router-dom": "^7.9.4",
-    "lucide-react": "^0.548.0",
+    "lucide-react": "^0.471.0",
     "@supabase/supabase-js": "^2.76.1",
     "date-fns": "^4.1.0",
     "deno.ns": "^0.8.0"

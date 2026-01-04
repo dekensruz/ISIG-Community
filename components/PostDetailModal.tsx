@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react';
 import { Post as PostType, Like, Comment as CommentType, Profile } from '../types';
 import { useAuth } from '../App';
@@ -25,7 +26,15 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const [editingText, setEditingText] = useState('');
   const [replyingTo, setReplyingTo] = useState<CommentType | null>(null);
   const [replyContent, setReplyContent] = useState('');
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const modalRootRef = useRef(document.getElementById('modal-root'));
+
+
+  const handleClose = () => {
+    setIsAnimatingOut(true);
+    setTimeout(onClose, 300);
+  };
 
   const renderContentWithLinks = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -54,10 +63,16 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   }, [post]);
 
   useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
+    const handleClickOutside = (event: MouseEvent) => {
+        if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+            handleClose();
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.body.style.overflow = originalStyle;
+        document.body.style.overflow = 'auto';
+        document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -71,18 +86,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     getCurrentUserProfile();
   }, [session]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-            onClose();
-        }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [onClose]);
-  
     const nestedComments = useMemo(() => {
         const commentMap: { [key: string]: CommentType } = {};
         const rootComments: CommentType[] = [];
@@ -207,12 +210,12 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const CommentComponent: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
         <div className={`flex items-start justify-between space-x-3 ${isReply ? 'mt-3' : ''}`}>
             <div className="flex items-start space-x-3 flex-1">
-                <Link to={`/profile/${comment.profiles.id}`} onClick={onClose}>
+                <Link to={`/profile/${comment.profiles.id}`} onClick={handleClose}>
                     <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
                 </Link>
                 <div className="flex-1">
                     <div className="bg-slate-100 p-2 rounded-lg">
-                        <Link to={`/profile/${comment.profiles.id}`} onClick={onClose} className="font-bold text-sm text-slate-800 hover:underline">{comment.profiles.full_name}</Link>
+                        <Link to={`/profile/${comment.profiles.id}`} onClick={handleClose} className="font-bold text-sm text-slate-800 hover:underline">{comment.profiles.full_name}</Link>
                         {editingComment?.id === comment.id ? (
                             <form onSubmit={handleUpdateComment}>
                                 <textarea value={editingText} onChange={e => setEditingText(e.target.value)} className="w-full p-1 border rounded-md mt-1 text-sm bg-white" autoFocus/>
@@ -244,12 +247,17 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         </div>
     );
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-      <div ref={modalRef} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] relative">
+  if (!modalRootRef.current) return null;
+
+  return createPortal(
+    <div className={`fixed inset-0 bg-black z-50 flex justify-center items-center p-4 transition-opacity duration-300 ease-in-out ${isAnimatingOut ? 'opacity-0' : 'bg-opacity-60'}`}>
+      <div
+        ref={modalRef}
+        className={`bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] relative transition-all duration-300 ease-in-out ${isAnimatingOut ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+      >
         <div className="flex justify-between items-center p-4 border-b">
             <h2 className="font-bold text-lg text-slate-800">Publication de {post.profiles.full_name}</h2>
-            <button onClick={onClose} className="text-slate-500 hover:text-slate-800">
+            <button onClick={handleClose} className="text-slate-500 hover:text-slate-800">
                 <X size={24} />
             </button>
         </div>
@@ -318,7 +326,8 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             </div>
         )}
       </div>
-    </div>
+    </div>,
+    modalRootRef.current
   );
 };
 

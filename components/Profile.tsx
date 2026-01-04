@@ -169,10 +169,14 @@ const Profile: React.FC = () => {
   const handleFollow = async () => {
     if (!session?.user || isOwnProfile || followLoading) return;
     setFollowLoading(true);
+    // Optimistic update
+    setIsFollowing(true);
+    setFollowerCount(c => c + 1);
     const { error } = await supabase.from('followers').insert({ follower_id: session.user.id, following_id: userId });
-    if (!error) {
-        setIsFollowing(true);
-        setFollowerCount(c => c + 1);
+    if (error) { // Revert on error
+        setIsFollowing(false);
+        setFollowerCount(c => c - 1);
+        alert("Erreur lors du suivi de l'utilisateur.");
     }
     setFollowLoading(false);
   };
@@ -180,10 +184,14 @@ const Profile: React.FC = () => {
   const handleUnfollow = async () => {
     if (!session?.user || isOwnProfile || followLoading) return;
     setFollowLoading(true);
+    // Optimistic update
+    setIsFollowing(false);
+    setFollowerCount(c => c - 1);
     const { error } = await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: userId });
-     if (!error) {
-        setIsFollowing(false);
-        setFollowerCount(c => c - 1);
+     if (error) { // Revert on error
+        setIsFollowing(true);
+        setFollowerCount(c => c + 1);
+        alert("Erreur lors de l'annulation du suivi.");
     }
     setFollowLoading(false);
   };

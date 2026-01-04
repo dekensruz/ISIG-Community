@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { Group, GroupMember, GroupJoinRequest } from '../types';
-import { X, Shield, UserX, Check, UserPlus } from 'lucide-react';
+import { X, Shield, UserX, Check, UserPlus, Crown, UserCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import Spinner from './Spinner';
+import { useAuth } from '../App';
 
 interface GroupMembersModalProps {
   group: Group;
@@ -16,10 +17,11 @@ interface GroupMembersModalProps {
 }
 
 const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMembers, initialRequests, isAdmin, onClose, onMembersUpdate }) => {
+  const { session } = useAuth();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [members, setMembers] = useState(initialMembers);
   const [requests, setRequests] = useState(initialRequests);
-  const [activeTab, setActiveTab] = useState<'members' | 'requests'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'requests'>(isAdmin && group.is_private && initialRequests.length > 0 ? 'requests' : 'members');
   
   useEffect(() => {
     setMembers(initialMembers);
@@ -28,12 +30,22 @@ const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMem
 
 
   const handleRoleChange = async (member: GroupMember, newRole: 'admin' | 'member') => {
-    if (!isAdmin || member.user_id === group.created_by) return;
+    if (!isAdmin || member.user_id === group.created_by || !session?.user) return;
     setLoadingAction(member.user_id);
-    const { error } = await supabase
-        .from('group_members')
-        .update({ role: newRole })
-        .match({ group_id: group.id, user_id: member.user_id });
+
+    let error;
+    if (newRole === 'admin') {
+        ({ error } = await supabase.rpc('promote_to_group_admin', {
+            p_group_id: group.id,
+            p_user_id: member.user_id,
+            p_actor_id: session.user.id
+        }));
+    } else {
+        ({ error } = await supabase.rpc('demote_to_group_member', {
+            p_group_id: group.id,
+            p_user_id: member.user_id
+        }));
+    }
     
     if (error) alert("Erreur lors du changement de rôle: " + error.message);
     else onMembersUpdate();
@@ -58,25 +70,22 @@ const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMem
   };
   
   const handleApproveRequest = async (request: GroupJoinRequest) => {
+    if (!session?.user || !isAdmin) return;
     setLoadingAction(request.user_id);
-    // 1. Add user to members
-    const { error: insertError } = await supabase.from('group_members').insert({
-        group_id: request.group_id,
-        user_id: request.user_id,
-        role: 'member'
+
+    // Call the secure RPC function to handle the approval process
+    const { error } = await supabase.rpc('approve_group_join_request', {
+        p_request_id: request.id,
+        p_admin_id: session.user.id
     });
-    
-    if(insertError) {
-        alert("Erreur lors de l'ajout du membre: " + insertError.message);
-        setLoadingAction(null);
-        return;
+
+    if (error) {
+        alert("Erreur lors de l'approbation de la demande : " + error.message);
+    } else {
+        // The RPC function handled everything, just refresh the parent state
+        onMembersUpdate();
     }
     
-    // 2. Delete the request
-    const { error: deleteError } = await supabase.from('group_join_requests').delete().eq('id', request.id);
-    if(deleteError) console.error("Could not delete request, but user was added:", deleteError);
-
-    onMembersUpdate(); // Refresh parent state
     setLoadingAction(null);
   };
 
@@ -89,6 +98,16 @@ const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMem
     setLoadingAction(null);
   };
 
+  const RoleBadge: React.FC<{ member: GroupMember }> = ({ member }) => {
+    if (member.user_id === group.created_by) {
+      return <span className="text-xs font-medium bg-isig-orange/10 text-isig-orange rounded-full px-2 py-0.5 ml-1 flex items-center gap-1"><Crown size={12}/>Créateur</span>;
+    }
+    if (member.role === 'admin') {
+      return <span className="text-xs font-medium bg-isig-blue/10 text-isig-blue rounded-full px-2 py-0.5 ml-1">Admin</span>;
+    }
+    return null;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full max-h-[80vh] flex flex-col">
@@ -97,7 +116,7 @@ const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMem
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24} /></button>
         </div>
         
-        {isAdmin && (
+        {isAdmin && group.is_private && (
             <div className="flex border-b mb-4">
                 <button onClick={() => setActiveTab('members')} className={`px-4 py-2 font-semibold text-sm ${activeTab === 'members' ? 'border-b-2 border-isig-blue text-isig-blue' : 'text-slate-500'}`}>Membres ({members.length})</button>
                 <button onClick={() => setActiveTab('requests')} className={`relative px-4 py-2 font-semibold text-sm ${activeTab === 'requests' ? 'border-b-2 border-isig-blue text-isig-blue' : 'text-slate-500'}`}>
@@ -108,43 +127,47 @@ const GroupMembersModal: React.FC<GroupMembersModalProps> = ({ group, initialMem
         )}
 
         <div className="flex-grow overflow-y-auto pr-2">
-            {activeTab === 'members' ? (
+            {(activeTab === 'members' || !group.is_private) ? (
                 <ul className="space-y-3">
-                    {members.map(member => (
-                        <li key={member.user_id} className="flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg">
-                            <Link to={`/profile/${member.user_id}`} onClick={onClose} className="flex items-center space-x-3 flex-grow min-w-0">
-                                <Avatar avatarUrl={member.profiles.avatar_url} name={member.profiles.full_name} />
-                                <div className="min-w-0">
-                                    <p className="font-semibold text-slate-700 truncate">{member.profiles.full_name}</p>
-                                    <p className="text-sm text-slate-500">
-                                        {member.user_id === group.created_by ? 'Créateur' : member.role === 'admin' ? 'Admin' : 'Membre'}
-                                    </p>
-                                </div>
-                            </Link>
-                            {isAdmin && group.created_by !== member.user_id && (
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                    {loadingAction === member.user_id ? <Spinner /> : (
-                                        <>
-                                            <button 
-                                                onClick={() => handleRoleChange(member, member.role === 'admin' ? 'member' : 'admin')} 
-                                                className="p-2 rounded-full text-slate-500 hover:bg-blue-100 hover:text-isig-blue"
-                                                title={member.role === 'admin' ? "Rétrograder en membre" : "Promouvoir en admin"}
-                                            >
-                                                <Shield size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleRemoveMember(member)} 
-                                                className="p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-600"
-                                                title="Retirer du groupe"
-                                            >
-                                                <UserX size={18} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </li>
-                    ))}
+                    {members.map(member => {
+                        const majorPromotion = [member.profiles.promotion, member.profiles.major].filter(Boolean).join(' ');
+                        return (
+                            <li key={member.user_id} className="flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg">
+                                <Link to={`/profile/${member.user_id}`} onClick={onClose} className="flex items-center space-x-3 flex-grow min-w-0">
+                                    <Avatar avatarUrl={member.profiles.avatar_url} name={member.profiles.full_name} />
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-slate-700 truncate flex items-center">
+                                            {member.profiles.full_name}
+                                            <RoleBadge member={member} />
+                                        </p>
+                                        <p className="text-sm text-slate-500 truncate">{majorPromotion || 'Étudiant'}</p>
+                                    </div>
+                                </Link>
+                                {isAdmin && group.created_by !== member.user_id && (
+                                    <div className="flex items-center space-x-1 flex-shrink-0">
+                                        {loadingAction === member.user_id ? <Spinner /> : (
+                                            <>
+                                                <button 
+                                                    onClick={() => handleRoleChange(member, member.role === 'admin' ? 'member' : 'admin')} 
+                                                    className="p-2 rounded-full text-slate-500 hover:bg-blue-100 hover:text-isig-blue"
+                                                    title={member.role === 'admin' ? "Rétrograder en membre" : "Promouvoir en admin"}
+                                                >
+                                                    <Shield size={18} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleRemoveMember(member)} 
+                                                    className="p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-600"
+                                                    title="Retirer du groupe"
+                                                >
+                                                    <UserX size={18} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </li>
+                        );
+                    })}
                 </ul>
             ) : (
                  <ul className="space-y-3">

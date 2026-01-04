@@ -140,7 +140,7 @@ export interface Notification {
     id: string;
     user_id: string; // The user who receives the notification
     actor_id: string; // The user who triggered the notification
-    type: 'new_like' | 'new_group_like' | 'new_comment' | 'new_group_post' | 'new_message' | 'new_follower' | 'group_join_request' | 'group_member_joined' | 'new_group_comment' | 'new_comment_reply' | 'new_group_comment_reply';
+    type: 'new_like' | 'new_group_like' | 'new_comment' | 'new_group_post' | 'new_message' | 'new_follower' | 'group_join_request' | 'group_member_joined' | 'new_group_comment' | 'new_comment_reply' | 'new_group_comment_reply' | 'group_request_accepted' | 'group_member_left' | 'group_admin_promotion';
     post_id?: string;
     group_id?: string;
     group_post_id?: string;

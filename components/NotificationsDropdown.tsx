@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Avatar from './Avatar';
-import { Heart, MessageCircle, MessageSquare, Users } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, Users, UserCheck, UserX, Crown } from 'lucide-react';
 
 interface NotificationsDropdownProps {
     notifications: Notification[];
@@ -46,6 +46,9 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
                 return baseGroupPath;
             case 'group_join_request':
             case 'group_member_joined':
+            case 'group_request_accepted':
+            case 'group_member_left':
+            case 'group_admin_promotion':
                  return notification.group_id ? `/group/${notification.group_id}` : '/groups';
             case 'new_follower':
                 return `/profile/${notification.actor_id}`;
@@ -77,6 +80,12 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
                 return <>{actorName} souhaite rejoindre un de vos groupes.</>;
             case 'group_member_joined':
                 return <>{actorName} a rejoint un de vos groupes.</>;
+            case 'group_request_accepted':
+                return <>{actorName} a accepté votre demande d'adhésion.</>;
+            case 'group_member_left':
+                return <>{actorName} a quitté un de vos groupes.</>;
+            case 'group_admin_promotion':
+                return <>{actorName} vous a promu administrateur d'un groupe.</>;
             default:
                 return <>Vous avez une nouvelle notification.</>;
         }
@@ -98,6 +107,12 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
             case 'group_join_request':
             case 'group_member_joined':
                  return <div className={iconBaseClasses}><Users className="h-4 w-4 text-green-500" /></div>;
+            case 'group_request_accepted':
+                 return <div className={iconBaseClasses}><UserCheck className="h-4 w-4 text-green-500" /></div>;
+            case 'group_member_left':
+                 return <div className={iconBaseClasses}><UserX className="h-4 w-4 text-red-500" /></div>;
+            case 'group_admin_promotion':
+                 return <div className={iconBaseClasses}><Crown className="h-4 w-4 text-isig-orange" /></div>;
             default:
                 return null;
         }

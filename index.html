@@ -1,25 +1,33 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ISIG Community</title>
+    <title>ISIG Community | Réseau Social Académique</title>
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
+      // Polyfill vital pour éviter la page blanche due à process.env
+      window.process = { env: { API_KEY: '' } };
+      
       tailwind.config = {
         theme: {
           extend: {
             colors: {
               'isig-blue': '#00AEEF',
               'isig-orange': '#FF8C00',
-              'light-blue': '#E0F7FF', // Kept for reference, but new design uses neutrals
+              'brand-dark': '#0F172A',
             },
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            },
+            boxShadow: {
+              'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              'premium': '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)',
             }
           }
         }
@@ -33,16 +41,37 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
     "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.4",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.548.0",
+    "lucide-react": "https://aistudiocdn.com/@lucide/lucide-react@^0.471.0",
     "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.76.1",
     "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0",
     "date-fns/": "https://aistudiocdn.com/date-fns@^4.1.0/",
-    "deno.ns": "https://aistudiocdn.com/deno.ns@^0.8.0"
+    "date-fns/locale": "https://aistudiocdn.com/date-fns@^4.1.0/locale",
+    "deno.ns": "https://aistudiocdn.com/deno.ns@^0.8.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
   }
 }
 </script>
+<style>
+  body {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    -webkit-font-smoothing: antialiased;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .active-nav {
+    color: #00AEEF !important;
+  }
+  .active-nav svg {
+    fill: #00AEEF;
+  }
+</style>
 </head>
-  <body class="bg-slate-100">
+  <body>
+    <div id="modal-root"></div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

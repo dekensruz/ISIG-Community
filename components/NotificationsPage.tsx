@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Avatar from './Avatar';
-import { Heart, MessageCircle, MessageSquare, Users, Search, Bell } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, Users, Search, Bell, UserCheck, UserX, Crown } from 'lucide-react';
 
 const NotificationsPage: React.FC = () => {
     const { session } = useAuth();
@@ -16,10 +16,11 @@ const NotificationsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const fetchNotifications = async () => {
+        const fetchAndMarkRead = async () => {
             if (!session?.user) return;
             setLoading(true);
 
+            // 1. Fetch notifications
             const { data, error } = await supabase
                 .from('notifications')
                 .select('*, profiles:actor_id(*)')
@@ -28,13 +29,45 @@ const NotificationsPage: React.FC = () => {
 
             if (error) {
                 console.error("Error fetching notifications:", error.message);
-            } else if (data) {
+                setLoading(false);
+                return;
+            }
+
+            if (data) {
                 setNotifications(data as any);
+
+                // 2. Identify unread notifications and mark them as read
+                const unreadIds = data.filter(n => !n.is_read).map(n => n.id);
+                if (unreadIds.length > 0) {
+                    markAsRead(unreadIds);
+                }
             }
             setLoading(false);
         };
-        fetchNotifications();
+
+        const markAsRead = async (ids: string[]) => {
+            if (!session?.user) return;
+            
+            // 3. Update the database
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', ids);
+
+            if (error) {
+                console.error("Error marking notifications as read:", error.message);
+            } else {
+                // 4. Update local state for immediate UI feedback (remove blue background)
+                // The real-time listener in Navbar will handle the badge update.
+                setNotifications(prev =>
+                    prev.map(n => (ids.includes(n.id) ? { ...n, is_read: true } : n))
+                );
+            }
+        };
+
+        fetchAndMarkRead();
     }, [session]);
+
 
     const getNotificationLink = (notification: Notification): string => {
         switch (notification.type) {
@@ -55,6 +88,9 @@ const NotificationsPage: React.FC = () => {
                 return baseGroupPath;
             case 'group_join_request':
             case 'group_member_joined':
+            case 'group_request_accepted':
+            case 'group_member_left':
+            case 'group_admin_promotion':
                 return notification.group_id ? `/group/${notification.group_id}` : '/groups';
             case 'new_follower':
                 return `/profile/${notification.actor_id}`;
@@ -76,6 +112,9 @@ const NotificationsPage: React.FC = () => {
             case 'new_message': return `${actorName} vous a envoyé un message.`;
             case 'group_join_request': return `${actorName} souhaite rejoindre un de vos groupes.`;
             case 'group_member_joined': return `${actorName} a rejoint un de vos groupes.`;
+            case 'group_request_accepted': return `${actorName} a accepté votre demande d'adhésion.`;
+            case 'group_member_left': return `${actorName} a quitté un de vos groupes.`;
+            case 'group_admin_promotion': return `${actorName} vous a promu administrateur d'un groupe.`;
             default: return `Vous avez une nouvelle notification.`;
         }
     };
@@ -96,6 +135,12 @@ const NotificationsPage: React.FC = () => {
             case 'group_join_request':
             case 'group_member_joined':
                 return <div className={iconBaseClasses}><Users className="h-5 w-5 text-green-500" /></div>;
+            case 'group_request_accepted':
+                return <div className={iconBaseClasses}><UserCheck className="h-5 w-5 text-green-500" /></div>;
+            case 'group_member_left':
+                return <div className={iconBaseClasses}><UserX className="h-5 w-5 text-red-500" /></div>;
+            case 'group_admin_promotion':
+                 return <div className={iconBaseClasses}><Crown className="h-5 w-5 text-isig-orange" /></div>;
             default:
                 return null;
         }

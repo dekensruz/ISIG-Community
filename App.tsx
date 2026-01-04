@@ -16,7 +16,8 @@ import UsersPage from './components/UsersPage';
 import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import SearchResultsPage from './components/SearchResultsPage';
-import NotificationsPage from './components/NotificationsPage'; // Nouveau
+import NotificationsPage from './components/NotificationsPage';
+import NotificationsProvider from './components/NotificationsProvider'; // Ajouté
 
 type AuthContextType = {
   session: Session | null;
@@ -130,7 +131,9 @@ const App: React.FC = () => {
         <HashRouter>
             <SearchFilterProvider>
                 <UnreadMessagesProvider>
-                    <AppContent />
+                    <NotificationsProvider>
+                        <AppContent />
+                    </NotificationsProvider>
                 </UnreadMessagesProvider>
             </SearchFilterProvider>
         </HashRouter>

@@ -1,4 +1,4 @@
-// Fix: Implemented the full component to resolve module errors.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -66,7 +66,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
             avatarUrl = data.publicUrl;
         }
 
-        // Insert group
+        // 1. Insertion du groupe
         const { data: groupData, error: groupError } = await supabase
             .from('groups')
             .insert({
@@ -81,15 +81,29 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
         
         if (groupError) throw groupError;
 
-        // Add creator as an admin member
+        // 2. Le déclencheur (trigger) côté base de données est censé ajouter le créateur automatiquement,
+        // mais pour être sûr, nous vérifions si l'entrée existe ou nous la mettons à jour.
         if (groupData) {
-            const { error: memberError } = await supabase.from('group_members').insert({
+            // Note: Si une erreur de permission survient ici, c'est que l'utilisateur n'a pas le droit d'écrire 'admin'.
+            // Cependant, en tant que créateur, l'utilisateur a généralement les droits via RLS.
+            const { error: memberError } = await supabase.from('group_members').upsert({
                 group_id: groupData.id,
                 user_id: session.user.id,
-                role: 'admin' // Assign admin role to creator
-            });
+                role: 'admin'
+            }, { onConflict: 'group_id,user_id' });
+
             if (memberError) {
-                console.error("Failed to add creator as admin member:", memberError);
+                console.error("Member assignment error:", memberError);
+                // Si l'upsert échoue, on tente un simple insert
+                const { error: secondAttemptError } = await supabase.from('group_members').insert({
+                    group_id: groupData.id,
+                    user_id: session.user.id,
+                    role: 'admin'
+                });
+                if (secondAttemptError) {
+                   await supabase.from('groups').delete().eq('id', groupData.id);
+                   throw new Error("Impossible d'assigner les droits d'administration. Veuillez réessayer.");
+                }
             }
         }
         
@@ -104,89 +118,73 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div ref={modalRef} className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-isig-blue">Créer un nouveau groupe</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24} /></button>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div ref={modalRef} className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-lg w-full transform transition-all animate-fade-in-up">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Créer un groupe</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"><X size={24} /></button>
         </div>
         
-        {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
+        {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-sm font-bold border border-red-100">{error}</div>}
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="groupName">
-                    Nom du groupe
-                </label>
+                <label className="block text-slate-700 text-xs font-black uppercase tracking-widest mb-2 ml-1" htmlFor="groupName">Nom du groupe</label>
                 <input
                     id="groupName"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5"
+                    className="bg-slate-50 border border-slate-100 text-slate-900 text-sm rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none block w-full p-4 transition-all"
+                    placeholder="Ex: Club de robotique"
                     required
                 />
             </div>
             <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="groupDescription">
-                    Description (facultatif)
-                </label>
+                <label className="block text-slate-700 text-xs font-black uppercase tracking-widest mb-2 ml-1" htmlFor="groupDescription">Description</label>
                 <textarea
                     id="groupDescription"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-isig-blue focus:border-isig-blue block w-full p-2.5 resize-none"
+                    className="bg-slate-50 border border-slate-100 text-slate-900 text-sm rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none block w-full p-4 resize-none transition-all"
+                    placeholder="De quoi parle ce groupe ?"
                 />
             </div>
             <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">Confidentialité</label>
-                <div className="flex rounded-md shadow-sm">
-                    <button type="button" onClick={() => setIsPrivate(false)} className={`relative inline-flex items-center space-x-2 px-4 py-2 rounded-l-md border text-sm font-medium ${!isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
-                        <Globe size={16} />
+                <label className="block text-slate-700 text-xs font-black uppercase tracking-widest mb-2 ml-1">Visibilité</label>
+                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-2xl">
+                    <button type="button" onClick={() => setIsPrivate(false)} className={`flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${!isPrivate ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                        <Globe size={18} />
                         <span>Public</span>
                     </button>
-                    <button type="button" onClick={() => setIsPrivate(true)} className={`relative -ml-px inline-flex items-center space-x-2 px-4 py-2 rounded-r-md border text-sm font-medium ${isPrivate ? 'bg-isig-blue text-white border-isig-blue z-10' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
-                         <Lock size={16} />
+                    <button type="button" onClick={() => setIsPrivate(true)} className={`flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${isPrivate ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                         <Lock size={18} />
                          <span>Privé</span>
                     </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">{isPrivate ? "Les membres doivent être approuvés par un admin." : "Tout le monde peut rejoindre ce groupe."}</p>
             </div>
              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                    Avatar du groupe (facultatif)
-                </label>
-                <div className="mt-1 flex items-center space-x-4">
-                    <span className="inline-block h-20 w-20 rounded-lg overflow-hidden bg-gray-100">
-                        {previewUrl ? 
-                            <img src={previewUrl} alt="Aperçu de l'avatar" className="h-full w-full object-cover" /> :
-                            <svg className="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M24 20.993V24H0v-2.993A2 2 0 002 18h20a2 2 0 002 2.007zM12 13a4 4 0 100-8 4 4 0 000 8z" />
-                            </svg>
-                        }
-                    </span>
-                    <label htmlFor="file-upload" className="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-isig-blue flex items-center">
-                        <Upload size={16} className="mr-2" />
-                        <span>Changer</span>
+                <label className="block text-slate-700 text-xs font-black uppercase tracking-widest mb-2 ml-1">Photo du groupe</label>
+                <div className="mt-2 flex items-center space-x-6">
+                    <div className="relative group">
+                      <div className="h-24 w-24 rounded-[1.5rem] overflow-hidden bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+                          {previewUrl ? 
+                              <img src={previewUrl} alt="Aperçu" className="h-full w-full object-cover" /> :
+                              <Upload className="text-slate-300" size={32} />
+                          }
+                      </div>
+                    </div>
+                    <label htmlFor="file-upload" className="cursor-pointer bg-isig-blue/10 text-isig-blue px-6 py-3 rounded-2xl text-sm font-black hover:bg-isig-blue hover:text-white transition-all">
+                        <span>Choisir une image</span>
                         <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
                     </label>
                 </div>
             </div>
-            <div className="text-right mt-6">
-                <button 
-                    type="button" 
-                    onClick={onClose} 
-                    className="mr-2 text-gray-700 bg-transparent hover:bg-gray-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
-                >
-                    Annuler
-                </button>
-                <button 
-                    type="submit"
-                    disabled={loading}
-                    className="text-white bg-isig-blue hover:bg-blue-600 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300"
-                >
-                    {loading ? <Spinner /> : 'Créer le groupe'}
+            <div className="flex space-x-3 mt-8">
+                <button type="button" onClick={onClose} className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all">Annuler</button>
+                <button type="submit" disabled={loading} className="flex-[2] bg-isig-blue text-white font-black py-4 rounded-2xl shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all disabled:opacity-50 active:scale-95">
+                    {loading ? <Spinner /> : 'Créer maintenant'}
                 </button>
             </div>
         </form>

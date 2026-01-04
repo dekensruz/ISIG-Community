@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface AvatarProps {
@@ -17,52 +18,45 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
   };
   
   const sizeClasses = {
-    sm: 'h-8 w-8 text-xs',
-    md: 'h-10 w-10 text-sm',
-    lg: 'h-12 w-12 text-base',
-    xl: 'h-16 w-16 text-xl',
-    '2xl': 'h-24 w-24 text-3xl',
-    '3xl': 'h-32 w-32 text-5xl',
+    sm: 'h-8 w-8 text-[10px]',
+    md: 'h-10 w-10 text-xs',
+    lg: 'h-12 w-12 text-sm',
+    xl: 'h-16 w-16 text-lg',
+    '2xl': 'h-24 w-24 text-2xl',
+    '3xl': 'h-32 w-32 text-4xl',
   };
   
   const shapeClasses = {
     circle: 'rounded-full',
-    square: 'rounded-lg',
+    square: 'rounded-2xl',
   }
 
   const colorClasses = [
-    'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 
-    'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
-    'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500',
-    'bg-pink-500', 'bg-rose-500'
+    'bg-isig-blue', 'bg-isig-orange', 'bg-indigo-500', 'bg-emerald-500', 'bg-rose-500'
   ];
 
-  // Simple hash function to get a consistent color for a name
   const getColor = (str: string) => {
     if (!str) return colorClasses[0];
     let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash % colorClasses.length);
-    return colorClasses[index];
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return colorClasses[Math.abs(hash % colorClasses.length)];
   };
 
-  const finalClassName = `${sizeClasses[size]} ${shapeClasses[shape]} ${className}`;
+  const finalClassName = `${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm`;
 
   if (avatarUrl) {
     return (
       <img
         src={avatarUrl}
         alt={name}
-        className={`${finalClassName} object-cover bg-slate-200`}
+        className={`${finalClassName} object-cover border-2 border-white`}
       />
     );
   }
 
   return (
     <div
-      className={`${finalClassName} flex items-center justify-center font-bold text-white ${getColor(name)}`}
+      className={`${finalClassName} flex items-center justify-center font-extrabold text-white border-2 border-white ${getColor(name)}`}
       title={name}
     >
       {getInitials(name)}

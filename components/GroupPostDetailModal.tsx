@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
+import { X, Heart, MessageCircle, Send, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
 import { GroupPost, GroupPostLike, GroupPostComment, Profile } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -22,6 +22,9 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   const [likes, setLikes] = useState<GroupPostLike[]>(postInitial.group_post_likes);
   const [comments, setComments] = useState<GroupPostComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   
@@ -83,10 +86,9 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     return sortComments(rootComments);
   }, [comments]);
 
-  const userHasLiked = likes.some(like => like.user_id === session?.user.id);
-
   const handleLike = async () => {
     if (!session?.user) return;
+    const userHasLiked = likes.some(like => like.user_id === session?.user.id);
     if (userHasLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -103,10 +105,11 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     e.preventDefault();
     if (!newComment.trim() || !session?.user) return;
     setIsPostingComment(true);
-    const contentText = newComment;
-    setNewComment('');
-    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content: contentText }).select('*, profiles(*)').single();
-    if (data) setComments(prev => [...prev, data as any]);
+    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content: newComment }).select('*, profiles(*)').single();
+    if (data) {
+        setComments(prev => [...prev, data as any]);
+        setNewComment('');
+    }
     setIsPostingComment(false);
   };
 
@@ -114,22 +117,71 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     e.preventDefault();
     if (!replyContent.trim() || !session?.user || !replyingTo) return;
     setIsPostingComment(true);
-    const content = replyContent;
-    const parentId = replyingTo.id;
-    setReplyContent('');
-    setReplyingTo(null);
-    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content, parent_comment_id: parentId }).select('*, profiles(*)').single();
-    if (data) setComments(prev => [...prev, data as any]);
+    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content: replyContent, parent_comment_id: replyingTo.id }).select('*, profiles(*)').single();
+    if (data) {
+        setComments(prev => [...prev, data as any]);
+        setReplyContent('');
+        setReplyingTo(null);
+    }
     setIsPostingComment(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm("Supprimer ce commentaire ?")) return;
+    const { error } = await supabase.from('group_post_comments').delete().eq('id', commentId);
+    if (!error) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        setCommentMenuOpen(null);
+    }
+  };
+
+  const handleEditComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editContent.trim() || !editingCommentId) return;
+    const { error } = await supabase.from('group_post_comments').update({ content: editContent }).eq('id', editingCommentId);
+    if (!error) {
+        setComments(prev => prev.map(c => c.id === editingCommentId ? { ...c, content: editContent } : c));
+        setEditingCommentId(null);
+        setEditContent('');
+    }
   };
 
   const CommentItem: React.FC<{ comment: GroupPostComment, isReply?: boolean }> = ({ comment, isReply }) => (
     <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
         <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
         <div className="flex-1 min-w-0">
-            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
-                <p className="text-sm text-slate-700 font-medium leading-relaxed">{comment.content}</p>
+            <div className="group/comment relative bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-start">
+                    <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                    {session?.user.id === comment.user_id && (
+                        <div className="relative">
+                            <button onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)} className="text-slate-400 hover:text-slate-600">
+                                <MoreHorizontal size={14} />
+                            </button>
+                            {commentMenuOpen === comment.id && (
+                                <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
+                                    <button onClick={() => { setEditingCommentId(comment.id); setEditContent(comment.content); setCommentMenuOpen(null); }} className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center">
+                                        <Pencil size={12} className="mr-2" /> Modifier
+                                    </button>
+                                    <button onClick={() => handleDeleteComment(comment.id)} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center">
+                                        <Trash2 size={12} className="mr-2" /> Supprimer
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {editingCommentId === comment.id ? (
+                    <form onSubmit={handleEditComment} className="mt-1">
+                        <input value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue" />
+                        <div className="flex space-x-2 mt-2">
+                            <button type="submit" className="text-[10px] font-black uppercase text-isig-blue">Sauver</button>
+                            <button type="button" onClick={() => setEditingCommentId(null)} className="text-[10px] font-black uppercase text-slate-400">Annuler</button>
+                        </div>
+                    </form>
+                ) : (
+                    <p className="text-sm text-slate-700 font-medium leading-relaxed">{comment.content}</p>
+                )}
             </div>
             <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                 <button onClick={() => setReplyingTo(comment)} className="hover:text-isig-blue">Répondre</button>
@@ -173,8 +225,8 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             )}
 
             <div className="flex items-center space-x-6 pb-6 border-b border-slate-50">
-                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${userHasLiked ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
-                    <Heart size={20} fill={userHasLiked ? '#FF8C00' : 'none'}/>
+                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${likes.some(l => l.user_id === session?.user.id) ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
+                    <Heart size={20} fill={likes.some(l => l.user_id === session?.user.id) ? '#FF8C00' : 'none'}/>
                     <span className="text-sm">{likes.length}</span>
                 </button>
                 <div className="flex items-center space-x-2 font-black text-slate-400">

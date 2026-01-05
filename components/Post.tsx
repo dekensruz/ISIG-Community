@@ -25,7 +25,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
@@ -36,6 +35,20 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const isLongContent = post.content.length > CONTENT_LIMIT;
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
+  const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   useEffect(() => {
     const fetchTopLikers = async () => {
       if (likes.length === 0) {
@@ -45,7 +58,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const likerIds = likes.slice(0, 3).map(l => l.user_id);
       const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
       if (data) {
-        // Garder l'ordre des likes récents
         const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
         setLikerProfiles(sorted);
       }
@@ -129,7 +141,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
       <div className="px-7 pb-4">
         <div className="text-[16px] text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
-          {displayedContent}
+          {renderContentWithLinks(displayedContent)}
           {!isExpanded && isLongContent && <span>...</span>}
         </div>
         {isLongContent && (

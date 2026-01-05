@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Profile as ProfileType, Post as PostType } from '../types';
 import Spinner from './Spinner';
-import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X } from 'lucide-react';
+import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X, Search } from 'lucide-react';
 import PostCard from './Post';
+import CreatePost from './CreatePost';
 import Avatar from './Avatar';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -20,6 +21,8 @@ const Profile: React.FC = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingPost, setEditingPost] = useState<PostType | null>(null);
+  const [profileSearch, setProfileSearch] = useState('');
   const [formData, setFormData] = useState<Partial<ProfileType>>({});
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -189,6 +192,16 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleEditRequested = (post: PostType) => {
+    setEditingPost(post);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const filteredPosts = useMemo(() => {
+    if (!profileSearch.trim()) return posts;
+    return posts.filter(p => p.content.toLowerCase().includes(profileSearch.toLowerCase()));
+  }, [posts, profileSearch]);
+
 
   if (loadingProfile && !profile) {
     return <div className="flex justify-center mt-8"><Spinner /></div>;
@@ -204,7 +217,6 @@ const Profile: React.FC = () => {
     <>
     <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-[3rem] shadow-soft border border-slate-100 overflow-hidden group">
-            {/* Cover Section with Soft Curve */}
             <div className="relative">
                 <div 
                     className={`w-full h-48 sm:h-64 md:h-72 bg-gradient-to-br from-isig-blue to-blue-600 relative rounded-b-[3.5rem] bg-cover bg-center transition-transform duration-700 ${profile.cover_url ? 'cursor-pointer' : ''}`}
@@ -224,8 +236,6 @@ const Profile: React.FC = () => {
             </div>
             
             <div className="px-4 sm:px-10">
-                {/* Profile Picture and Actions Section */}
-                {/* Ajustement: Flex items-end sur desktop, mais avec padding pour que le texte soit dans la zone blanche */}
                 <div className="relative flex flex-col sm:flex-row items-center sm:items-start -mt-16 sm:-mt-20 mb-6 sm:space-x-8">
                     <div className="relative group/avatar shrink-0">
                         <button 
@@ -243,7 +253,6 @@ const Profile: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Zone d'infos décalée vers le bas pour PC */}
                     <div className="mt-6 sm:mt-24 flex-grow text-center sm:text-left min-w-0">
                        {isEditing ? (
                             <input type="text" name="full_name" value={formData.full_name || ''} onChange={handleInputChange} className="text-3xl font-black text-slate-800 w-full p-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue transition-all" placeholder="Nom complet"/>
@@ -362,15 +371,35 @@ const Profile: React.FC = () => {
         </div>
 
         <div className="mt-12">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Publications</h2>
-                <div className="h-1 flex-1 bg-slate-100 mx-6 rounded-full"></div>
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Chercher dans ces posts..." 
+                      value={profileSearch}
+                      onChange={(e) => setProfileSearch(e.target.value)}
+                      className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-sm"
+                    />
+                </div>
             </div>
+
+            {isOwnProfile && editingPost && (
+                <div className="mb-8">
+                  <CreatePost 
+                    onPostCreated={() => { fetchProfileData(); setEditingPost(null); }} 
+                    editingPost={editingPost}
+                    onCancelEdit={() => setEditingPost(null)}
+                  />
+                </div>
+            )}
+
             {loadingPosts ? (
                 <div className="flex justify-center py-10"><Spinner /></div>
-            ) : posts.length > 0 ? (
+            ) : filteredPosts.length > 0 ? (
                 <div className="space-y-8">
-                    {posts.map(post => <PostCard key={post.id} post={post} />)}
+                    {filteredPosts.map(post => <PostCard key={post.id} post={post} onEditRequested={handleEditRequested} />)}
                 </div>
             ) : (
                 <div className="text-center bg-white p-16 rounded-[3rem] shadow-soft border border-slate-100">

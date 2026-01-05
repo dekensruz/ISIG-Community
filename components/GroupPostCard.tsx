@@ -35,6 +35,20 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const isLongContent = post.content.length > CONTENT_LIMIT;
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
+  const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   useEffect(() => {
     const fetchTopLikers = async () => {
       if (likes.length === 0) {
@@ -116,7 +130,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       </div>
 
       <div className="text-slate-700 whitespace-pre-wrap mb-4 font-medium leading-relaxed">
-        {displayedContent}
+        {renderContentWithLinks(displayedContent)}
         {!isExpanded && isLongContent && <span>...</span>}
         {isLongContent && (
             <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block">

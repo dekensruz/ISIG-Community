@@ -15,6 +15,15 @@ const Feed: React.FC = () => {
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
   const { searchQuery, sortOrder } = useSearchFilter();
 
+  const shuffleArray = (array: any[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[shuffled[j]]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
   const fetchPosts = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -23,7 +32,15 @@ const Feed: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data as any || []);
+      
+      const allPosts = data as any || [];
+      if (allPosts.length > 3) {
+        const topThree = allPosts.slice(0, 3);
+        const rest = allPosts.slice(3);
+        setPosts([...topThree, ...shuffleArray(rest)]);
+      } else {
+        setPosts(allPosts);
+      }
     } catch (error: any) {
       console.error('Feed loading error:', error.message);
     } finally {
@@ -48,11 +65,8 @@ const Feed: React.FC = () => {
     return posts.filter(post => {
       const q = searchQuery.toLowerCase();
       return post.content.toLowerCase().includes(q) || post.profiles.full_name.toLowerCase().includes(q);
-    }).sort((a, b) => {
-        const d = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return sortOrder === 'desc' ? d : -d;
     });
-  }, [posts, searchQuery, sortOrder]);
+  }, [posts, searchQuery]);
 
   return (
     <div className="max-w-3xl mx-auto w-full">

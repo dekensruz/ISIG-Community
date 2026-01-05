@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'export React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Send, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
 import { GroupPost, GroupPostLike, GroupPostComment, Profile } from '../types';
@@ -218,7 +218,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
             <div className="flex items-center space-x-4 mb-6">
                 <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
                 <div>
@@ -252,7 +252,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             </div>
         </div>
 
-        <div className="p-6 border-t border-slate-50 bg-white">
+        <div className="p-4 sm:p-6 border-t border-slate-50 bg-white relative z-10 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
             {replyingTo && (
                 <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100 animate-fade-in">
                     <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
@@ -261,7 +261,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             )}
             <form onSubmit={replyingTo ? handleReplySubmit : handlePostComment} className="flex items-center space-x-3">
                 <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" className="shrink-0" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 pr-2">
                     <textarea
                         ref={textareaRef}
                         rows={1}
@@ -273,13 +273,14 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                             else setNewComment(val);
                             adjustHeight();
                         }}
-                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto"
+                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto custom-scrollbar"
                     />
                 </div>
                 <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
                     {isPostingComment ? <Spinner /> : <Send size={20} />}
                 </button>
             </form>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60">Faites preuve de courtoisie.</p>
         </div>
       </div>
     </div>,

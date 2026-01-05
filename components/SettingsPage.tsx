@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle, MessageSquareText, Lock, LayoutDashboard, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle, MessageSquareText, Lock, LayoutDashboard, ChevronDown, ChevronUp, Scale } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
@@ -14,6 +14,7 @@ const SettingsPage: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
   const [isPassExpanded, setIsPassExpanded] = useState(false);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
+  const [isRulesExpanded, setIsRulesExpanded] = useState(false);
   
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -151,7 +152,7 @@ const SettingsPage: React.FC = () => {
 
       <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">À propos</h2>
+            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">À propos & Charte</h2>
         </div>
         <div className="divide-y divide-slate-50">
             <div className="p-8">
@@ -181,6 +182,49 @@ const SettingsPage: React.FC = () => {
 
             <div className="bg-white">
                 <button 
+                    onClick={() => setIsRulesExpanded(!isRulesExpanded)}
+                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
+                >
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 rounded-2xl bg-slate-100 text-isig-orange"><Scale size={20}/></div>
+                        <div className="text-left">
+                            <p className="font-black text-sm uppercase tracking-tight">Charte de Bonne Conduite</p>
+                            <p className="text-xs text-slate-400 font-medium">Règles & Courtoisie</p>
+                        </div>
+                    </div>
+                    {isRulesExpanded ? <ChevronUp size={18} className="text-isig-blue" /> : <ChevronDown size={18} className="text-slate-300" />}
+                </button>
+                {isRulesExpanded && (
+                    <div className="px-8 pb-8 animate-fade-in">
+                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                            <div className="flex items-start space-x-3">
+                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                                    <strong className="text-slate-900">Respect mutuel :</strong> Soyez courtois et bienveillants. Les insultes et le harcèlement sont strictement interdits.
+                                </p>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                                    <strong className="text-slate-900">Contenu académique :</strong> Privilégiez le partage de connaissances, de projets et d'entraide. Ne publiez pas de contenu inapproprié.
+                                </p>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                                    <strong className="text-slate-900">Propriété intellectuelle :</strong> Respectez le travail de vos pairs. Citez vos sources lors du partage de ressources.
+                                </p>
+                            </div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase text-center mt-4">
+                                Tout manquement à ces règles peut entraîner une suspension de compte.
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white">
+                <button 
                     onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
                     className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
                 >
@@ -199,7 +243,7 @@ const SettingsPage: React.FC = () => {
                             <div className="bg-emerald-500 text-white p-2 rounded-xl flex-shrink-0">
                                 <CheckCircle size={20} />
                             </div>
-                            <p className="text-emerald-800 font-bold text-sm leading-relaxed">Vos données sont sauvegardées de manière sécurisée sur les serveurs ISIG.</p>
+                            <p className="text-emerald-800 font-bold text-sm leading-relaxed">Vos données sont sauvegardées de manière sécurisée et ne sont jamais partagées avec des tiers.</p>
                         </div>
                     </div>
                 )}

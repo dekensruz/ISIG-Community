@@ -136,7 +136,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
             <div className="flex items-center space-x-4 mb-6">
                 <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
                 <div>
@@ -157,7 +157,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             </div>
         </div>
 
-        <div className="border-t border-slate-50 bg-white flex-shrink-0">
+        <div className="border-t border-slate-50 bg-white flex-shrink-0 relative z-10 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
             <div className="px-6 py-4 flex items-center space-x-6 border-b border-slate-50">
                 <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${userHasLiked ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
                     <Heart size={24} fill={userHasLiked ? '#FF8C00' : 'none'}/>
@@ -168,7 +168,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                     <span className="text-sm">{comments.length}</span>
                 </div>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6 pr-6 sm:pr-8">
                 {replyingTo && (
                     <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100">
                         <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
@@ -177,7 +177,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                 )}
                 <form onSubmit={handlePostComment} className="flex items-center space-x-3">
                     <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" className="shrink-0" />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-2">
                         <textarea 
                             ref={textareaRef}
                             rows={1}
@@ -189,13 +189,14 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                                 else setNewComment(val);
                                 adjustHeight();
                             }} 
-                            className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto" 
+                            className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto custom-scrollbar" 
                         />
                     </div>
                     <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
                         {isPostingComment ? <Spinner /> : <Send size={20} />}
                     </button>
                 </form>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60">Restez courtois et respectueux.</p>
             </div>
         </div>
       </div>

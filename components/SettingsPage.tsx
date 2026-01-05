@@ -1,25 +1,31 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { User, Settings, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, Lock, CheckCircle } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
 
 const SettingsPage: React.FC = () => {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
-  // States pour les modaux
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
-  // States pour le changement de mot de passe
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Détecter si on arrive d'un lien de récupération
+  useEffect(() => {
+    if (location.hash && location.hash.includes('type=recovery')) {
+        setShowPasswordModal(true);
+    }
+  }, [location.hash]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -107,7 +113,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                    ISIG Community est le réseau social académique exclusif de l'ISIG Goma. Conçu pour favoriser la collaboration, le partage de ressources et l'innovation technologique entre étudiants de toutes promotions.
+                    ISIG Community est le réseau social académique exclusif de l'ISIG Goma. Conçu pour favoriser la collaboration, le partage de ressources et l'innovation technologique.
                 </p>
                 <div className="mt-8 pt-8 border-t border-slate-50">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Créateur de la plateforme</p>
@@ -116,7 +122,7 @@ const SettingsPage: React.FC = () => {
                             <img 
                                 src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
                                 alt="Dekens Ruzuba" 
-                                className="w-12 h-12 rounded-2xl object-cover shadow-lg shadow-isig-blue/20"
+                                className="w-12 h-12 rounded-2xl object-cover shadow-lg shadow-isig-blue/20 ring-2 ring-white"
                             />
                             <div>
                                 <p className="font-black text-slate-800 text-sm">Dekens Ruzuba</p>
@@ -129,7 +135,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <SettingItem icon={<Info size={20}/>} title="Politique de confidentialité" subtitle="Vos données sont protégées" onClick={() => setShowPrivacyModal(true)} />
+            <SettingItem icon={<Info size={20}/>} title="Politique de confidentialité" subtitle="Protection de vos données" onClick={() => setShowPrivacyModal(true)} />
         </div>
       </div>
 
@@ -139,23 +145,26 @@ const SettingsPage: React.FC = () => {
 
       {/* Modal Politique de Confidentialité */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-md w-full animate-fade-in-up">
+        <div className="fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={() => setShowPrivacyModal(false)}>
+            <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-md w-full animate-fade-in-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Confidentialité</h2>
                     <button onClick={() => setShowPrivacyModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
                 </div>
-                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
-                    <CheckCircle size={48} className="text-emerald-500 mx-auto mb-4" />
-                    <p className="text-slate-700 font-bold leading-relaxed">
+                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 text-center">
+                    <CheckCircle size={56} className="text-emerald-500 mx-auto mb-4" />
+                    <p className="text-slate-800 font-extrabold text-lg leading-relaxed">
                         Vos données sont sauvegardées de manière sécurisée.
+                    </p>
+                    <p className="text-slate-500 text-sm mt-3 font-medium italic">
+                        La plateforme utilise un cryptage de bout-en-bout pour protéger vos échanges.
                     </p>
                 </div>
                 <button 
                     onClick={() => setShowPrivacyModal(false)}
-                    className="w-full mt-6 py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs"
+                    className="w-full mt-6 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs"
                 >
-                    Fermer
+                    J'ai compris
                 </button>
             </div>
         </div>
@@ -174,10 +183,16 @@ const SettingsPage: React.FC = () => {
                     <div className="text-center py-6">
                         <CheckCircle size={64} className="text-emerald-500 mx-auto mb-4" />
                         <p className="text-lg font-black text-slate-800">Mise à jour réussie !</p>
+                        <p className="text-slate-500 text-sm mt-1">Votre accès a été sécurisé.</p>
                     </div>
                 ) : (
                     <form onSubmit={handleChangePassword} className="space-y-4">
-                        {passwordError && <p className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-xl border border-red-100">{passwordError}</p>}
+                        {passwordError && (
+                          <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-start text-xs font-bold">
+                            <AlertCircle size={16} className="mr-2 shrink-0" />
+                            <span>{passwordError}</span>
+                          </div>
+                        )}
                         <div>
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-2">Nouveau mot de passe</label>
                             <input 
@@ -187,6 +202,7 @@ const SettingsPage: React.FC = () => {
                                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none font-bold text-sm"
                                 placeholder="Min. 6 caractères"
                                 required
+                                autoFocus
                             />
                         </div>
                         <div>
@@ -205,7 +221,7 @@ const SettingsPage: React.FC = () => {
                             disabled={loading}
                             className="w-full mt-4 py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center"
                         >
-                            {loading ? <Spinner /> : "Mettre à jour"}
+                            {loading ? <Spinner /> : "Sauvegarder"}
                         </button>
                     </form>
                 )}

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
 import Spinner from './Spinner';
 
 const AuthPage: React.FC = () => {
@@ -18,6 +18,16 @@ const AuthPage: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const getFriendlyErrorMessage = (err: any) => {
+    const msg = err.message || '';
+    if (msg.includes('Invalid login credentials')) return "Email ou mot de passe incorrect. Veuillez vérifier vos accès.";
+    if (msg.includes('User not found')) return "Aucun compte n'est associé à cet email.";
+    if (msg.includes('Email not confirmed')) return "Veuillez confirmer votre adresse email avant de vous connecter.";
+    if (msg.includes('already registered')) return "Cet email est déjà utilisé par un autre étudiant.";
+    if (msg.includes('Password should be')) return "Le mot de passe doit contenir au moins 6 caractères.";
+    return msg || "Une erreur est survenue. Veuillez réessayer.";
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -63,17 +73,16 @@ const AuthPage: React.FC = () => {
                 avatar_url: avatarUrl,
             }).eq('id', data.user.id);
         }
-        setMessage('Vérifiez votre email pour confirmer votre inscription !');
+        setMessage('Un email de confirmation a été envoyé. Vérifiez votre boîte de réception.');
       } else {
-        // Forgot password mode
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/settings`,
         });
         if (error) throw error;
-        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail.');
+        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail (pensez aux spams).');
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(getFriendlyErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -84,26 +93,19 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
-      {/* Côté gauche - Visuel */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-dark p-12 flex-col justify-between relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
-        
         <div className="relative z-10">
           <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
           <h1 className="text-5xl font-extrabold text-white leading-tight italic">
             L'intelligence <br/><span className="text-isig-blue text-6xl">collective</span> <br/> de l'ISIG Goma.
           </h1>
-          <p className="text-slate-400 mt-6 text-xl max-w-md">
-            Collaborez, apprenez et construisez l'avenir de la technologie avec vos pairs.
-          </p>
         </div>
       </div>
 
-      {/* Côté droit - Formulaire */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
         <div className="w-full max-w-md space-y-8 animate-fade-in-up">
-          
           <div className="lg:hidden flex justify-center mb-6">
             <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 drop-shadow-xl" />
           </div>
@@ -112,14 +114,21 @@ const AuthPage: React.FC = () => {
             <h2 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">
               {isForgot ? 'Récupération' : isLogin ? 'Bon retour !' : 'Rejoindre'}
             </h2>
-            <p className="mt-2 text-slate-500 font-medium">
-              {isForgot ? 'Récupérez l\'accès à votre compte.' : isLogin ? 'Accédez à votre espace étudiant.' : 'Créez votre profil académique.'}
-            </p>
           </div>
 
           <form onSubmit={handleAuth} className="mt-8 space-y-4">
-            {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100">{error}</div>}
-            {message && <div className="p-4 bg-green-50 text-green-600 rounded-2xl text-sm font-bold border border-green-100">{message}</div>}
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100 flex items-start animate-pulse">
+                <AlertCircle size={18} className="mr-2 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+            {message && (
+              <div className="p-4 bg-green-50 text-green-600 rounded-2xl text-sm font-bold border border-green-100 flex items-start">
+                <RefreshCw size={18} className="mr-2 shrink-0 mt-0.5" />
+                <span>{message}</span>
+              </div>
+            )}
 
             {!isLogin && !isForgot && (
               <div className="grid grid-cols-1 gap-4">
@@ -128,7 +137,7 @@ const AuthPage: React.FC = () => {
                   <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <div className="relative">
+                  <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input type="text" placeholder="Matricule" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                   </div>
@@ -137,9 +146,7 @@ const AuthPage: React.FC = () => {
                     <input type="text" placeholder="Promotion" value={promotion} onChange={(e) => setPromotion(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                   </div>
                 </div>
-                <div className="relative">
-                   <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
-                </div>
+                <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
               </div>
             )}
 
@@ -159,7 +166,7 @@ const AuthPage: React.FC = () => {
                 </div>
                 {isLogin && (
                     <div className="text-right">
-                        <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors">
+                        <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors uppercase tracking-widest">
                             Mot de passe oublié ?
                         </button>
                     </div>
@@ -168,21 +175,19 @@ const AuthPage: React.FC = () => {
             )}
 
             <button type="submit" disabled={loading} className="w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm">
-              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
+              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer l\'accès' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
               {!loading && <ArrowRight size={20} />}
             </button>
           </form>
 
-          <div className="text-center space-y-2">
-            <p className="text-slate-500 font-bold">
-              {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
-              <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
-                {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
-              </button>
-            </p>
-          </div>
+          <p className="text-center text-slate-500 font-bold">
+            {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
+            <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
+              {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
+            </button>
+          </p>
 
-          <div className="mt-12 text-center">
+          <div className="mt-12 text-center border-t border-slate-100 pt-8">
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Développé par</p>
             <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-3 group">
                 <img 

@@ -38,7 +38,11 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      const scrollHeight = textarea.scrollHeight;
+      const maxHeight = 128; // max-h-32 = 8rem = 128px
+      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+      // N'affiche le scroll que si on dépasse la hauteur max
+      textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
   };
 
@@ -103,7 +107,10 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         setNewComment(''); 
         setReplyContent(''); 
         setReplyingTo(null);
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.overflowY = 'hidden';
+        }
     }
     setIsPostingComment(false);
   };
@@ -168,7 +175,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                     <span className="text-sm">{comments.length}</span>
                 </div>
             </div>
-            <div className="p-4 sm:p-6 pr-6 sm:pr-8">
+            <div className="p-4 sm:p-6">
                 {replyingTo && (
                     <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100">
                         <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
@@ -189,7 +196,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                                 else setNewComment(val);
                                 adjustHeight();
                             }} 
-                            className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto custom-scrollbar" 
+                            className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden custom-scrollbar" 
                         />
                     </div>
                     <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">

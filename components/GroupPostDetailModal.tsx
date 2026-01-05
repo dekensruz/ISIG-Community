@@ -45,7 +45,10 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      const scrollHeight = textarea.scrollHeight;
+      const maxHeight = 128; // max-h-32 = 128px
+      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+      textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
   };
 
@@ -118,7 +121,10 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     if (data) {
         setComments(prev => [...prev, data as any]);
         setNewComment('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.overflowY = 'hidden';
+        }
     }
     setIsPostingComment(false);
   };
@@ -132,7 +138,10 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
         setComments(prev => [...prev, data as any]);
         setReplyContent('');
         setReplyingTo(null);
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.overflowY = 'hidden';
+        }
     }
     setIsPostingComment(false);
   };
@@ -213,7 +222,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
         onClick={e => e.stopPropagation()}
         className={`bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] overflow-hidden transition-all duration-300 ${isAnimatingOut ? 'scale-95' : 'scale-100'}`}
       >
-        <div className="flex justify-between items-center p-6 border-b border-slate-50">
+        <div className="flex justify-between items-center p-6 border-b border-slate-50 flex-shrink-0">
             <h2 className="font-black text-xl text-slate-800 tracking-tight italic uppercase">Groupe • Post</h2>
             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
@@ -273,7 +282,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                             else setNewComment(val);
                             adjustHeight();
                         }}
-                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto custom-scrollbar"
+                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden custom-scrollbar"
                     />
                 </div>
                 <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">

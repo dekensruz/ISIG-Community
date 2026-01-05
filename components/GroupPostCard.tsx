@@ -65,26 +65,22 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     }
   };
 
-  const getLikeSummary = () => {
-    if (likes.length === 0) return null;
-    let text = "";
+  const getLikeSummaryText = () => {
     const count = likes.length;
+    if (count === 0) return null;
+
     if (isLiked) {
-        if (count === 1) text = "Vous avez aimé";
-        else text = `Vous et ${count - 1} autre${count > 2 ? 's' : ''}`;
+        if (count === 1) return "Vous avez aimé";
+        if (count === 2) {
+            const other = likerProfiles.find(p => p.id !== session?.user.id);
+            return `Vous et ${other?.full_name.split(' ')[0] || '1 autre'}`;
+        }
+        return `Vous et ${count - 1} autres`;
     } else {
-        const first = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
-        if (count === 1) text = `${first} a aimé`;
-        else text = `${first} et ${count - 1} autre${count > 2 ? 's' : ''}`;
+        const first = likerProfiles[0]?.full_name.split(' ')[0] || "Un étudiant";
+        if (count === 1) return `${first} a aimé`;
+        return `${first} et ${count - 1} autres`;
     }
-    return (
-        <button onClick={() => setShowLikersModal(true)} className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue mb-3">
-            <div className="flex -space-x-1.5">
-                {likerProfiles.slice(0, 3).map(p => <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />)}
-            </div>
-            <span>{text}</span>
-        </button>
-    );
   };
 
   return (
@@ -142,7 +138,19 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         </div>
       )}
 
-      {getLikeSummary()}
+      {likes.length > 0 && (
+          <div className="pb-3 px-1">
+              <button 
+                onClick={() => setShowLikersModal(true)}
+                className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue"
+              >
+                  <div className="flex -space-x-1.5 mr-1">
+                      {likerProfiles.slice(0, 3).map(p => <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />)}
+                  </div>
+                  <span className="italic">{getLikeSummaryText()}</span>
+              </button>
+          </div>
+      )}
       
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">
         <div className="flex items-center space-x-2 sm:space-x-6">

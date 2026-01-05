@@ -19,8 +19,12 @@ const AdminFeedbacksPage: React.FC = () => {
   useEffect(() => {
     const checkAdmin = async () => {
         if (!session?.user) return;
-        const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-        setIsAdmin(data?.role === 'admin');
+        try {
+            const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+            setIsAdmin(data?.role === 'admin');
+        } catch (e) {
+            setIsAdmin(false);
+        }
     };
     checkAdmin();
   }, [session]);
@@ -33,22 +37,31 @@ const AdminFeedbacksPage: React.FC = () => {
 
   const fetchFeedbacks = async () => {
     setLoading(true);
-    // Correction de la requête : utiliser la clé étrangère explicite vers profiles
+    // On essaie de récupérer les feedbacks sans jointure d'abord pour vérifier si la table est lisible
     const { data, error } = await supabase
         .from('feedbacks')
         .select(`
             id,
             content,
             created_at,
-            user_id,
-            profiles:user_id (*)
+            user_id
         `)
         .order('created_at', { ascending: false });
     
     if (error) {
-        console.error("Erreur chargement feedbacks:", error);
-    } else {
-        setFeedbacks(data as any);
+        console.error("Erreur feedbacks:", error);
+    } else if (data) {
+        // Une fois les données de base reçues, on enrichit avec les profils localement 
+        // ou via une requête séparée si nécessaire pour contourner les blocages RLS
+        const userIds = [...new Set(data.map(f => f.user_id))];
+        const { data: profileData } = await supabase.from('profiles').select('*').in('id', userIds);
+        
+        const enriched = data.map(f => ({
+            ...f,
+            profiles: profileData?.find(p => p.id === f.user_id)
+        }));
+        
+        setFeedbacks(enriched as any);
     }
     setLoading(false);
   };
@@ -90,7 +103,7 @@ const AdminFeedbacksPage: React.FC = () => {
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <MessageSquareText size={32} className="text-slate-200" />
                     </div>
-                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Aucun feedback dans la base de données.</p>
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Aucun feedback trouvé.</p>
                 </div>
             )}
         </div>

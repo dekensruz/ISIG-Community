@@ -45,6 +45,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const likerIds = likes.slice(0, 3).map(l => l.user_id);
       const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
       if (data) {
+        // Garder l'ordre des likes récents
         const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
         setLikerProfiles(sorted);
       }
@@ -66,36 +67,23 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     }
   };
 
-  const getLikeSummary = () => {
-    if (likes.length === 0) return null;
-    
-    let text = "";
+  const getLikeSummaryText = () => {
     const count = likes.length;
-    
-    if (isLiked) {
-        if (count === 1) text = "Vous avez aimé";
-        else if (count === 2) text = `Vous et 1 autre personne`;
-        else text = `Vous et ${count - 1} autres personnes`;
-    } else {
-        const firstLiker = likerProfiles[0]?.full_name || "Quelqu'un";
-        if (count === 1) text = `${firstLiker} a aimé`;
-        else if (count === 2) text = `${firstLiker} et 1 autre personne`;
-        else text = `${firstLiker} et ${count - 1} autres personnes`;
-    }
+    if (count === 0) return null;
 
-    return (
-        <button 
-            onClick={() => setShowLikersModal(true)}
-            className="flex items-center space-x-2 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors mb-3 group/likers"
-        >
-            <div className="flex -space-x-2">
-                {likerProfiles.slice(0, 3).map(p => (
-                    <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-                ))}
-            </div>
-            <span>{text}</span>
-        </button>
-    );
+    if (isLiked) {
+        if (count === 1) return "Vous avez aimé";
+        if (count === 2) {
+            const other = likerProfiles.find(p => p.id !== session?.user.id);
+            return `Vous et ${other?.full_name.split(' ')[0] || '1 autre'} avez aimé`;
+        }
+        return `Vous, ${likerProfiles.find(p => p.id !== session?.user.id)?.full_name.split(' ')[0] || 'quelqu\'un'} et ${count - 2} autres`;
+    } else {
+        const first = likerProfiles[0]?.full_name || "Un étudiant";
+        if (count === 1) return `${first} a aimé`;
+        if (count === 2) return `${first} et 1 autre ont aimé`;
+        return `${first} et ${count - 1} autres ont aimé`;
+    }
   };
 
   return (
@@ -166,7 +154,21 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         </div>
       )}
 
-      <div className="px-7 pb-2">{getLikeSummary()}</div>
+      {likes.length > 0 && (
+          <div className="px-7 pb-4">
+              <button 
+                onClick={() => setShowLikersModal(true)}
+                className="flex items-center space-x-3 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors group/likes"
+              >
+                  <div className="flex -space-x-2">
+                      {likerProfiles.slice(0, 3).map(p => (
+                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                      ))}
+                  </div>
+                  <span className="italic">{getLikeSummaryText()}</span>
+              </button>
+          </div>
+      )}
 
       <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-between">
         <div className="flex items-center space-x-2">

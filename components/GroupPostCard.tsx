@@ -81,7 +81,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     const shareUrl = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
     const shareData = {
         title: `ISIG Community - Groupe`,
-        text: `Nouveau post de ${post.profiles.full_name} dans un groupe d'étude sur ISIG Community.`,
+        text: `Découvrez cette publication académique sur ISIG Community.`,
         url: shareUrl,
     };
 
@@ -94,6 +94,23 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         }
     } catch (err) {
         console.error("Erreur de partage:", err);
+    }
+  };
+
+  const getLikeText = () => {
+    if (likes.length === 0) return "";
+    const count = likes.length;
+    const userLiked = isLiked;
+    
+    if (userLiked) {
+      if (count === 1) return "Vous avez aimé";
+      if (count === 2) return "Vous et 1 autre";
+      return `Vous et ${count - 1} autres`;
+    } else {
+      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
+      if (count === 1) return `${firstLiker} a aimé`;
+      if (count === 2) return `${firstLiker} et 1 autre`;
+      return `${firstLiker} et ${count - 1} autres`;
     }
   };
 
@@ -154,6 +171,22 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
             </a>
           )}
         </div>
+      )}
+
+      {likes.length > 0 && (
+          <div className="pb-3 px-1">
+              <button 
+                onClick={() => setShowLikersModal(true)}
+                className="flex items-center text-[10px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors"
+              >
+                  <div className="flex -space-x-1.5 mr-3">
+                      {likerProfiles.slice(0, 3).map(p => (
+                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                      ))}
+                  </div>
+                  <span>{getLikeText()}</span>
+              </button>
+          </div>
       )}
       
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">

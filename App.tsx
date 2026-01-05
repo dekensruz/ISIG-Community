@@ -21,6 +21,7 @@ import SearchResultsPage from './components/SearchResultsPage';
 import NotificationsPage from './components/NotificationsPage';
 import NotificationsProvider from './components/NotificationsProvider';
 import AdminFeedbacksPage from './components/AdminFeedbacksPage';
+import FeedbackPage from './components/FeedbackPage';
 
 type AuthContextType = {
   session: Session | null;
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
                     <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
                     <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
                     <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
+                    <Route path="/feedback" element={session ? <FeedbackPage /> : <Navigate to="/auth" />} />
                     <Route path="/admin/feedbacks" element={session ? <AdminFeedbacksPage /> : <Navigate to="/auth" />} />
                     <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
                     <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />

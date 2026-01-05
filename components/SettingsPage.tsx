@@ -5,7 +5,6 @@ import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckC
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
-import FeedbackModal from './FeedbackModal';
 
 const SettingsPage: React.FC = () => {
   const { session } = useAuth();
@@ -14,7 +13,6 @@ const SettingsPage: React.FC = () => {
   
   const [profile, setProfile] = useState<any>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [isPassExpanded, setIsPassExpanded] = useState(false);
   
   const [newPassword, setNewPassword] = useState('');
@@ -143,7 +141,7 @@ const SettingsPage: React.FC = () => {
                 )}
             </div>
 
-            <SettingItem icon={<MessageSquareText size={20}/>} title="Feedback" subtitle="Signaler un bug ou proposer une idée" onClick={() => setShowFeedbackModal(true)} />
+            <SettingItem icon={<MessageSquareText size={20}/>} title="Feedback" subtitle="Signaler un bug ou proposer une idée" to="/feedback" />
             
             {profile?.role === 'admin' && (
                 <SettingItem icon={<LayoutDashboard size={20}/>} title="Panel Admin" subtitle="Gérer les feedbacks et la plateforme" to="/admin/feedbacks" />
@@ -202,8 +200,6 @@ const SettingsPage: React.FC = () => {
             </div>
         </div>
       )}
-
-      {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
     </div>
   );
 };

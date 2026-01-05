@@ -33,12 +33,23 @@ const AdminFeedbacksPage: React.FC = () => {
 
   const fetchFeedbacks = async () => {
     setLoading(true);
+    // Correction de la requête : utiliser la clé étrangère explicite vers profiles
     const { data, error } = await supabase
         .from('feedbacks')
-        .select('*, profiles:user_id(*)')
+        .select(`
+            id,
+            content,
+            created_at,
+            user_id,
+            profiles:user_id (*)
+        `)
         .order('created_at', { ascending: false });
     
-    if (data) setFeedbacks(data as any);
+    if (error) {
+        console.error("Erreur chargement feedbacks:", error);
+    } else {
+        setFeedbacks(data as any);
+    }
     setLoading(false);
   };
 
@@ -52,8 +63,8 @@ const AdminFeedbacksPage: React.FC = () => {
                 <ChevronLeft size={24} />
             </Link>
             <div className="text-right">
-                <h1 className="text-3xl font-black text-slate-800 italic uppercase">Panel Admin</h1>
-                <p className="text-slate-500 font-medium">Gestion des feedbacks reçus</p>
+                <h1 className="text-3xl font-black text-slate-800 italic uppercase tracking-tight">Panel Admin</h1>
+                <p className="text-slate-500 font-medium">Gestion des retours utilisateurs</p>
             </div>
         </div>
 
@@ -62,7 +73,7 @@ const AdminFeedbacksPage: React.FC = () => {
                 <div key={f.id} className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-slate-100 animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
-                            <Avatar avatarUrl={f.profiles?.avatar_url} name={f.profiles?.full_name || 'Inconnu'} size="md" />
+                            <Avatar avatarUrl={f.profiles?.avatar_url} name={f.profiles?.full_name || 'Étudiant'} size="md" />
                             <div>
                                 <p className="font-extrabold text-slate-800 text-sm">{f.profiles?.full_name || 'Utilisateur inconnu'}</p>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: fr })}</p>
@@ -75,8 +86,11 @@ const AdminFeedbacksPage: React.FC = () => {
                     </div>
                 </div>
             )) : (
-                <div className="text-center py-20 bg-white rounded-[3rem] border border-slate-100 shadow-soft">
-                    <p className="text-slate-400 font-black uppercase tracking-widest">Aucun feedback pour le moment.</p>
+                <div className="text-center py-24 bg-white rounded-[3rem] border border-slate-100 shadow-soft">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <MessageSquareText size={32} className="text-slate-200" />
+                    </div>
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Aucun feedback dans la base de données.</p>
                 </div>
             )}
         </div>

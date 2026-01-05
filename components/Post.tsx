@@ -83,7 +83,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     
     const shareData = {
         title: `ISIG Community`,
-        text: `Découvrez cette publication académique de ${post.profiles.full_name} sur ISIG Community.`,
+        text: `Découvrez cette publication académique sur ISIG Community.`,
         url: shareUrl,
     };
 
@@ -103,6 +103,23 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     if (window.confirm("Voulez-vous vraiment supprimer cette publication ?")) {
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (!error) window.location.reload();
+    }
+  };
+
+  const getLikeText = () => {
+    if (likes.length === 0) return "";
+    const count = likes.length;
+    const userLiked = isLiked;
+    
+    if (userLiked) {
+      if (count === 1) return "Vous avez aimé";
+      if (count === 2) return "Vous et 1 autre personne";
+      return `Vous et ${count - 1} autres personnes`;
+    } else {
+      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
+      if (count === 1) return `${firstLiker} a aimé`;
+      if (count === 2) return `${firstLiker} et 1 autre personne`;
+      return `${firstLiker} et ${count - 1} autres personnes`;
     }
   };
 
@@ -191,6 +208,22 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
              </a>
            )}
         </div>
+      )}
+
+      {likes.length > 0 && (
+          <div className="px-7 pb-4">
+              <button 
+                onClick={() => setShowLikersModal(true)}
+                className="flex items-center text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors group/likes"
+              >
+                  <div className="flex -space-x-2 mr-3">
+                      {likerProfiles.slice(0, 3).map(p => (
+                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                      ))}
+                  </div>
+                  <span>{getLikeText()}</span>
+              </button>
+          </div>
       )}
 
       <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-between">

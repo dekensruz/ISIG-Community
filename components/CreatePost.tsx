@@ -2,14 +2,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Paperclip, X, FileText } from 'lucide-react';
+import { Post as PostType } from '../types';
+import { Paperclip, X, FileText, Send, RotateCcw } from 'lucide-react';
 import Spinner from './Spinner';
 
 interface CreatePostProps {
   onPostCreated: () => void;
+  editingPost?: PostType | null;
+  onCancelEdit?: () => void;
 }
 
-const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
+const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onCancelEdit }) => {
   const { session } = useAuth();
   const [content, setContent] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -18,16 +21,31 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Charger le post en cours d'édition
+  useEffect(() => {
+    if (editingPost) {
+      setContent(editingPost.content);
+      if (editingPost.media_url && editingPost.media_type === 'image') {
+        setPreviewUrl(editingPost.media_url);
+      } else {
+        setPreviewUrl(null);
+      }
+    } else {
+        setContent('');
+        setPreviewUrl(null);
+        setFile(null);
+    }
+  }, [editingPost]);
+
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (previewUrl) {
+    if (previewUrl && previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
     }
 
     if (e.target.files && e.target.files.length > 0) {
@@ -43,17 +61,17 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
 
   const handleRemoveFile = () => {
     setFile(null);
-    if (previewUrl) {
+    if (previewUrl && previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
     }
+    setPreviewUrl(null);
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
   };
 
   const handlePost = async () => {
-    if (!content.trim() && !file) {
+    if (!content.trim() && !file && !previewUrl) {
       setError("La publication ne peut pas être vide.");
       return;
     }
@@ -65,8 +83,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
     setUploading(true);
     setError(null);
 
-    let mediaUrl: string | undefined = undefined;
-    let mediaType: string | undefined = undefined;
+    let mediaUrl: string | undefined = editingPost?.media_url;
+    let mediaType: string | undefined = editingPost?.media_type;
 
     if (file) {
       const fileExt = file.name.split('.').pop();
@@ -86,25 +104,56 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
       mediaType = file.type.startsWith('image/') ? 'image' : 'document';
     }
 
-    const { error: insertError } = await supabase.from('posts').insert({
-      user_id: session.user.id,
-      content,
-      media_url: mediaUrl,
-      media_type: mediaType
-    });
+    if (editingPost) {
+        // Mise à jour
+        const { error: updateError } = await supabase
+            .from('posts')
+            .update({
+                content,
+                media_url: mediaUrl,
+                media_type: mediaType
+            })
+            .eq('id', editingPost.id);
 
-    if (insertError) {
-      setError(insertError.message);
+        if (updateError) {
+            setError(updateError.message);
+        } else {
+            onPostCreated();
+        }
     } else {
-      setContent('');
-      handleRemoveFile();
-      onPostCreated();
+        // Insertion
+        const { error: insertError } = await supabase.from('posts').insert({
+            user_id: session.user.id,
+            content,
+            media_url: mediaUrl,
+            media_type: mediaType
+        });
+
+        if (insertError) {
+            setError(insertError.message);
+        } else {
+            setContent('');
+            handleRemoveFile();
+            onPostCreated();
+        }
     }
     setUploading(false);
   };
   
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
+    <div className={`bg-white p-6 rounded-[2rem] shadow-soft border transition-all duration-500 animate-fade-in-up ${editingPost ? 'ring-2 ring-isig-blue border-transparent' : 'border-slate-100'}`}>
+      <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              {editingPost ? 'Modification en cours' : 'Nouvelle publication'}
+          </h3>
+          {editingPost && (
+              <button onClick={onCancelEdit} className="flex items-center space-x-1 text-red-500 hover:text-red-600 text-[10px] font-black uppercase tracking-widest">
+                  <RotateCcw size={12}/>
+                  <span>Annuler</span>
+              </button>
+          )}
+      </div>
+
       <div className="relative">
         <textarea
             className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all"
@@ -114,14 +163,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         />
       </div>
       
-      {file && (
+      {previewUrl && (
         <div className="mt-4 relative inline-block group">
-            {previewUrl ? (
+            {editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage') ? (
                 <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
             ) : (
                 <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <FileText className="text-isig-blue mr-3" />
-                    <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file.name}</p>
+                    <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file?.name || 'Fichier attaché'}</p>
                 </div>
             )}
             <button
@@ -142,13 +191,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         </div>
         <button
           onClick={handlePost}
-          disabled={uploading || (!content.trim() && !file)}
-          className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl shadow-lg shadow-isig-orange/20 hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs"
+          disabled={uploading || (!content.trim() && !file && !previewUrl)}
+          className={`${editingPost ? 'bg-isig-blue' : 'bg-isig-orange'} text-white font-black py-3.5 px-8 rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-[10px] flex items-center space-x-2`}
         >
-          {uploading ? 'Envoi...' : 'Publier'}
+          {uploading ? <Spinner /> : (editingPost ? <><Send size={14}/><span>Mettre à jour</span></> : 'Publier')}
         </button>
       </div>
-      {error && <p className="text-red-500 text-xs font-bold mt-3 ml-2">{error}</p>}
+      {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
     </div>
   );
 };

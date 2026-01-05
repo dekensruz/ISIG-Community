@@ -12,6 +12,7 @@ const Feed: React.FC = () => {
   const { session } = useAuth();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingPost, setEditingPost] = useState<PostType | null>(null);
   const { searchQuery, sortOrder } = useSearchFilter();
 
   const fetchPosts = useCallback(async () => {
@@ -38,14 +39,17 @@ const Feed: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchPosts]);
 
+  const handleEditRequested = (post: PostType) => {
+    setEditingPost(post);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const filteredPosts = useMemo(() => {
     return posts.filter(post => {
       const q = searchQuery.toLowerCase();
       return post.content.toLowerCase().includes(q) || post.profiles.full_name.toLowerCase().includes(q);
     }).sort((a, b) => {
-        // Fix: Use created_at directly as it is a string on the Post object
         const d = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        // Correction de la logique de tri si nécessaire
         return sortOrder === 'desc' ? d : -d;
     });
   }, [posts, searchQuery, sortOrder]);
@@ -53,7 +57,13 @@ const Feed: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto w-full">
       <div className="space-y-6">
-        {session ? <CreatePost onPostCreated={fetchPosts} /> : (
+        {session ? (
+          <CreatePost 
+            onPostCreated={() => { fetchPosts(); setEditingPost(null); }} 
+            editingPost={editingPost}
+            onCancelEdit={() => setEditingPost(null)}
+          />
+        ) : (
             <div className="bg-isig-blue p-8 rounded-3xl text-white shadow-xl mb-8 relative overflow-hidden animate-fade-in-up">
                 <div className="relative z-10">
                     <h2 className="text-2xl font-black italic">ISIG COMMUNITY</h2>
@@ -74,7 +84,7 @@ const Feed: React.FC = () => {
                 className="animate-fade-in-up" 
                 style={{ animationDelay: `${Math.min(index * 0.1, 1)}s` }}
               >
-                <PostCard post={post} />
+                <PostCard post={post} onEditRequested={handleEditRequested} />
               </div>
             ))
           ) : (

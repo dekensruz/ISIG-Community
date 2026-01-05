@@ -11,20 +11,19 @@ import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
 import Avatar from './Avatar';
 import LikerListModal from './LikerListModal';
-import EditPostModal from './EditPostModal';
 import Spinner from './Spinner';
 
 interface PostProps {
   post: PostType;
   startWithModalOpen?: boolean;
+  onEditRequested?: (post: PostType) => void;
 }
 
-const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => {
+const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEditRequested }) => {
   const { session } = useAuth();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [showLikersModal, setShowLikersModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   
@@ -143,7 +142,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
             </button>
             {showOptions && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden">
-                <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <button 
+                  onClick={() => { 
+                    if(onEditRequested) onEditRequested(post);
+                    setShowOptions(false); 
+                  }} 
+                  className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                >
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
                 <button onClick={() => { handleDelete(); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
@@ -225,7 +230,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false }) => 
       {showImageModal && <ImageModal post={post} onClose={() => setShowImageModal(false)} onOpenComments={() => setShowPostDetailModal(true)} />}
       {showPostDetailModal && <PostDetailModal post={post} onClose={() => setShowPostDetailModal(false)} />}
       {showLikersModal && <LikerListModal postId={post.id} postType="feed" onClose={() => setShowLikersModal(false)} />}
-      {showEditModal && <EditPostModal post={post} onClose={() => setShowEditModal(false)} />}
     </div>
   );
 };

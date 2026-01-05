@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'export React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Send, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
 import { GroupPost, GroupPostLike, GroupPostComment, Profile } from '../types';

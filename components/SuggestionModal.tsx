@@ -6,7 +6,7 @@ import { Profile } from '../types';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
 import { Link } from 'react-router-dom';
-import { Search, Sparkles, X, ArrowRight, Lightbulb, Send } from 'lucide-react';
+import { Search, Sparkles, X, ArrowRight, Lightbulb, Send, AlertCircle } from 'lucide-react';
 
 interface SuggestionModalProps {
   currentUser: Profile;
@@ -53,7 +53,7 @@ const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentUser, onClose 
         }
     } catch (error) {
         console.error(error);
-        alert("Une erreur est survenue lors de la recherche.");
+        setSuggestions([]);
     } finally {
         setLoading(false);
     }
@@ -138,9 +138,16 @@ const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentUser, onClose 
                         ))}
                     </div>
                 ) : hasSearched ? (
-                    <div className="text-center py-16 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
-                        <p className="text-slate-500 font-bold">Aucune correspondance précise trouvée.</p>
-                        <p className="text-xs text-slate-400 mt-2 px-10">Essayez d'utiliser des termes plus généraux.</p>
+                    <div className="text-center py-12 px-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 animate-fade-in">
+                        <div className="w-16 h-16 bg-isig-orange/10 text-isig-orange rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertCircle size={32} />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 mb-2 italic">Oups, l'IA est un peu fatiguée !</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            Désolé, l'IA n'a trouvé aucune correspondance. <br/>
+                            <span className="text-isig-blue font-bold">À savoir :</span> Nous utilisons des crédits gratuits qui s'épuisent parfois vite à cause du succès d'ISIG Community ! 🚀 <br/><br/>
+                            Réessayez un peu plus tard ou tentez une recherche différente. N'oubliez pas que nous ne sommes qu'à nos débuts !
+                        </p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">

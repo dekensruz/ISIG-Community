@@ -79,6 +79,30 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     }
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
+    const shareText = `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community : ${url}`;
+    
+    try {
+        if (navigator.share) {
+            await navigator.share({
+                title: 'ISIG Community',
+                text: `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community`,
+                url: url,
+            });
+        } else {
+            throw new Error('Web Share API not supported');
+        }
+    } catch (err) {
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert("Lien personnalisé copié dans le presse-papier !");
+        } catch (copyErr) {
+            console.error("Copy failed", copyErr);
+        }
+    }
+  };
+
   const getLikeSummaryText = () => {
     const count = likes.length;
     if (count === 0) return null;
@@ -177,11 +201,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
             <span className="text-sm font-bold">{post.group_post_comments.length}</span>
           </button>
         </div>
-        <button onClick={async () => {
-            const url = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
-            if(navigator.share) await navigator.share({ title: 'Groupe ISIG', url });
-            else { navigator.clipboard.writeText(url); alert("Lien copié !"); }
-        }} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl">
+        <button onClick={handleShare} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl">
            <Share2 size={20} />
         </button>
       </div>

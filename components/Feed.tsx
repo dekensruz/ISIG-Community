@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Post as PostType } from '../types';
 import CreatePost from './CreatePost';
@@ -12,8 +12,14 @@ const Feed: React.FC = () => {
   const { session } = useAuth();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
-  const { searchQuery, sortOrder } = useSearchFilter();
+  const { searchQuery } = useSearchFilter();
+  
+  const loaderRef = useRef<HTMLDivElement>(null);
+  const POSTS_PER_PAGE = 10;
 
   const shuffleArray = (array: any[]) => {
     const shuffled = [...array];
@@ -24,37 +30,70 @@ const Feed: React.FC = () => {
     return shuffled;
   };
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (isInitial = false) => {
     try {
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const currentPage = isInitial ? 0 : page + 1;
+      const from = currentPage * POSTS_PER_PAGE;
+      const to = from + POSTS_PER_PAGE - 1;
+
       const { data, error } = await supabase
         .from('posts')
         .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       
-      const allPosts = data as any || [];
-      if (allPosts.length > 3) {
-        const topThree = allPosts.slice(0, 3);
-        const rest = allPosts.slice(3);
-        setPosts([...topThree, ...shuffleArray(rest)]);
+      const newPosts = data as any || [];
+      
+      if (isInitial) {
+        if (newPosts.length > 3) {
+          const topThree = newPosts.slice(0, 3);
+          const rest = newPosts.slice(3);
+          setPosts([...topThree, ...shuffleArray(rest)]);
+        } else {
+          setPosts(newPosts);
+        }
+        setPage(0);
       } else {
-        setPosts(allPosts);
+        setPosts(prev => [...prev, ...newPosts]);
+        setPage(currentPage);
       }
+
+      setHasMore(newPosts.length === POSTS_PER_PAGE);
+
     } catch (error: any) {
       console.error('Feed loading error:', error.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [page]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery) {
+        fetchPosts(false);
+      }
+    }, { threshold: 0.1 });
+
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, searchQuery, fetchPosts]);
 
   useEffect(() => {
-    fetchPosts();
-    const channel = supabase.channel('feed-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchPosts]);
+    fetchPosts(true);
+  }, []);
 
   const handleEditRequested = (post: PostType) => {
     setEditingPost(post);
@@ -73,7 +112,7 @@ const Feed: React.FC = () => {
       <div className="space-y-6">
         {session ? (
           <CreatePost 
-            onPostCreated={() => { fetchPosts(); setEditingPost(null); }} 
+            onPostCreated={() => { fetchPosts(true); setEditingPost(null); }} 
             editingPost={editingPost}
             onCancelEdit={() => setEditingPost(null)}
           />
@@ -92,15 +131,22 @@ const Feed: React.FC = () => {
           {loading ? (
              <div className="flex justify-center py-20"><Spinner /></div>
           ) : filteredPosts.length > 0 ? (
-            filteredPosts.map((post, index) => (
-              <div 
-                key={post.id} 
-                className="animate-fade-in-up" 
-                style={{ animationDelay: `${Math.min(index * 0.1, 1)}s` }}
-              >
-                <PostCard post={post} onEditRequested={handleEditRequested} />
+            <>
+              {filteredPosts.map((post, index) => (
+                <div 
+                  key={post.id} 
+                  className="animate-fade-in-up" 
+                  style={{ animationDelay: `${Math.min((index % POSTS_PER_PAGE) * 0.1, 1)}s` }}
+                >
+                  <PostCard post={post} onEditRequested={handleEditRequested} />
+                </div>
+              ))}
+              
+              {/* Invisible loader element for Infinite Scroll */}
+              <div ref={loaderRef} className="h-20 flex items-center justify-center">
+                {loadingMore && <Spinner />}
               </div>
-            ))
+            </>
           ) : (
             <div className="text-center p-16 bg-white rounded-3xl border border-slate-200 shadow-soft animate-fade-in-up">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">

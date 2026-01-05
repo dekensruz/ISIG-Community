@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 import { useAuth, useSearchFilter } from '../App';
 import { Link, useNavigate } from 'react-router-dom';
 import { Profile } from '../types';
-import { User, LogOut, Search, Bell, LayoutGrid } from 'lucide-react';
+import { User, LogOut, Search, Bell, LayoutGrid, Settings } from 'lucide-react';
 import Avatar from './Avatar';
 
 const Navbar: React.FC = () => {
@@ -83,6 +83,9 @@ const Navbar: React.FC = () => {
                     <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-3xl shadow-premium border border-slate-100 py-2 overflow-hidden animate-fade-in">
                         <Link to={`/profile/${profile.id}`} onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
                             <User size={18} className="mr-3 text-slate-400" /> Profil
+                        </Link>
+                        <Link to="/settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                            <Settings size={18} className="mr-3 text-slate-400" /> Paramètres
                         </Link>
                         <div className="border-t border-slate-100 my-1 mx-2"></div>
                         <button onClick={handleSignOut} className="w-full flex items-center px-4 py-3.5 text-sm font-bold text-red-500 hover:bg-red-50 text-left">

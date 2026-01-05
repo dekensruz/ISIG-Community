@@ -164,6 +164,12 @@ const AuthPage: React.FC = () => {
               {isLogin ? "S'inscrire" : "Se connecter"}
             </button>
           </p>
+
+          <div className="mt-12 text-center">
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-[0.1em]">
+              Développé par <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline font-black">Dekens Ruzuba</a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Paperclip, X, FileText, Sparkles, Wand2 } from 'lucide-react';
-import { improveAcademicPost } from '../services/gemini';
+import { Paperclip, X, FileText } from 'lucide-react';
 import Spinner from './Spinner';
 
 interface CreatePostProps {
@@ -14,7 +13,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const { session } = useAuth();
   const [content, setContent] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [improving, setImproving] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,19 +49,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
     }
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
-    }
-  };
-
-  const handleImprove = async () => {
-    if (!content.trim()) return;
-    setImproving(true);
-    try {
-        const improved = await improveAcademicPost(content);
-        setContent(improved);
-    } catch (err) {
-        console.error(err);
-    } finally {
-        setImproving(false);
     }
   };
 
@@ -127,17 +112,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
             value={content}
             onChange={(e) => setContent(e.target.value)}
         />
-        {content.length > 10 && (
-            <button 
-                onClick={handleImprove}
-                disabled={improving}
-                className="absolute bottom-4 right-4 flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur shadow-sm rounded-xl text-isig-blue font-bold text-xs hover:bg-isig-blue hover:text-white transition-all border border-isig-blue/10 disabled:opacity-50"
-                title="Améliorer avec l'IA"
-            >
-                {improving ? <Spinner /> : <Sparkles size={14} />}
-                <span>{improving ? 'Optimisation...' : 'Améliorer'}</span>
-            </button>
-        )}
       </div>
       
       {file && (

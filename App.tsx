@@ -6,6 +6,7 @@ import AuthPage from './components/Auth';
 import Feed from './components/Feed';
 import Navbar from './components/Navbar';
 import Profile from './components/Profile';
+import SettingsPage from './components/SettingsPage';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Spinner from './components/Spinner';
 import PostPage from './components/PostPage';
@@ -90,6 +91,7 @@ const AppContent: React.FC = () => {
                     <Route path="/chat" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
                     <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
                     <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
+                    <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
                     <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
                     <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
                     <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />

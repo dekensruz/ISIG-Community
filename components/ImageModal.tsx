@@ -71,6 +71,31 @@ const ImageModal: React.FC<ImageModalProps> = ({ post, onClose, onOpenComments }
     }
   };
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/post/${post.id}`;
+    const shareText = `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community : ${url}`;
+    
+    try {
+        if (navigator.share) {
+            await navigator.share({
+                title: 'ISIG Community',
+                text: `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community`,
+                url: url,
+            });
+        } else {
+            throw new Error('Web Share API non supportée');
+        }
+    } catch (err) {
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert("Lien copié dans votre presse-papier !");
+        } catch (copyErr) {
+            console.error("Erreur de copie", copyErr);
+        }
+    }
+  };
+
   if (!modalRoot) return null;
 
   return createPortal(
@@ -110,7 +135,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ post, onClose, onOpenComments }
                             <span className="font-black text-lg">{post.comments.length}</span>
                         </button>
                     </div>
-                    <button className="p-3 bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all">
+                    <button onClick={handleShare} className="p-3 bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all">
                         <Share2 size={24} />
                     </button>
                 </div>

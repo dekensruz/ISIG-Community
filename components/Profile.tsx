@@ -195,9 +195,13 @@ const Profile: React.FC = () => {
 
   const handleEditRequested = (post: PostType) => {
     setEditingPost(post);
-    // Défilement vers la zone d'édition après un court délai pour laisser le composant s'afficher
+    // Défilement direct vers le haut de la section des publications (là où CreatePost apparaît)
     setTimeout(() => {
-        editAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (editAreaRef.current) {
+            const yOffset = -100; // Offset pour compenser la navbar
+            const y = editAreaRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        }
     }, 100);
   };
 

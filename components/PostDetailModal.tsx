@@ -164,9 +164,11 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                     </div>
                 )}
                 <form onSubmit={handlePostComment} className="flex items-center space-x-3">
-                    <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" />
-                    <input type="text" placeholder={replyingTo ? "Écrire une réponse..." : "Ajouter un commentaire..."} value={replyingTo ? replyContent : newComment} onChange={(e) => replyingTo ? setReplyContent(e.target.value) : setNewComment(e.target.value)} className="flex-1 bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all" />
-                    <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                    <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" className="shrink-0" />
+                    <div className="flex-1 min-w-0">
+                        <input type="text" placeholder={replyingTo ? "Écrire une réponse..." : "Ajouter un commentaire..."} value={replyingTo ? replyContent : newComment} onChange={(e) => replyingTo ? setReplyContent(e.target.value) : setNewComment(e.target.value)} className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all" />
+                    </div>
+                    <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
                         {isPostingComment ? <Spinner /> : <Send size={20} />}
                     </button>
                 </form>

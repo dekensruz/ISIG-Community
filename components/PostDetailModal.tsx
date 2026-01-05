@@ -27,10 +27,19 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const modalRootRef = useRef(document.getElementById('modal-root'));
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleClose = () => {
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
+  };
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
   };
 
   const fetchComments = async () => {
@@ -91,7 +100,10 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     }).select('*, profiles(*)').single();
     if (data) {
         setComments(prev => [...prev, data as any]);
-        setNewComment(''); setReplyContent(''); setReplyingTo(null);
+        setNewComment(''); 
+        setReplyContent(''); 
+        setReplyingTo(null);
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }
     setIsPostingComment(false);
   };
@@ -166,7 +178,19 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                 <form onSubmit={handlePostComment} className="flex items-center space-x-3">
                     <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" className="shrink-0" />
                     <div className="flex-1 min-w-0">
-                        <input type="text" placeholder={replyingTo ? "Écrire une réponse..." : "Ajouter un commentaire..."} value={replyingTo ? replyContent : newComment} onChange={(e) => replyingTo ? setReplyContent(e.target.value) : setNewComment(e.target.value)} className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all" />
+                        <textarea 
+                            ref={textareaRef}
+                            rows={1}
+                            placeholder={replyingTo ? "Écrire une réponse..." : "Ajouter un commentaire..."} 
+                            value={replyingTo ? replyContent : newComment} 
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (replyingTo) setReplyContent(val);
+                                else setNewComment(val);
+                                adjustHeight();
+                            }} 
+                            className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-auto" 
+                        />
                     </div>
                     <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
                         {isPostingComment ? <Spinner /> : <Send size={20} />}

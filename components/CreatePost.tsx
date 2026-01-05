@@ -20,6 +20,15 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  };
 
   // Charger le post en cours d'édition
   useEffect(() => {
@@ -30,10 +39,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       } else {
         setPreviewUrl(null);
       }
+      // Ajuster la hauteur après un court délai pour que le contenu soit rendu
+      setTimeout(adjustHeight, 0);
     } else {
         setContent('');
         setPreviewUrl(null);
         setFile(null);
+        if (textareaRef.current) textareaRef.current.style.height = '120px';
     }
   }, [editingPost]);
 
@@ -156,10 +168,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
 
       <div className="relative">
         <textarea
-            className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all"
+            ref={textareaRef}
+            className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all overflow-hidden"
             placeholder="Partagez une astuce, une question ou un projet..."
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              adjustHeight();
+            }}
         />
       </div>
       

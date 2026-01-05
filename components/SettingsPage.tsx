@@ -12,8 +12,8 @@ const SettingsPage: React.FC = () => {
   const location = useLocation();
   
   const [profile, setProfile] = useState<any>(null);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [isPassExpanded, setIsPassExpanded] = useState(false);
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -178,28 +178,38 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <SettingItem icon={<Info size={20}/>} title="Politique de confidentialité" subtitle="Vos données sont protégées" onClick={() => setShowPrivacyModal(true)} />
+
+            <div className="bg-white">
+                <button 
+                    onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
+                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
+                >
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 rounded-2xl bg-slate-100 text-slate-500"><Info size={20}/></div>
+                        <div className="text-left">
+                            <p className="font-black text-sm uppercase tracking-tight">Politique de confidentialité</p>
+                            <p className="text-xs text-slate-400 font-medium">Vos données sont protégées</p>
+                        </div>
+                    </div>
+                    {isPrivacyExpanded ? <ChevronUp size={18} className="text-isig-blue" /> : <ChevronDown size={18} className="text-slate-300" />}
+                </button>
+                {isPrivacyExpanded && (
+                    <div className="px-5 pb-6 animate-fade-in">
+                        <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 flex items-center space-x-4">
+                            <div className="bg-emerald-500 text-white p-2 rounded-xl flex-shrink-0">
+                                <CheckCircle size={20} />
+                            </div>
+                            <p className="text-emerald-800 font-bold text-sm leading-relaxed">Vos données sont sauvegardées de manière sécurisée sur les serveurs ISIG.</p>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden mb-12">
         <SettingItem icon={<LogOut size={20}/>} title="Déconnexion" subtitle="Quitter votre session actuelle" onClick={handleSignOut} danger />
       </div>
-
-      {showPrivacyModal && (
-        <div className="fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={() => setShowPrivacyModal(false)}>
-            <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-md w-full animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Confidentialité</h2>
-                    <button onClick={() => setShowPrivacyModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
-                </div>
-                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 text-center">
-                    <CheckCircle size={56} className="text-emerald-500 mx-auto mb-4" />
-                    <p className="text-slate-800 font-extrabold text-lg">Vos données sont sauvegardées de manière sécurisée.</p>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 };

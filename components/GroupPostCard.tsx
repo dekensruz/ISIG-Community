@@ -27,8 +27,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const [showOptions, setShowOptions] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes);
-  const [comments, setComments] = useState<GroupPostComment[]>(post.group_post_comments);
+  const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes || []);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
@@ -52,16 +51,6 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     fetchTopLikers();
   }, [likes]);
 
-  const renderContentWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.split(urlRegex).map((part, i) => {
-      if (part.match(urlRegex)) {
-        return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>;
-      }
-      return part;
-    });
-  };
-
   const handleLike = async () => {
     if (!session?.user) return;
     if (isLiked) {
@@ -71,51 +60,35 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         await supabase.from('group_post_likes').delete().match({ group_post_id: post.id, user_id: session.user.id });
       }
     } else {
-      const tempLike = { id: Math.random().toString(), group_post_id: post.id, user_id: session.user.id };
-      setLikes(prev => [tempLike as any, ...prev]);
-      await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id });
+      const { data, error } = await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id }).select().single();
+      if(!error && data) setLikes(prev => [data, ...prev]);
     }
   };
 
-  const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
-    const shareData = {
-        title: `ISIG Community - Groupe`,
-        text: `Découvrez cette publication académique sur ISIG Community.`,
-        url: shareUrl,
-    };
-
-    try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-            await navigator.clipboard.writeText(shareUrl);
-            alert("Lien de la publication copié !");
-        }
-    } catch (err) {
-        console.error("Erreur de partage:", err);
-    }
-  };
-
-  const getLikeText = () => {
-    if (likes.length === 0) return "";
+  const getLikeSummary = () => {
+    if (likes.length === 0) return null;
+    let text = "";
     const count = likes.length;
-    const userLiked = isLiked;
-    
-    if (userLiked) {
-      if (count === 1) return "Vous avez aimé";
-      if (count === 2) return "Vous et 1 autre";
-      return `Vous et ${count - 1} autres`;
+    if (isLiked) {
+        if (count === 1) text = "Vous avez aimé";
+        else text = `Vous et ${count - 1} autre${count > 2 ? 's' : ''}`;
     } else {
-      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
-      if (count === 1) return `${firstLiker} a aimé`;
-      if (count === 2) return `${firstLiker} et 1 autre`;
-      return `${firstLiker} et ${count - 1} autres`;
+        const first = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
+        if (count === 1) text = `${first} a aimé`;
+        else text = `${first} et ${count - 1} autre${count > 2 ? 's' : ''}`;
     }
+    return (
+        <button onClick={() => setShowLikersModal(true)} className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue mb-3">
+            <div className="flex -space-x-1.5">
+                {likerProfiles.slice(0, 3).map(p => <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />)}
+            </div>
+            <span>{text}</span>
+        </button>
+    );
   };
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group relative">
+    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Link to={`/profile/${post.profiles.id}`}>
@@ -135,7 +108,10 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
             {showOptions && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20">
                 <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  <Pencil size={16} className="mr-3" /> Modifier
+                  <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
+                </button>
+                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('group_posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
+                  <Trash2 size={16} className="mr-3" /> Supprimer
                 </button>
               </div>
             )}
@@ -144,65 +120,46 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       </div>
 
       <div className="text-slate-700 whitespace-pre-wrap mb-4 font-medium leading-relaxed">
-        {renderContentWithLinks(displayedContent)}
+        {displayedContent}
         {!isExpanded && isLongContent && <span>...</span>}
         {isLongContent && (
-            <button 
-                onClick={() => setIsExpanded(!isExpanded)} 
-                className="mt-2 text-isig-blue font-black text-xs uppercase tracking-widest flex items-center block hover:opacity-70 transition-opacity"
-            >
-                {isExpanded ? <><ChevronUp size={16} className="mr-1"/> Voir moins</> : <><ChevronDown size={16} className="mr-1"/> Voir plus</>}
+            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block">
+                {isExpanded ? <><ChevronUp size={14} className="inline mr-1"/>Voir moins</> : <><ChevronDown size={14} className="inline mr-1"/>Voir plus</>}
             </button>
         )}
       </div>
 
       {post.media_url && (
-        <div className="mb-4">
+        <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100">
           {post.media_type?.startsWith('image/') ? (
-            <button onClick={() => setShowImageModal(true)} className="w-full h-auto cursor-pointer focus:outline-none rounded-[1.5rem] overflow-hidden group/media">
-                <img src={post.media_url} alt="Média" className="max-h-[500px] w-full object-cover transition-transform duration-700 group-hover/media:scale-110" />
-            </button>
+            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} />
           ) : (
-            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all">
-              <div className="w-10 h-10 bg-isig-blue/10 rounded-xl flex items-center justify-center text-isig-blue mr-3">
-                <FileText size={20} />
-              </div>
-              <span className="text-slate-800 font-bold text-sm">Consulter le document</span>
+            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4">
+              <FileText size={20} className="text-isig-blue mr-3" />
+              <span className="text-slate-800 font-bold text-sm uppercase">Fichier joint</span>
             </a>
           )}
         </div>
       )}
 
-      {likes.length > 0 && (
-          <div className="pb-3 px-1">
-              <button 
-                onClick={() => setShowLikersModal(true)}
-                className="flex items-center text-[10px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors"
-              >
-                  <div className="flex -space-x-1.5 mr-3">
-                      {likerProfiles.slice(0, 3).map(p => (
-                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-                      ))}
-                  </div>
-                  <span>{getLikeText()}</span>
-              </button>
-          </div>
-      )}
+      {getLikeSummary()}
       
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">
         <div className="flex items-center space-x-2 sm:space-x-6">
-          <button onClick={handleLike} className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
+          <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
             <Heart size={20} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
             <span className="text-sm font-bold">{likes.length}</span>
           </button>
-          
-          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-3 sm:px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
+          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
             <MessageCircle size={20} />
-            <span className="text-sm font-bold">{comments.length}</span>
+            <span className="text-sm font-bold">{post.group_post_comments.length}</span>
           </button>
         </div>
-        
-        <button onClick={handleShare} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
+        <button onClick={async () => {
+            const url = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
+            if(navigator.share) await navigator.share({ title: 'Groupe ISIG', url });
+            else { navigator.clipboard.writeText(url); alert("Lien copié !"); }
+        }} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl">
            <Share2 size={20} />
         </button>
       </div>

@@ -28,7 +28,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   
-  const [likes, setLikes] = useState<Like[]>(post.likes);
+  const [likes, setLikes] = useState<Like[]>(post.likes || []);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
@@ -52,16 +52,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     fetchTopLikers();
   }, [likes]);
 
-  const renderContentWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.split(urlRegex).map((part, i) => {
-      if (part.match(urlRegex)) {
-        return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>;
-      }
-      return part;
-    });
-  };
-
   const handleLike = async () => {
     if (!session?.user) return;
     if (isLiked) {
@@ -71,60 +61,45 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         await supabase.from('likes').delete().match({ post_id: post.id, user_id: session.user.id });
       }
     } else {
-      const tempLike = { id: Math.random().toString(), post_id: post.id, user_id: session.user.id };
-      setLikes(prev => [tempLike as any, ...prev]);
-      await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id });
+      const { data, error } = await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id }).select().single();
+      if (!error && data) setLikes(prev => [data, ...prev]);
     }
   };
 
-  const handleShare = async () => {
-    const baseUrl = window.location.origin;
-    const shareUrl = `${baseUrl}/post/${post.id}`;
+  const getLikeSummary = () => {
+    if (likes.length === 0) return null;
     
-    const shareData = {
-        title: `ISIG Community`,
-        text: `Découvrez cette publication académique sur ISIG Community.`,
-        url: shareUrl,
-    };
-
-    try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-            await navigator.clipboard.writeText(shareUrl);
-            alert("Lien de la publication copié !");
-        }
-    } catch (err) {
-        console.error("Erreur de partage:", err);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (window.confirm("Voulez-vous vraiment supprimer cette publication ?")) {
-      const { error } = await supabase.from('posts').delete().eq('id', post.id);
-      if (!error) window.location.reload();
-    }
-  };
-
-  const getLikeText = () => {
-    if (likes.length === 0) return "";
+    let text = "";
     const count = likes.length;
-    const userLiked = isLiked;
     
-    if (userLiked) {
-      if (count === 1) return "Vous avez aimé";
-      if (count === 2) return "Vous et 1 autre personne";
-      return `Vous et ${count - 1} autres personnes`;
+    if (isLiked) {
+        if (count === 1) text = "Vous avez aimé";
+        else if (count === 2) text = `Vous et 1 autre personne`;
+        else text = `Vous et ${count - 1} autres personnes`;
     } else {
-      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
-      if (count === 1) return `${firstLiker} a aimé`;
-      if (count === 2) return `${firstLiker} et 1 autre personne`;
-      return `${firstLiker} et ${count - 1} autres personnes`;
+        const firstLiker = likerProfiles[0]?.full_name || "Quelqu'un";
+        if (count === 1) text = `${firstLiker} a aimé`;
+        else if (count === 2) text = `${firstLiker} et 1 autre personne`;
+        else text = `${firstLiker} et ${count - 1} autres personnes`;
     }
+
+    return (
+        <button 
+            onClick={() => setShowLikersModal(true)}
+            className="flex items-center space-x-2 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors mb-3 group/likers"
+        >
+            <div className="flex -space-x-2">
+                {likerProfiles.slice(0, 3).map(p => (
+                    <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                ))}
+            </div>
+            <span>{text}</span>
+        </button>
+    );
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all hover:shadow-premium group relative">
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all hover:shadow-premium group">
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link to={`/profile/${post.profiles.id}`}>
@@ -150,15 +125,12 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
             {showOptions && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden">
                 <button 
-                  onClick={() => { 
-                    if(onEditRequested) onEditRequested(post);
-                    setShowOptions(false); 
-                  }} 
+                  onClick={() => { if(onEditRequested) onEditRequested(post); setShowOptions(false); }} 
                   className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
                 >
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
-                <button onClick={() => { handleDelete(); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
+                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
                   <Trash2 size={16} className="mr-3" /> Supprimer
                 </button>
               </div>
@@ -168,16 +140,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       </div>
 
       <div className="px-7 pb-4">
-        <div className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-          {renderContentWithLinks(displayedContent)}
+        <div className="text-[16px] text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
+          {displayedContent}
           {!isExpanded && isLongContent && <span>...</span>}
         </div>
         {isLongContent && (
-            <button 
-                onClick={() => setIsExpanded(!isExpanded)} 
-                className="mt-2 text-isig-blue font-black text-xs uppercase tracking-widest flex items-center hover:opacity-70 transition-opacity"
-            >
-                {isExpanded ? <><ChevronUp size={16} className="mr-1"/> Voir moins</> : <><ChevronDown size={16} className="mr-1"/> Voir plus</>}
+            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest hover:opacity-70">
+                {isExpanded ? <><ChevronUp size={14} className="inline mr-1"/>Voir moins</> : <><ChevronDown size={14} className="inline mr-1"/>Voir plus</>}
             </button>
         )}
       </div>
@@ -185,51 +154,24 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       {post.media_url && (
         <div className="px-6 pb-6">
            {post.media_type === 'image' ? (
-             <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative group/media ring-1 ring-slate-100">
-               {!imageLoaded && <div className="absolute inset-0 bg-slate-100 animate-pulse-soft flex items-center justify-center"><Spinner /></div>}
-               <img 
-                 src={post.media_url} 
-                 alt="Contenu" 
-                 loading="lazy"
-                 onLoad={() => setImageLoaded(true)}
-                 className={`w-full h-full object-cover transition-all duration-1000 ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'} group-hover/media:scale-110`} 
-               />
-               <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/5 transition-colors"></div>
+             <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative ring-1 ring-slate-100">
+               <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />
              </div>
            ) : (
-             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all transform hover:-translate-y-1">
-                <div className="w-12 h-12 bg-isig-blue/10 rounded-2xl flex items-center justify-center text-isig-blue mr-4">
-                   <FileText size={24} />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-slate-800 truncate uppercase tracking-tight">Document attaché</p>
-                    <p className="text-xs text-slate-500 font-bold italic">Cliquer pour consulter</p>
-                </div>
+             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all">
+                <FileText size={24} className="text-isig-blue mr-4" />
+                <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Consulter le document</span>
              </a>
            )}
         </div>
       )}
 
-      {likes.length > 0 && (
-          <div className="px-7 pb-4">
-              <button 
-                onClick={() => setShowLikersModal(true)}
-                className="flex items-center text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors group/likes"
-              >
-                  <div className="flex -space-x-2 mr-3">
-                      {likerProfiles.slice(0, 3).map(p => (
-                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-                      ))}
-                  </div>
-                  <span>{getLikeText()}</span>
-              </button>
-          </div>
-      )}
+      <div className="px-7 pb-2">{getLikeSummary()}</div>
 
       <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <button onClick={handleLike} className={`flex items-center space-x-2 px-5 py-3 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={`${isLiked ? 'scale-110' : ''} transition-transform duration-300`} />
+            <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
             <span className="text-sm font-black">{likes.length}</span>
           </button>
           
@@ -239,7 +181,11 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           </button>
         </div>
 
-        <button onClick={handleShare} className="flex items-center space-x-2 px-5 py-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
+        <button onClick={async () => {
+            const url = `${window.location.origin}/post/${post.id}`;
+            if(navigator.share) await navigator.share({ title: 'ISIG Community', url });
+            else { navigator.clipboard.writeText(url); alert("Lien copié !"); }
+        }} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
             <Share2 size={22} />
         </button>
       </div>

@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import Spinner from './Spinner';
 
 const AuthPage: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,10 +35,10 @@ const AuthPage: React.FC = () => {
     setMessage(null);
 
     try {
-      if (isLogin) {
+      if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-      } else {
+      } else if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -63,6 +64,13 @@ const AuthPage: React.FC = () => {
             }).eq('id', data.user.id);
         }
         setMessage('Vérifiez votre email pour confirmer votre inscription !');
+      } else {
+        // Forgot password mode
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/settings`,
+        });
+        if (error) throw error;
+        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail.');
       }
     } catch (err: any) {
       setError(err.message);
@@ -71,9 +79,12 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const isLogin = mode === 'login';
+  const isForgot = mode === 'forgot';
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
-      {/* Côté gauche - Visuel (Desktop uniquement) */}
+      {/* Côté gauche - Visuel */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-dark p-12 flex-col justify-between relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
@@ -87,29 +98,22 @@ const AuthPage: React.FC = () => {
             Collaborez, apprenez et construisez l'avenir de la technologie avec vos pairs.
           </p>
         </div>
-
-        <div className="relative z-10 flex items-center space-x-4 text-slate-300">
-           <div className="flex -space-x-3">
-              {[1,2,3,4].map(i => <div key={i} className="w-10 h-10 rounded-full bg-slate-700 border-2 border-brand-dark"></div>)}
-           </div>
-        </div>
       </div>
 
       {/* Côté droit - Formulaire */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-md space-y-8 animate-fade-in-up">
           
-          {/* Logo visible sur mobile uniquement */}
           <div className="lg:hidden flex justify-center mb-6">
             <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 drop-shadow-xl" />
           </div>
 
           <div className="text-center">
             <h2 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">
-              {isLogin ? 'Bon retour !' : 'Rejoindre'}
+              {isForgot ? 'Récupération' : isLogin ? 'Bon retour !' : 'Rejoindre'}
             </h2>
             <p className="mt-2 text-slate-500 font-medium">
-              {isLogin ? 'Accédez à votre espace étudiant.' : 'Créez votre profil académique.'}
+              {isForgot ? 'Récupérez l\'accès à votre compte.' : isLogin ? 'Accédez à votre espace étudiant.' : 'Créez votre profil académique.'}
             </p>
           </div>
 
@@ -117,7 +121,7 @@ const AuthPage: React.FC = () => {
             {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100">{error}</div>}
             {message && <div className="p-4 bg-green-50 text-green-600 rounded-2xl text-sm font-bold border border-green-100">{message}</div>}
 
-            {!isLogin && (
+            {!isLogin && !isForgot && (
               <div className="grid grid-cols-1 gap-4">
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -144,31 +148,50 @@ const AuthPage: React.FC = () => {
               <input type="email" placeholder="Adresse email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
             </div>
 
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type={showPassword ? "text" : "password"} placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-12 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-isig-blue transition-colors">
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
+            {!isForgot && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input type={showPassword ? "text" : "password"} placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-12 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-isig-blue transition-colors">
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {isLogin && (
+                    <div className="text-right">
+                        <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors">
+                            Mot de passe oublié ?
+                        </button>
+                    </div>
+                )}
+              </div>
+            )}
 
             <button type="submit" disabled={loading} className="w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm">
-              <span>{loading ? 'Traitement...' : (isLogin ? 'Se connecter' : "Créer mon compte")}</span>
+              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
               {!loading && <ArrowRight size={20} />}
             </button>
           </form>
 
-          <p className="text-center text-slate-500 font-bold">
-            {isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
-            <button onClick={() => setIsLogin(!isLogin)} className="ml-2 text-isig-blue hover:underline">
-              {isLogin ? "S'inscrire" : "Se connecter"}
-            </button>
-          </p>
+          <div className="text-center space-y-2">
+            <p className="text-slate-500 font-bold">
+              {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
+              <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
+                {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
+              </button>
+            </p>
+          </div>
 
           <div className="mt-12 text-center">
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-[0.1em]">
-              Développé par <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline font-black">Dekens Ruzuba</a>
-            </p>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Développé par</p>
+            <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-3 group">
+                <img 
+                    src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
+                    alt="Dekens Ruzuba" 
+                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100 group-hover:ring-isig-blue transition-all"
+                />
+                <span className="text-slate-900 font-black group-hover:text-isig-blue transition-all">Dekens Ruzuba</span>
+            </a>
           </div>
         </div>
       </div>

@@ -73,10 +73,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/post/${post.id}`;
+    // Construction propre de l'URL pour éviter les 404 de routing
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/post/${post.id}`;
+    
     const shareData = {
-        title: `Publication de ${post.profiles.full_name} sur ISIG Community`,
-        text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+        title: `Publication de ${post.profiles.full_name}`,
+        text: post.content.substring(0, 100),
         url: shareUrl,
     };
 
@@ -85,7 +88,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
             await navigator.share(shareData);
         } else {
             await navigator.clipboard.writeText(shareUrl);
-            alert("Lien copié dans le presse-papier !");
+            alert("Lien de la publication copié !");
         }
     } catch (err) {
         console.error("Erreur de partage:", err);

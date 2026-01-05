@@ -91,14 +91,14 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
                 url: url,
             });
         } else {
-            throw new Error('Web Share API not supported');
+            throw new Error('Web Share API non supportée');
         }
     } catch (err) {
         try {
             await navigator.clipboard.writeText(shareText);
-            alert("Lien personnalisé copié dans le presse-papier !");
+            alert("Mention personnalisée et lien copiés dans votre presse-papier !");
         } catch (copyErr) {
-            console.error("Copy failed", copyErr);
+            console.error("Erreur de copie", copyErr);
         }
     }
   };

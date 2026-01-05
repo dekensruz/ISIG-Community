@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -35,6 +35,7 @@ const Profile: React.FC = () => {
   const [followLoading, setFollowLoading] = useState(false);
 
   const [modalImage, setModalImage] = useState<string | null>(null);
+  const editAreaRef = useRef<HTMLDivElement>(null);
 
   const isOwnProfile = session?.user.id === userId;
 
@@ -194,7 +195,10 @@ const Profile: React.FC = () => {
 
   const handleEditRequested = (post: PostType) => {
     setEditingPost(post);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Défilement vers la zone d'édition après un court délai pour laisser le composant s'afficher
+    setTimeout(() => {
+        editAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const filteredPosts = useMemo(() => {
@@ -370,7 +374,7 @@ const Profile: React.FC = () => {
             </div>
         </div>
 
-        <div className="mt-12">
+        <div className="mt-12" ref={editAreaRef}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Publications</h2>
                 <div className="relative w-full sm:w-64">

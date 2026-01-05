@@ -142,10 +142,10 @@ const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentUser, onClose 
                         <div className="w-16 h-16 bg-isig-orange/10 text-isig-orange rounded-full flex items-center justify-center mx-auto mb-4">
                             <AlertCircle size={32} />
                         </div>
-                        <h3 className="text-lg font-black text-slate-800 mb-2 italic">Oups, l'IA est un peu fatiguée !</h3>
+                        <h3 className="text-lg font-black text-slate-800 mb-2 italic">Oups, l'IA est un peu timide !</h3>
                         <p className="text-sm text-slate-600 font-medium leading-relaxed">
                             Désolé, l'IA n'a trouvé aucune correspondance. <br/>
-                            <span className="text-isig-blue font-bold">À savoir :</span> Nous utilisons des crédits gratuits qui s'épuisent parfois vite à cause du succès d'ISIG Community ! 🚀 <br/><br/>
+                            <span className="text-isig-blue font-bold">À savoir :</span> Nous utilisons des crédits gratuits qui s'épuisent parfois vite car ISIG Community grandit chaque jour ! 🚀 <br/><br/>
                             Réessayez un peu plus tard ou tentez une recherche différente. N'oubliez pas que nous ne sommes qu'à nos débuts !
                         </p>
                     </div>

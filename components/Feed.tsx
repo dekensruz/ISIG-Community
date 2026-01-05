@@ -76,7 +76,7 @@ const Feed: React.FC = () => {
     }
   }, [page]);
 
-  // Infinite Scroll Observer
+  // Observer pour l'Infinite Scroll
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery) {
@@ -142,8 +142,8 @@ const Feed: React.FC = () => {
                 </div>
               ))}
               
-              {/* Invisible loader element for Infinite Scroll */}
-              <div ref={loaderRef} className="h-20 flex items-center justify-center">
+              {/* Element invisible qui déclenche le chargement suivant */}
+              <div ref={loaderRef} className="h-24 flex items-center justify-center">
                 {loadingMore && <Spinner />}
               </div>
             </>

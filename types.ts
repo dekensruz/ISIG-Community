@@ -1,3 +1,4 @@
+
 import { User } from '@supabase/supabase-js';
 
 export interface Profile {
@@ -15,6 +16,7 @@ export interface Profile {
   birth_date?: string;
   show_birth_year?: boolean;
   last_seen_at?: string;
+  role: 'user' | 'admin';
 }
 
 export interface Post {
@@ -24,7 +26,7 @@ export interface Post {
   media_url?: string;
   media_type?: 'image' | 'document' | 'link';
   created_at: string;
-  profiles: Profile; // Joined data
+  profiles: Profile; 
   comments: Comment[];
   likes: Like[];
 }
@@ -35,7 +37,7 @@ export interface Comment {
   user_id: string;
   content: string;
   created_at: string;
-  profiles: Profile; // Joined data
+  profiles: Profile;
   parent_comment_id?: string;
   replies?: Comment[];
 }
@@ -50,7 +52,6 @@ export interface AppUser extends User {
     profile: Profile;
 }
 
-// Nouvelles interfaces pour les Groupes
 export interface Group {
     id: string;
     created_at: string;
@@ -58,10 +59,10 @@ export interface Group {
     description?: string;
     created_by: string;
     avatar_url?: string;
-    is_private: boolean; // Nouveau champ
-    profiles: Profile; // Créateur du groupe
-    group_members: GroupMember[]; // Liste des membres
-    group_join_requests: GroupJoinRequest[]; // Liste des demandes
+    is_private: boolean;
+    profiles: Profile;
+    group_members: GroupMember[];
+    group_join_requests: GroupJoinRequest[];
 }
 
 export interface GroupJoinRequest {
@@ -69,7 +70,7 @@ export interface GroupJoinRequest {
     group_id: string;
     user_id: string;
     created_at: string;
-    profiles: Profile; // User making the request
+    profiles: Profile;
 }
 
 export interface GroupMember {
@@ -99,7 +100,7 @@ export interface GroupPostComment {
   user_id: string;
   content: string;
   created_at: string;
-  profiles: Profile; // Joined data
+  profiles: Profile;
   parent_comment_id?: string;
   replies?: GroupPostComment[];
 }
@@ -110,11 +111,17 @@ export interface GroupPostLike {
     user_id: string;
 }
 
-// Types for Chat
+export interface Feedback {
+    id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+    profiles?: Profile;
+}
+
 export interface Conversation {
     id: string;
     created_at: string;
-    // These will be processed in the front-end
     other_participant: Profile;
     last_message: Message | null;
     unread_count: number;
@@ -126,20 +133,19 @@ export interface Message {
     sender_id: string;
     content: string;
     created_at: string;
-    profiles?: Profile; // Sender's profile
+    profiles?: Profile;
     is_read?: boolean;
     updated_at?: string;
     replying_to_message_id?: string;
-    replied_to?: Message; // Joined data for the message being replied to
+    replied_to?: Message;
     media_url?: string;
     media_type?: string;
 }
 
-// Types for Notifications
 export interface Notification {
     id: string;
-    user_id: string; // The user who receives the notification
-    actor_id: string; // The user who triggered the notification
+    user_id: string;
+    actor_id: string;
     type: 'new_like' | 'new_group_like' | 'new_comment' | 'new_group_post' | 'new_message' | 'new_follower' | 'group_join_request' | 'group_member_joined' | 'new_group_comment' | 'new_comment_reply' | 'new_group_comment_reply' | 'group_request_accepted' | 'group_member_left' | 'group_admin_promotion';
     post_id?: string;
     group_id?: string;
@@ -147,5 +153,5 @@ export interface Notification {
     conversation_id?: string;
     is_read: boolean;
     created_at: string;
-    profiles: Profile; // Joined data for the actor
+    profiles: Profile;
 }

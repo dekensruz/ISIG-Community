@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import * as locales from 'date-fns/locale';
-import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
@@ -26,10 +26,15 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const [likes, setLikes] = useState<Like[]>(post.likes);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
+
+  const CONTENT_LIMIT = 280;
+  const isLongContent = post.content.length > CONTENT_LIMIT;
+  const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
   useEffect(() => {
     const fetchTopLikers = async () => {
@@ -73,13 +78,12 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   };
 
   const handleShare = async () => {
-    // Construction propre de l'URL pour éviter les 404 de routing
     const baseUrl = window.location.origin;
     const shareUrl = `${baseUrl}/post/${post.id}`;
     
     const shareData = {
-        title: `Publication de ${post.profiles.full_name}`,
-        text: post.content.substring(0, 100),
+        title: `ISIG Community`,
+        text: `Découvrez cette publication académique de ${post.profiles.full_name} sur ISIG Community.`,
         url: shareUrl,
     };
 
@@ -99,23 +103,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     if (window.confirm("Voulez-vous vraiment supprimer cette publication ?")) {
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (!error) window.location.reload();
-    }
-  };
-
-  const getLikeText = () => {
-    if (likes.length === 0) return "Aucun j'aime";
-    const userLiked = isLiked;
-    const count = likes.length;
-    
-    if (userLiked) {
-      if (count === 1) return "Vous avez aimé";
-      if (count === 2) return "Vous et 1 autre personne";
-      return `Vous et ${count - 1} autres personnes`;
-    } else {
-      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
-      if (count === 1) return `${firstLiker} a aimé`;
-      if (count === 2) return `${firstLiker} et 1 autre personne`;
-      return `${firstLiker} et ${count - 1} autres personnes`;
     }
   };
 
@@ -164,9 +151,18 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       </div>
 
       <div className="px-7 pb-4">
-        <p className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-          {renderContentWithLinks(post.content)}
-        </p>
+        <div className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+          {renderContentWithLinks(displayedContent)}
+          {!isExpanded && isLongContent && <span>...</span>}
+        </div>
+        {isLongContent && (
+            <button 
+                onClick={() => setIsExpanded(!isExpanded)} 
+                className="mt-2 text-isig-blue font-black text-xs uppercase tracking-widest flex items-center hover:opacity-70 transition-opacity"
+            >
+                {isExpanded ? <><ChevronUp size={16} className="mr-1"/> Voir moins</> : <><ChevronDown size={16} className="mr-1"/> Voir plus</>}
+            </button>
+        )}
       </div>
 
       {post.media_url && (
@@ -176,7 +172,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                {!imageLoaded && <div className="absolute inset-0 bg-slate-100 animate-pulse-soft flex items-center justify-center"><Spinner /></div>}
                <img 
                  src={post.media_url} 
-                 alt="Contenu du post" 
+                 alt="Contenu" 
                  loading="lazy"
                  onLoad={() => setImageLoaded(true)}
                  className={`w-full h-full object-cover transition-all duration-1000 ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'} group-hover/media:scale-110`} 
@@ -194,21 +190,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                 </div>
              </a>
            )}
-        </div>
-      )}
-
-      {likes.length > 0 && (
-        <div className="px-7 pb-3 flex items-center">
-          <button onClick={() => setShowLikersModal(true)} className="flex items-center group/likers">
-             <div className="flex -space-x-2 mr-3">
-               {likerProfiles.map(p => (
-                 <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-               ))}
-             </div>
-             <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider group-hover/likers:text-isig-blue transition-colors">
-               {getLikeText()}
-             </span>
-          </button>
         </div>
       )}
 

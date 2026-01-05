@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react';
+import { X, Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { Post as PostType, Like, Comment as CommentType, Profile } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -30,26 +31,9 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const modalRootRef = useRef(document.getElementById('modal-root'));
 
-
   const handleClose = () => {
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
-  };
-
-  const renderContentWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-
-    return parts.map((part, index) => {
-      if (part.match(urlRegex)) {
-        return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all">
-            {part}
-          </a>
-        );
-      }
-      return part;
-    });
   };
 
   const fetchComments = async () => {
@@ -64,15 +48,8 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    const handleClickOutside = (event: MouseEvent) => {
-        if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-            handleClose();
-        }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
     return () => {
         document.body.style.overflow = 'auto';
-        document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -104,14 +81,9 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         });
 
         const sortComments = (c: CommentType[]) => c.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        
-        rootComments.forEach(c => {
-            if(c.replies) c.replies = sortComments(c.replies);
-        });
-
+        rootComments.forEach(c => { if(c.replies) c.replies = sortComments(c.replies); });
         return sortComments(rootComments);
     }, [comments]);
-
 
   const userHasLiked = likes.some(like => like.user_id === session?.user.id);
 
@@ -132,49 +104,24 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !session?.user) return;
-
     setIsPostingComment(true);
     const content = newComment;
     setNewComment('');
-
-    const { data, error } = await supabase.from('comments').insert({ post_id: post.id, user_id: session.user.id, content }).select('*, profiles(*)').single();
-    if (error) {
-        console.error("Erreur lors de la publication du commentaire:", error);
-        alert(`Erreur: ${error.message}`);
-        setNewComment(content);
-    } else if (data) {
-        setComments(prev => [...prev, data as any]);
-    }
+    const { data } = await supabase.from('comments').insert({ post_id: post.id, user_id: session.user.id, content }).select('*, profiles(*)').single();
+    if (data) setComments(prev => [...prev, data as any]);
     setIsPostingComment(false);
   };
-  
+
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyContent.trim() || !session?.user || !replyingTo) return;
-    
     setIsPostingComment(true);
     const content = replyContent;
-    const parentComment = replyingTo; // Conserver la référence
-    
+    const parentId = replyingTo.id;
     setReplyContent('');
     setReplyingTo(null);
-
-    const { data, error } = await supabase.from('comments').insert({ 
-      post_id: post.id, 
-      user_id: session.user.id, 
-      content: content,
-      parent_comment_id: parentComment.id
-    }).select('*, profiles(*)').single();
-
-    if (error) {
-        console.error("Erreur lors de la publication de la réponse:", error);
-        alert(`Erreur lors de la publication de la réponse : ${error.message}`);
-        // Restaurer l'état en cas d'erreur
-        setReplyContent(content);
-        setReplyingTo(parentComment);
-    } else if (data) {
-        setComments([...comments, data as any]);
-    }
+    const { data } = await supabase.from('comments').insert({ post_id: post.id, user_id: session.user.id, content, parent_comment_id: parentId }).select('*, profiles(*)').single();
+    if (data) setComments(prev => [...prev, data as any]);
     setIsPostingComment(false);
   };
 
@@ -183,148 +130,99 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     await supabase.from('comments').delete().eq('id', commentId);
   };
 
-  const handleStartEditing = (comment: CommentType) => {
-    setEditingComment(comment);
-    setEditingText(comment.content);
-    setReplyingTo(null);
-  };
-  
-  const handleCancelEditing = () => {
-    setEditingComment(null);
-    setEditingText('');
-  };
-
-  const handleUpdateComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingComment || !editingText.trim()) return;
-
-    const { error } = await supabase.from('comments').update({ content: editingText }).eq('id', editingComment.id);
-    if (error) {
-      alert("Échec de la mise à jour du commentaire.");
-    } else {
-      setComments(prev => prev.map(c => c.id === editingComment.id ? { ...c, content: editingText } : c));
-      handleCancelEditing();
-    }
-  };
-  
-  const CommentComponent: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
-        <div className={`flex items-start justify-between space-x-3 ${isReply ? 'mt-3' : ''}`}>
-            <div className="flex items-start space-x-3 flex-1">
-                <Link to={`/profile/${comment.profiles.id}`} onClick={handleClose}>
-                    <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
-                </Link>
-                <div className="flex-1">
-                    <div className="bg-slate-100 p-2 rounded-lg">
-                        <Link to={`/profile/${comment.profiles.id}`} onClick={handleClose} className="font-bold text-sm text-slate-800 hover:underline">{comment.profiles.full_name}</Link>
-                        {editingComment?.id === comment.id ? (
-                            <form onSubmit={handleUpdateComment}>
-                                <textarea value={editingText} onChange={e => setEditingText(e.target.value)} className="w-full p-1 border rounded-md mt-1 text-sm bg-white" autoFocus/>
-                                <div className="flex space-x-2 mt-1">
-                                    <button type="submit" className="text-xs bg-isig-blue text-white px-2 py-1 rounded">Enregistrer</button>
-                                    <button type="button" onClick={handleCancelEditing} className="text-xs bg-gray-200 px-2 py-1 rounded">Annuler</button>
-                                </div>
-                            </form>
-                        ) : (
-                            <p className="text-sm text-slate-600">{comment.content}</p>
-                        )}
-                    </div>
-                     <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-                        <button onClick={() => setReplyingTo(comment)} className="hover:underline">Répondre</button>
-                        <span>·</span>
-                        <p>{formatDistanceToNow(new Date(comment.created_at), { locale: fr })}</p>
-                         {session?.user.id === comment.user_id && editingComment?.id !== comment.id && (
-                            <>
-                                <span>·</span>
-                                <button onClick={() => handleStartEditing(comment)} className="hover:underline">Modifier</button>
-                            </>
-                         )}
-                    </div>
-                </div>
+  const CommentItem: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
+    <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4'}`}>
+        <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
+        <div className="flex-1 min-w-0">
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                <p className="text-sm text-slate-700 font-medium leading-relaxed">{comment.content}</p>
             </div>
-             {session?.user.id === comment.user_id && editingComment?.id !== comment.id && (
-                <button onClick={() => handleDeleteComment(comment.id)} className="flex-shrink-0 text-slate-400 hover:text-red-500 p-1"><Trash2 size={14}/></button>
-            )}
+            <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                <button onClick={() => setReplyingTo(comment)} className="hover:text-isig-blue">Répondre</button>
+                <span>•</span>
+                <span>{formatDistanceToNow(new Date(comment.created_at), { locale: fr })}</span>
+                {session?.user.id === comment.user_id && (
+                    <>
+                        <span>•</span>
+                        <button onClick={() => handleDeleteComment(comment.id)} className="text-red-400 hover:text-red-600">Supprimer</button>
+                    </>
+                )}
+            </div>
+            {comment.replies?.map(reply => <CommentItem key={reply.id} comment={reply} isReply />)}
         </div>
-    );
+    </div>
+  );
 
   if (!modalRootRef.current) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 bg-black z-50 flex justify-center items-center p-4 transition-opacity duration-300 ease-in-out ${isAnimatingOut ? 'opacity-0' : 'bg-opacity-60'}`}>
+    <div className={`fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex justify-center items-center p-4 transition-opacity duration-300 ${isAnimatingOut ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}>
       <div
         ref={modalRef}
-        className={`bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] relative transition-all duration-300 ease-in-out ${isAnimatingOut ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+        onClick={e => e.stopPropagation()}
+        className={`bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] overflow-hidden transition-all duration-300 ${isAnimatingOut ? 'scale-95' : 'scale-100'}`}
       >
-        <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="font-bold text-lg text-slate-800">Publication de {post.profiles.full_name}</h2>
-            <button onClick={handleClose} className="text-slate-500 hover:text-slate-800">
-                <X size={24} />
-            </button>
+        <div className="flex justify-between items-center p-6 border-b border-slate-50">
+            <h2 className="font-black text-xl text-slate-800 tracking-tight italic uppercase">Publication</h2>
+            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <div className="flex-grow overflow-y-auto">
-            {post.media_url && post.media_type === 'image' && (
-                <img src={post.media_url} alt="Média de la publication" className="w-full h-auto max-h-96 object-contain bg-slate-100" />
-            )}
-            <div className="p-4">
-                <p className="text-slate-700 whitespace-pre-wrap">{renderContentWithLinks(post.content)}</p>
-                 <div className="flex justify-between items-center text-slate-500 mt-4 pt-3 border-t">
-                    <div className="flex items-center space-x-6">
-                        <button onClick={handleLike} disabled={!session} className={`flex items-center space-x-2 transition-colors ${!session ? 'cursor-not-allowed' : `hover:text-isig-orange ${userHasLiked ? 'text-isig-orange' : ''}`}`}>
-                            <Heart size={20} fill={userHasLiked ? '#FF8C00' : 'none'}/>
-                            <span className="text-sm font-semibold">{likes.length}</span>
-                        </button>
-                        <div className="flex items-center space-x-2">
-                            <MessageCircle size={20} />
-                            <span className="text-sm font-semibold">{comments.length}</span>
-                        </div>
-                    </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+            <div className="flex items-center space-x-4 mb-6">
+                <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
+                <div>
+                    <p className="font-extrabold text-slate-800">{post.profiles.full_name}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{post.profiles.major} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
                 </div>
             </div>
 
-            <div className="px-4 pb-4 space-y-4">
-                {nestedComments.map(comment => (
-                    <div key={comment.id}>
-                        <CommentComponent comment={comment} />
-                        
-                        {comment.replies?.map(reply => (
-                            <div key={reply.id} className="ml-10 mt-2">
-                                 <CommentComponent comment={reply} isReply />
-                            </div>
-                        ))}
-                        
-                        {replyingTo?.id === comment.id && session && currentUserProfile && (
-                            <form onSubmit={handleReplySubmit} className="flex items-center space-x-3 mt-2 ml-10">
-                                <Avatar avatarUrl={currentUserProfile.avatar_url} name={currentUserProfile.full_name} size="sm" />
-                                <input type="text" placeholder={`Répondre à ${comment.profiles.full_name}...`} value={replyContent} onChange={(e) => setReplyContent(e.target.value)} className="w-full bg-slate-100 p-2 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-isig-blue text-sm" autoFocus />
-                                 <button type="submit" disabled={isPostingComment} className="text-isig-blue font-semibold disabled:text-gray-400">
-                                    {isPostingComment ? <Spinner /> : 'Envoyer'}
-                                </button>
-                            </form>
-                        )}
-                    </div>
-                ))}
-                {comments.length === 0 && <p className="text-center text-slate-500 text-sm py-4">Soyez le premier à commenter.</p>}
+            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{post.content}</p>
+            
+            {post.media_url && post.media_type === 'image' && (
+                <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100">
+                    <img src={post.media_url} alt="Média" className="w-full h-auto max-h-[500px] object-contain" />
+                </div>
+            )}
+
+            <div className="flex items-center space-x-6 pb-6 border-b border-slate-50">
+                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${userHasLiked ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
+                    <Heart size={20} fill={userHasLiked ? '#FF8C00' : 'none'}/>
+                    <span className="text-sm">{likes.length}</span>
+                </button>
+                <div className="flex items-center space-x-2 font-black text-slate-400">
+                    <MessageCircle size={20} />
+                    <span className="text-sm">{comments.length}</span>
+                </div>
+            </div>
+
+            <div className="pt-6 space-y-2">
+                {nestedComments.map(comment => <CommentItem key={comment.id} comment={comment} />)}
+                {comments.length === 0 && <div className="text-center py-10 opacity-40 italic text-sm font-medium">Aucun commentaire pour le moment.</div>}
             </div>
         </div>
 
-        {session && currentUserProfile && !replyingTo && (
-            <div className="p-4 border-t bg-slate-50">
-                <form onSubmit={handlePostComment} className="flex items-center space-x-3">
-                    <Avatar avatarUrl={currentUserProfile.avatar_url} name={currentUserProfile.full_name} size="sm" />
-                    <input
-                        type="text"
-                        placeholder="Écrire un commentaire..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="w-full bg-white p-2 border border-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-isig-blue text-sm"
-                    />
-                    <button type="submit" disabled={isPostingComment} className="text-isig-blue font-semibold disabled:text-gray-400">
-                        {isPostingComment ? <Spinner /> : 'Envoyer'}
-                    </button>
-                </form>
-            </div>
-        )}
+        <div className="p-6 border-t border-slate-50 bg-white">
+            {replyingTo && (
+                <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100">
+                    <p className="text-xs font-bold text-slate-500 truncate">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
+                    <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
+                </div>
+            )}
+            <form onSubmit={replyingTo ? handleReplySubmit : handlePostComment} className="flex items-center space-x-3">
+                <Avatar avatarUrl={currentUserProfile?.avatar_url} name={currentUserProfile?.full_name || ''} size="md" />
+                <input
+                    type="text"
+                    placeholder={replyingTo ? "Écrire une réponse..." : "Votre commentaire..."}
+                    value={replyingTo ? replyContent : newComment}
+                    onChange={(e) => replyingTo ? setReplyContent(e.target.value) : setNewComment(e.target.value)}
+                    className="flex-1 bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all"
+                />
+                <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                    {isPostingComment ? <Spinner /> : <Send size={20} />}
+                </button>
+            </form>
+        </div>
       </div>
     </div>,
     modalRootRef.current

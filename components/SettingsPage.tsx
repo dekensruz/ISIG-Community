@@ -1,18 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle, MessageSquareText, Lock, LayoutDashboard, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
+import FeedbackModal from './FeedbackModal';
 
 const SettingsPage: React.FC = () => {
   const { session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
+  const [profile, setProfile] = useState<any>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [isPassExpanded, setIsPassExpanded] = useState(false);
   
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,12 +23,12 @@ const SettingsPage: React.FC = () => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // Détecter si on arrive d'un lien de récupération
   useEffect(() => {
-    if (location.hash && location.hash.includes('type=recovery')) {
-        setShowPasswordModal(true);
+    if (session?.user) {
+        supabase.from('profiles').select('*').eq('id', session.user.id).single()
+            .then(({ data }) => setProfile(data));
     }
-  }, [location.hash]);
+  }, [session]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -45,20 +48,19 @@ const SettingsPage: React.FC = () => {
 
     setLoading(true);
     setPasswordError(null);
-    
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    
     setLoading(false);
+
     if (error) {
         setPasswordError(error.message);
     } else {
         setPasswordSuccess(true);
+        setNewPassword('');
+        setConfirmPassword('');
         setTimeout(() => {
-            setShowPasswordModal(false);
             setPasswordSuccess(false);
-            setNewPassword('');
-            setConfirmPassword('');
-        }, 2000);
+            setIsPassExpanded(false);
+        }, 3000);
     }
   };
 
@@ -95,8 +97,57 @@ const SettingsPage: React.FC = () => {
         </div>
         <div className="divide-y divide-slate-50">
             <SettingItem icon={<User size={20}/>} title="Éditer le profil" subtitle="Changer nom, bio et photos" to={`/profile/${session?.user.id}`} />
-            <SettingItem icon={<Shield size={20}/>} title="Mot de passe" subtitle="Modifier votre mot de passe" onClick={() => setShowPasswordModal(true)} />
-            <SettingItem icon={<Bell size={20}/>} title="Notifications" subtitle="Gérer les alertes push" to="/notifications" />
+            
+            <div className="bg-white border-b border-slate-50">
+                <button 
+                    onClick={() => setIsPassExpanded(!isPassExpanded)}
+                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
+                >
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 rounded-2xl bg-slate-100 text-slate-500"><Shield size={20}/></div>
+                        <div className="text-left">
+                            <p className="font-black text-sm uppercase tracking-tight">Sécurité</p>
+                            <p className="text-xs text-slate-400 font-medium">Changer de mot de passe</p>
+                        </div>
+                    </div>
+                    {isPassExpanded ? <ChevronUp size={18} className="text-isig-blue" /> : <ChevronDown size={18} className="text-slate-300" />}
+                </button>
+                {isPassExpanded && (
+                    <div className="px-5 pb-8 animate-fade-in">
+                        <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                             {passwordError && <p className="text-red-500 text-xs font-bold flex items-center"><AlertCircle size={14} className="mr-2"/>{passwordError}</p>}
+                             {passwordSuccess && <p className="text-emerald-500 text-xs font-bold flex items-center"><CheckCircle size={14} className="mr-2"/>Mis à jour avec succès !</p>}
+                             <div>
+                                <input 
+                                    type="password" 
+                                    placeholder="Nouveau mot de passe"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    className="w-full p-4 bg-white border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm"
+                                />
+                             </div>
+                             <div>
+                                <input 
+                                    type="password" 
+                                    placeholder="Confirmer le mot de passe"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    className="w-full p-4 bg-white border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm"
+                                />
+                             </div>
+                             <button type="submit" disabled={loading} className="w-full py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest">
+                                {loading ? <Spinner /> : "Mettre à jour"}
+                             </button>
+                        </form>
+                    </div>
+                )}
+            </div>
+
+            <SettingItem icon={<MessageSquareText size={20}/>} title="Feedback" subtitle="Signaler un bug ou proposer une idée" onClick={() => setShowFeedbackModal(true)} />
+            
+            {profile?.role === 'admin' && (
+                <SettingItem icon={<LayoutDashboard size={20}/>} title="Panel Admin" subtitle="Gérer les feedbacks et la plateforme" to="/admin/feedbacks" />
+            )}
         </div>
       </div>
 
@@ -113,29 +164,23 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                    ISIG Community est le réseau social académique exclusif de l'ISIG Goma. Conçu pour favoriser la collaboration, le partage de ressources et l'innovation technologique.
+                    ISIG Community est le réseau social académique exclusif de l'ISIG Goma.
                 </p>
                 <div className="mt-8 pt-8 border-t border-slate-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Créateur de la plateforme</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Créateur</p>
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-3xl border border-slate-100 group">
                         <div className="flex items-center space-x-4">
-                            <img 
-                                src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
-                                alt="Dekens Ruzuba" 
-                                className="w-12 h-12 rounded-2xl object-cover shadow-lg shadow-isig-blue/20 ring-2 ring-white"
-                            />
+                            <img src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" alt="Dekens" className="w-12 h-12 rounded-2xl object-cover shadow-lg ring-2 ring-white"/>
                             <div>
                                 <p className="font-black text-slate-800 text-sm">Dekens Ruzuba</p>
-                                <p className="text-[10px] font-bold text-slate-400">Software Engineer & Designer</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">Software Engineer</p>
                             </div>
                         </div>
-                        <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="p-3 bg-white rounded-xl shadow-sm hover:text-isig-blue hover:shadow-md transition-all">
-                            <ExternalLink size={20} />
-                        </a>
+                        <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="p-3 bg-white rounded-xl shadow-sm hover:text-isig-blue transition-all"><ExternalLink size={20} /></a>
                     </div>
                 </div>
             </div>
-            <SettingItem icon={<Info size={20}/>} title="Politique de confidentialité" subtitle="Protection de vos données" onClick={() => setShowPrivacyModal(true)} />
+            <SettingItem icon={<Info size={20}/>} title="Politique de confidentialité" subtitle="Vos données sont protégées" onClick={() => setShowPrivacyModal(true)} />
         </div>
       </div>
 
@@ -143,7 +188,6 @@ const SettingsPage: React.FC = () => {
         <SettingItem icon={<LogOut size={20}/>} title="Déconnexion" subtitle="Quitter votre session actuelle" onClick={handleSignOut} danger />
       </div>
 
-      {/* Modal Politique de Confidentialité */}
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={() => setShowPrivacyModal(false)}>
             <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-md w-full animate-fade-in-up" onClick={e => e.stopPropagation()}>
@@ -153,81 +197,13 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 text-center">
                     <CheckCircle size={56} className="text-emerald-500 mx-auto mb-4" />
-                    <p className="text-slate-800 font-extrabold text-lg leading-relaxed">
-                        Vos données sont sauvegardées de manière sécurisée.
-                    </p>
-                    <p className="text-slate-500 text-sm mt-3 font-medium italic">
-                        La plateforme utilise un cryptage de bout-en-bout pour protéger vos échanges.
-                    </p>
+                    <p className="text-slate-800 font-extrabold text-lg">Vos données sont sauvegardées de manière sécurisée.</p>
                 </div>
-                <button 
-                    onClick={() => setShowPrivacyModal(false)}
-                    className="w-full mt-6 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs"
-                >
-                    J'ai compris
-                </button>
             </div>
         </div>
       )}
 
-      {/* Modal Changement de Mot de Passe */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 max-w-md w-full animate-fade-in-up">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic text-isig-blue">Mot de passe</h2>
-                    <button onClick={() => setShowPasswordModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
-                </div>
-                
-                {passwordSuccess ? (
-                    <div className="text-center py-6">
-                        <CheckCircle size={64} className="text-emerald-500 mx-auto mb-4" />
-                        <p className="text-lg font-black text-slate-800">Mise à jour réussie !</p>
-                        <p className="text-slate-500 text-sm mt-1">Votre accès a été sécurisé.</p>
-                    </div>
-                ) : (
-                    <form onSubmit={handleChangePassword} className="space-y-4">
-                        {passwordError && (
-                          <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-start text-xs font-bold">
-                            <AlertCircle size={16} className="mr-2 shrink-0" />
-                            <span>{passwordError}</span>
-                          </div>
-                        )}
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-2">Nouveau mot de passe</label>
-                            <input 
-                                type="password" 
-                                value={newPassword} 
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none font-bold text-sm"
-                                placeholder="Min. 6 caractères"
-                                required
-                                autoFocus
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-2">Confirmer</label>
-                            <input 
-                                type="password" 
-                                value={confirmPassword} 
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none font-bold text-sm"
-                                placeholder="Confirmez"
-                                required
-                            />
-                        </div>
-                        <button 
-                            type="submit"
-                            disabled={loading}
-                            className="w-full mt-4 py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center"
-                        >
-                            {loading ? <Spinner /> : "Sauvegarder"}
-                        </button>
-                    </form>
-                )}
-            </div>
-        </div>
-      )}
+      {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
     </div>
   );
 };

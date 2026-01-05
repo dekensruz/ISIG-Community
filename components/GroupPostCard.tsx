@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Heart, MessageCircle, Share2, FileText, Trash2, Pencil, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Share2, FileText, Trash2, Pencil, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import GroupImageModal from './GroupImageModal';
@@ -20,17 +20,21 @@ interface GroupPostCardProps {
 
 const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen = false }) => {
   const { session } = useAuth();
-  const [copied, setCopied] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes);
   const [comments, setComments] = useState<GroupPostComment[]>(post.group_post_comments);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
+
+  const CONTENT_LIMIT = 280;
+  const isLongContent = post.content.length > CONTENT_LIMIT;
+  const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
   useEffect(() => {
     const fetchTopLikers = async () => {
@@ -76,8 +80,8 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/group/${post.group_id}?postId=${post.id}&openModal=true`;
     const shareData = {
-        title: `Post de ${post.profiles.full_name} dans un groupe ISIG`,
-        text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+        title: `ISIG Community - Groupe`,
+        text: `Nouveau post de ${post.profiles.full_name} dans un groupe d'étude sur ISIG Community.`,
         url: shareUrl,
     };
 
@@ -86,35 +90,10 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
             await navigator.share(shareData);
         } else {
             await navigator.clipboard.writeText(shareUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            alert("Lien de la publication copié !");
         }
     } catch (err) {
         console.error("Erreur de partage:", err);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (window.confirm("Voulez-vous vraiment supprimer cette publication du groupe ?")) {
-      const { error } = await supabase.from('group_posts').delete().eq('id', post.id);
-      if (!error) window.location.reload();
-    }
-  };
-
-  const getLikeText = () => {
-    if (likes.length === 0) return "Aucun j'aime";
-    const userLiked = isLiked;
-    const count = likes.length;
-    
-    if (userLiked) {
-      if (count === 1) return "Vous avez aimé";
-      if (count === 2) return "Vous et 1 autre personne";
-      return `Vous et ${count - 1} autres personnes`;
-    } else {
-      const firstLiker = likerProfiles[0]?.full_name?.split(' ')[0] || "Quelqu'un";
-      if (count === 1) return `${firstLiker} a aimé`;
-      if (count === 2) return `${firstLiker} et 1 autre personne`;
-      return `${firstLiker} et ${count - 1} autres personnes`;
     }
   };
 
@@ -141,16 +120,24 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
                 <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
                   <Pencil size={16} className="mr-3" /> Modifier
                 </button>
-                <button onClick={() => { handleDelete(); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
-                  <Trash2 size={16} className="mr-3" /> Supprimer
-                </button>
               </div>
             )}
           </div>
         )}
       </div>
 
-      <p className="text-slate-700 whitespace-pre-wrap mb-4 font-medium leading-relaxed">{renderContentWithLinks(post.content)}</p>
+      <div className="text-slate-700 whitespace-pre-wrap mb-4 font-medium leading-relaxed">
+        {renderContentWithLinks(displayedContent)}
+        {!isExpanded && isLongContent && <span>...</span>}
+        {isLongContent && (
+            <button 
+                onClick={() => setIsExpanded(!isExpanded)} 
+                className="mt-2 text-isig-blue font-black text-xs uppercase tracking-widest flex items-center block hover:opacity-70 transition-opacity"
+            >
+                {isExpanded ? <><ChevronUp size={16} className="mr-1"/> Voir moins</> : <><ChevronDown size={16} className="mr-1"/> Voir plus</>}
+            </button>
+        )}
+      </div>
 
       {post.media_url && (
         <div className="mb-4">
@@ -169,21 +156,6 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         </div>
       )}
       
-      {likes.length > 0 && (
-        <div className="pb-3 flex items-center">
-          <button onClick={() => setShowLikersModal(true)} className="flex items-center group/likers">
-             <div className="flex -space-x-2 mr-3">
-               {likerProfiles.map(p => (
-                 <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-               ))}
-             </div>
-             <span className="text-xs font-bold text-slate-500 group-hover/likers:text-isig-blue transition-colors">
-               {getLikeText()}
-             </span>
-          </button>
-        </div>
-      )}
-
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">
         <div className="flex items-center space-x-2 sm:space-x-6">
           <button onClick={handleLike} className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -197,9 +169,8 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           </button>
         </div>
         
-        <button onClick={handleShare} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all relative flex-shrink-0">
+        <button onClick={handleShare} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
            <Share2 size={20} />
-           {copied && <span className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-slate-800 text-white text-[10px] rounded-lg font-bold shadow-xl">Lien copié</span>}
         </button>
       </div>
 

@@ -7,6 +7,7 @@ import PostCard from './Post';
 import Spinner from './Spinner';
 import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
+import { Search, X } from 'lucide-react';
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
@@ -16,7 +17,7 @@ const Feed: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
-  const { searchQuery } = useSearchFilter();
+  const { searchQuery, setSearchQuery } = useSearchFilter();
   
   const loaderRef = useRef<HTMLDivElement>(null);
   const POSTS_PER_PAGE = 10;
@@ -110,6 +111,29 @@ const Feed: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto w-full">
       <div className="space-y-6">
+        
+        {/* Barre de recherche responsive visible surtout sur mobile */}
+        <div className="md:hidden mb-4">
+            <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-isig-blue transition-colors" size={18} />
+                <input 
+                    type="text" 
+                    placeholder="Rechercher un post, un étudiant..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-12 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"
+                />
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                )}
+            </div>
+        </div>
+
         {session ? (
           <CreatePost 
             onPostCreated={() => { fetchPosts(true); setEditingPost(null); }} 
@@ -154,6 +178,14 @@ const Feed: React.FC = () => {
                 </div>
                 <p className="text-slate-500 font-bold text-lg">Aucune publication pour le moment.</p>
                 <p className="text-slate-400 text-sm mt-1">Soyez le premier à partager quelque chose !</p>
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="mt-4 text-isig-blue font-black uppercase tracking-widest text-xs hover:underline"
+                    >
+                        Effacer la recherche
+                    </button>
+                )}
             </div>
           )}
         </div>

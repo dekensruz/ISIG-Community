@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, MessageCircle, Send } from 'lucide-react';
+import { X, Heart, MessageCircle, Send, Trash2, Pencil, MoreHorizontal } from 'lucide-react';
 import { Post as PostType, Like, Comment as CommentType, Profile } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -25,6 +25,12 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const [replyingTo, setReplyingTo] = useState<CommentType | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  
+  // États pour l'édition et la suppression
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
+
   const modalRef = useRef<HTMLDivElement>(null);
   const modalRootRef = useRef(document.getElementById('modal-root'));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,7 +47,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
       const scrollHeight = textarea.scrollHeight;
       const maxHeight = 128; // max-h-32 = 8rem = 128px
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-      // N'affiche le scroll que si on dépasse la hauteur max
       textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
   };
@@ -115,16 +120,86 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     setIsPostingComment(false);
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
+    const { error } = await supabase.from('comments').delete().eq('id', commentId);
+    if (!error) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        setCommentMenuOpen(null);
+    } else {
+        alert("Erreur lors de la suppression: " + error.message);
+    }
+  };
+
+  const handleEditComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editContent.trim() || !editingCommentId) return;
+    const { error } = await supabase.from('comments').update({ content: editContent }).eq('id', editingCommentId);
+    if (!error) {
+        setComments(prev => prev.map(c => c.id === editingCommentId ? { ...c, content: editContent } : c));
+        setEditingCommentId(null);
+        setEditContent('');
+    } else {
+        alert("Erreur lors de la modification: " + error.message);
+    }
+  };
+
   const CommentItem: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
     <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
         <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
         <div className="flex-1 min-w-0">
-            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
-                <p className="text-sm text-slate-700 font-medium leading-relaxed">{comment.content}</p>
+            <div className="relative group/comment bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-start">
+                    <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                    
+                    {session?.user.id === comment.user_id && (
+                        <div className="relative">
+                            <button 
+                                onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)} 
+                                className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                            >
+                                <MoreHorizontal size={14} />
+                            </button>
+                            {commentMenuOpen === comment.id && (
+                                <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
+                                    <button 
+                                        onClick={() => { setEditingCommentId(comment.id); setEditContent(comment.content); setCommentMenuOpen(null); }} 
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center"
+                                    >
+                                        <Pencil size={12} className="mr-2 text-isig-blue" /> Modifier
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteComment(comment.id)} 
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center"
+                                    >
+                                        <Trash2 size={12} className="mr-2" /> Supprimer
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {editingCommentId === comment.id ? (
+                    <form onSubmit={handleEditComment} className="mt-1">
+                        <textarea 
+                            value={editContent} 
+                            onChange={(e) => setEditContent(e.target.value)} 
+                            className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue resize-none min-h-[60px]"
+                            autoFocus
+                        />
+                        <div className="flex space-x-3 mt-2">
+                            <button type="submit" className="text-[10px] font-black uppercase text-isig-blue hover:underline">Enregistrer</button>
+                            <button type="button" onClick={() => setEditingCommentId(null)} className="text-[10px] font-black uppercase text-slate-400 hover:underline">Annuler</button>
+                        </div>
+                    </form>
+                ) : (
+                    <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">{comment.content}</p>
+                )}
             </div>
+            
             <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                <button onClick={() => setReplyingTo(comment)} className="hover:text-isig-blue">Répondre</button>
+                <button onClick={() => setReplyingTo(comment)} className="hover:text-isig-blue transition-colors">Répondre</button>
                 <span>•</span>
                 <span>{formatDistanceToNow(new Date(comment.created_at), { locale: fr })}</span>
             </div>
@@ -177,7 +252,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             </div>
             <div className="p-4 sm:p-6">
                 {replyingTo && (
-                    <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100">
+                    <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100 animate-fade-in">
                         <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
                         <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
                     </div>

@@ -8,11 +8,12 @@ import Avatar from './Avatar';
 import { UserPlus, UserCheck, Search, X, Users } from 'lucide-react';
 import { useAuth } from '../App';
 
-const USERS_PER_PAGE = 12; // Augmenté pour remplir les grilles plus denses
+const USERS_PER_PAGE = 12;
 
 const UsersPage: React.FC = () => {
   const { session } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
@@ -33,9 +34,23 @@ const UsersPage: React.FC = () => {
     const to = from + USERS_PER_PAGE - 1;
 
     try {
+      // 1. Récupérer le compte total réel pour la recherche actuelle
+      let countQuery = supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .neq('id', session.user.id);
+
+      if (currentSearch.trim()) {
+        countQuery = countQuery.ilike('full_name', `%${currentSearch.trim()}%`);
+      }
+      
+      const { count: total } = await countQuery;
+      setTotalCount(total);
+
+      // 2. Récupérer la page de données
       let query = supabase
         .from('profiles')
-        .select('*', { count: 'exact' })
+        .select('*')
         .neq('id', session.user.id);
 
       if (currentSearch.trim()) {
@@ -58,7 +73,7 @@ const UsersPage: React.FC = () => {
           .eq('follower_id', session.user.id)
           .in('following_id', newUserIds);
         
-        const newFollowingMap = new Map(followingMap);
+        const newFollowingMap = isInitial ? new Map() : new Map(followingMap);
         followingData?.forEach(item => newFollowingMap.set(item.following_id, true));
         setFollowingMap(newFollowingMap);
       }
@@ -113,14 +128,20 @@ const UsersPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 px-2">
         <div>
           <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight italic uppercase">Membres</h1>
-          <p className="text-slate-500 font-medium text-xs sm:text-sm mt-1">Découvrez la communauté ({users.length} étudiants).</p>
+          <p className="text-slate-500 font-medium text-xs sm:text-sm mt-1 flex items-center">
+            {totalCount !== null ? (
+                <>Découvrez la communauté (<span className="text-isig-blue font-black px-1">{totalCount}</span> étudiants)</>
+            ) : (
+                <>Chargement des membres...</>
+            )}
+          </p>
         </div>
         
         <div className="relative w-full md:w-80">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input 
             type="text" 
-            placeholder="Rechercher..." 
+            placeholder="Rechercher par nom..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-10 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"

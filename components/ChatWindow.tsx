@@ -159,23 +159,35 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             .eq('id', newMessage.sender_id)
             .single();
 
+          // Récupérer le message répondu si nécessaire pour l'enrichir
+          let repliedToMsg = null;
+          if (newMessage.replying_to_message_id) {
+              const { data } = await supabase
+                .from('messages')
+                .select('*, profiles:sender_id(*)')
+                .eq('id', newMessage.replying_to_message_id)
+                .single();
+              repliedToMsg = data;
+          }
+
           setMessages(prev => {
-              // DÉDUPLICATION : On cherche un message optimiste identique (même expéditeur et contenu)
               const existingIndex = prev.findIndex(m => 
                   (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content) ||
                   m.id === newMessage.id
               );
 
-              const enrichedMessage = { ...newMessage, profiles: senderProfile as any };
+              const enrichedMessage = { 
+                  ...newMessage, 
+                  profiles: senderProfile as any,
+                  replied_to: repliedToMsg as any 
+              };
 
               if (existingIndex !== -1) {
-                  // On remplace le message optimiste par le vrai message de la DB
                   const newMessages = [...prev];
                   newMessages[existingIndex] = enrichedMessage;
                   return newMessages;
               }
               
-              // Sinon on l'ajoute simplement
               return [...prev, enrichedMessage];
           });
 
@@ -234,6 +246,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         created_at: new Date().toISOString(),
         profiles: { id: session.user.id, full_name: 'Vous' } as any,
         replying_to_message_id: replyingToMessage?.id,
+        // ENRICHISSEMENT OPTIMISTE : On inclut l'objet du message répondu pour l'UI
+        replied_to: replyingToMessage ? { ...replyingToMessage } : undefined,
         is_read: false
     };
 
@@ -266,7 +280,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         const { error } = await supabase.from('messages').insert(msgData);
         if (error) throw error;
     } catch (err: any) {
-        // En cas d'erreur réelle, on retire le message optimiste
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
         alert("Échec de l'envoi : " + err.message);
     } finally {

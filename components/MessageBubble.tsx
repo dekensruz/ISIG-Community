@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { Message } from '../types';
@@ -190,16 +191,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     </div>
                 )}
             </div>
-            <div className={`relative max-w-xs md:max-w-md lg:max-w-lg px-3 py-2 rounded-2xl order-2 ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border'}`}>
+            <div className={`relative max-w-xs md:max-w-md lg:max-w-lg px-3 py-2 rounded-2xl order-2 shadow-sm ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border'}`}>
                  {message.replied_to && (
-                     <div className={`p-2 mb-1 border-l-2 rounded-md ${isOwnMessage ? 'border-white/50 bg-black/20' : 'border-isig-blue bg-slate-100'}`}>
-                         <p className="font-bold text-sm">{message.replied_to.profiles?.full_name}</p>
-                         <p className={`text-sm opacity-90 line-clamp-2 ${isOwnMessage ? '' : 'text-slate-600'}`}>{message.replied_to.content}</p>
+                     <div className={`p-2 mb-2 border-l-4 rounded-lg flex flex-col ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
+                         <p className={`font-black text-[10px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>
+                             {message.replied_to.profiles?.full_name || '...'}
+                         </p>
+                         <p className={`text-xs italic line-clamp-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-500'}`}>
+                             {message.replied_to.content || (message.replied_to.media_url ? "Média" : "...")}
+                         </p>
                      </div>
                  )}
                 {renderMedia()}
-                {message.content && <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>}
-                <div className="text-right text-xs mt-1 flex justify-end items-center" style={{ color: isOwnMessage ? 'rgba(255,255,255,0.7)' : 'rgb(100 116 139)' }}>
+                {message.content && <p className="text-sm font-medium break-words whitespace-pre-wrap">{message.content}</p>}
+                <div className="text-right text-[10px] mt-1 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     <StatusIcon />

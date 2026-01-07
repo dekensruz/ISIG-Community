@@ -11,6 +11,7 @@ import CreatePost from './CreatePost';
 import Avatar from './Avatar';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import UserListModal from './UserListModal';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -35,6 +36,8 @@ const Profile: React.FC = () => {
   const [followLoading, setFollowLoading] = useState(false);
 
   const [modalImage, setModalImage] = useState<string | null>(null);
+  const [userListConfig, setUserListConfig] = useState<{ type: 'followers' | 'following', title: string } | null>(null);
+  
   const editAreaRef = useRef<HTMLDivElement>(null);
 
   const isOwnProfile = session?.user.id === userId;
@@ -195,7 +198,6 @@ const Profile: React.FC = () => {
 
   const handleEditRequested = (post: PostType) => {
     setEditingPost(post);
-    // Défilement direct vers le haut de la section des publications (là où CreatePost apparaît)
     setTimeout(() => {
         if (editAreaRef.current) {
             const textarea = editAreaRef.current.querySelector('textarea');
@@ -203,7 +205,7 @@ const Profile: React.FC = () => {
               textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
               textarea.focus();
             } else {
-              const yOffset = -100; // Offset pour compenser la navbar
+              const yOffset = -100;
               const y = editAreaRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
               window.scrollTo({ top: y, behavior: 'smooth' });
             }
@@ -314,14 +316,20 @@ const Profile: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-center sm:justify-start space-x-8 pb-8 border-b border-slate-50">
-                    <div className="text-center sm:text-left">
-                        <span className="block text-xl font-black text-slate-800">{followerCount}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Abonnés</span>
-                    </div>
-                    <div className="text-center sm:text-left">
-                        <span className="block text-xl font-black text-slate-800">{followingCount}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Abonnements</span>
-                    </div>
+                    <button 
+                        onClick={() => setUserListConfig({ type: 'followers', title: 'Abonnés' })}
+                        className="text-center sm:text-left group/stat"
+                    >
+                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followerCount}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/stat:text-isig-blue/70">Abonnés</span>
+                    </button>
+                    <button 
+                        onClick={() => setUserListConfig({ type: 'following', title: 'Abonnements' })}
+                        className="text-center sm:text-left group/stat"
+                    >
+                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followingCount}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/stat:text-isig-blue/70">Abonnements</span>
+                    </button>
                     <div className="text-center sm:text-left">
                         <span className="block text-xl font-black text-slate-800">{posts.length}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Posts</span>
@@ -430,6 +438,15 @@ const Profile: React.FC = () => {
                 <X size={32} />
             </button>
         </div>
+    )}
+
+    {userListConfig && (
+        <UserListModal 
+            userId={userId!} 
+            type={userListConfig.type} 
+            title={userListConfig.title} 
+            onClose={() => setUserListConfig(null)} 
+        />
     )}
     </>
   );

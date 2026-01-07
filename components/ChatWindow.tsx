@@ -13,11 +13,6 @@ import MediaViewerModal from './MediaViewerModal';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-interface ChatWindowProps {
-  conversationId: string;
-  onMessagesRead: () => void;
-}
-
 const formatPresence = (lastSeenAt?: string | null): string => {    
     if (!lastSeenAt) return '';
     const lastSeenDate = new Date(lastSeenAt);
@@ -33,6 +28,12 @@ const formatTime = (seconds: number) => {
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
+
+// Fix: Define the missing ChatWindowProps interface
+interface ChatWindowProps {
+  conversationId: string;
+  onMessagesRead: () => void;
+}
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead }) => {
   const { session } = useAuth();
@@ -65,7 +66,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const { fetchUnreadCount } = useUnreadMessages();
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+    setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+    }, 100);
   };
   
   const handleSetFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,44 +135,77 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     }
   }, [conversationId, session?.user, markMessagesAsRead]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-  
-  useEffect(() => {
-    if (!session?.user || !otherParticipant?.id) return;
-    const profileChannel = supabase.channel(`profiles-channel-${otherParticipant.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${otherParticipant.id}` }, (payload) => {
-            const newProfile = payload.new as Profile;
-            setPresenceStatus(formatPresence(newProfile.last_seen_at));
-        }).subscribe();
-    return () => { supabase.removeChannel(profileChannel); };
-  }, [session?.user, otherParticipant?.id]);
+  useEffect(() => { 
+    fetchData(); 
+  }, [fetchData]);
 
+  // Gestion du Realtime optimisée pour éviter les doublons
   useEffect(() => {
+    if (!conversationId || !session?.user) return;
+
     const channel = supabase.channel(`chat:${conversationId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}`}, (payload) => {
-            if (payload.eventType === 'INSERT') {
-                const msg = payload.new as Message;
-                // Si le message est déjà présent via mise à jour optimiste, on l'ignore ou on le met à jour
-                supabase.from('profiles').select('*').eq('id', msg.sender_id).single().then(({data}) => {
-                    if(data) {
-                        setMessages(prev => {
-                            const exists = prev.some(m => m.id === msg.id || (m.sender_id === msg.sender_id && m.created_at === msg.created_at));
-                            if (exists) {
-                                return prev.map(m => (m.sender_id === msg.sender_id && m.created_at === msg.created_at) ? { ...msg, profiles: data } : m);
-                            }
-                            return [...prev, {...msg, profiles: data}];
-                        });
-                    }
-                });
-                if (msg.sender_id !== session?.user.id) markMessagesAsRead();
-            } else if (payload.eventType === 'UPDATE') {
-                setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
-            } else if (payload.eventType === 'DELETE') {
-                setMessages(prev => prev.filter(m => m.id !== payload.old.id));
-            }
-      }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [conversationId, markMessagesAsRead, session?.user.id]);
+      .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `conversation_id=eq.${conversationId}`
+      }, async (payload) => {
+          const newMessage = payload.new as Message;
+          
+          // Récupérer le profil de l'expéditeur
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', newMessage.sender_id)
+            .single();
+
+          setMessages(prev => {
+              // DÉDUPLICATION : On cherche un message optimiste identique (même expéditeur et contenu)
+              const existingIndex = prev.findIndex(m => 
+                  (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content) ||
+                  m.id === newMessage.id
+              );
+
+              const enrichedMessage = { ...newMessage, profiles: senderProfile as any };
+
+              if (existingIndex !== -1) {
+                  // On remplace le message optimiste par le vrai message de la DB
+                  const newMessages = [...prev];
+                  newMessages[existingIndex] = enrichedMessage;
+                  return newMessages;
+              }
+              
+              // Sinon on l'ajoute simplement
+              return [...prev, enrichedMessage];
+          });
+
+          if (newMessage.sender_id !== session.user.id) {
+              markMessagesAsRead();
+          }
+          scrollToBottom();
+      })
+      .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+      })
+      .on('postgres_changes', { 
+          event: 'DELETE', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, session?.user.id, markMessagesAsRead]);
 
   useEffect(() => { 
     if (!loading) scrollToBottom("auto"); 
@@ -188,17 +224,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    // Mise à jour optimiste
+    // MISE À JOUR OPTIMISTE
+    const optimisticId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
-        id: `temp-${Date.now()}`,
+        id: optimisticId,
         conversation_id: conversationId,
         sender_id: session.user.id,
         content: content,
         created_at: new Date().toISOString(),
-        profiles: otherParticipant as any, // On utilise n'importe quel profil pour éviter le crash visuel
+        profiles: { id: session.user.id, full_name: 'Vous' } as any,
         replying_to_message_id: replyingToMessage?.id,
         is_read: false
     };
+
     setMessages(prev => [...prev, optimisticMsg]);
     setNewMessage('');
     removeFile();
@@ -217,12 +255,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             mediaType = mediaFile.type;
         }
 
-        const msgData = { conversation_id: conversationId, sender_id: session.user.id, content: content, media_url: mediaUrl, media_type: mediaType, replying_to_message_id: optimisticMsg.replying_to_message_id };
+        const msgData = { 
+            conversation_id: conversationId, 
+            sender_id: session.user.id, 
+            content: content, 
+            media_url: mediaUrl, 
+            media_type: mediaType, 
+            replying_to_message_id: optimisticMsg.replying_to_message_id 
+        };
         const { error } = await supabase.from('messages').insert(msgData);
         if (error) throw error;
     } catch (err: any) {
-        // En cas d'erreur, on retire le message optimiste
-        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        // En cas d'erreur réelle, on retire le message optimiste
+        setMessages(prev => prev.filter(m => m.id !== optimisticId));
         alert("Échec de l'envoi : " + err.message);
     } finally {
         setIsUploading(false);

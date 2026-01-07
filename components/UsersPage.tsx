@@ -34,7 +34,6 @@ const UsersPage: React.FC = () => {
     const to = from + USERS_PER_PAGE - 1;
 
     try {
-      // 1. Récupérer le compte total réel pour la recherche actuelle
       let countQuery = supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -47,7 +46,6 @@ const UsersPage: React.FC = () => {
       const { count: total } = await countQuery;
       setTotalCount(total);
 
-      // 2. Récupérer la page de données
       let query = supabase
         .from('profiles')
         .select('*')
@@ -57,8 +55,9 @@ const UsersPage: React.FC = () => {
         query = query.ilike('full_name', `%${currentSearch.trim()}%`);
       }
 
+      // TRI : Du plus récent au plus ancien
       const { data: usersData, error: usersError } = await query
-        .order('full_name', { ascending: true })
+        .order('updated_at', { ascending: false }) // On utilise updated_at ou created_at selon la structure
         .range(from, to);
         
       if (usersError) throw usersError;

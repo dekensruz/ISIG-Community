@@ -3,25 +3,38 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Conversation } from '../types';
+import { Conversation, Profile } from '../types';
 import Spinner from './Spinner';
 import ChatWindow from './ChatWindow';
 import Avatar from './Avatar';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MessageSquarePlus, CheckCheck, Users } from 'lucide-react';
+
+const isUserOnline = (lastSeenAt?: string | null): boolean => {
+    if (!lastSeenAt) return false;
+    const lastSeenDate = new Date(lastSeenAt);
+    const now = new Date();
+    return differenceInMinutes(now, lastSeenDate) < 3;
+};
 
 const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boolean }> = ({ conversation, isActive }) => {
     const { session } = useAuth();
     const { other_participant, last_message, unread_count } = conversation;
     const isLastMessageFromMe = session?.user && last_message?.sender_id === session.user.id;
+    const online = isUserOnline(other_participant.last_seen_at);
     
     return (
         <Link to={`/chat/${conversation.id}`} className={`flex items-start p-3 rounded-lg w-full text-left transition-colors ${isActive ? 'bg-isig-blue/10' : 'hover:bg-slate-100'}`}>
-            <Avatar avatarUrl={other_participant.avatar_url} name={other_participant.full_name} size="lg" className="mr-3 flex-shrink-0" />
+            <div className="relative mr-3 flex-shrink-0">
+                <Avatar avatarUrl={other_participant.avatar_url} name={other_participant.full_name} size="lg" />
+                {online && (
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                )}
+            </div>
             <div className="flex-grow overflow-hidden">
                 <div className="flex justify-between items-center">
-                    <p className="font-bold text-slate-800 truncate">{other_participant.full_name}</p>
+                    <p className={`font-bold truncate ${online ? 'text-isig-blue' : 'text-slate-800'}`}>{other_participant.full_name}</p>
                     {last_message && (
                         <time className="text-xs text-slate-400 flex-shrink-0 ml-2 flex items-center">
                              {isLastMessageFromMe && (
@@ -80,6 +93,7 @@ const ChatPage: React.FC = () => {
                 id: c.participant_id,
                 full_name: c.participant_full_name,
                 avatar_url: c.participant_avatar_url,
+                last_seen_at: c.participant_last_seen_at // Assurez-vous que cette colonne est retournée par le RPC
             },
             last_message: c.last_message_id ? {
                 id: c.last_message_id,
@@ -95,7 +109,6 @@ const ChatPage: React.FC = () => {
         if (isInitial) setLoading(false);
     }, [session?.user]);
 
-    // Cette fonction doit être stable pour éviter les boucles infinies dans ChatWindow
     const handleMessagesRead = useCallback(() => {
         fetchConversations(false);
     }, [fetchConversations]);
@@ -119,6 +132,14 @@ const ChatPage: React.FC = () => {
                 schema: 'public', 
                 table: 'conversation_participants', 
                 filter: `user_id=eq.${session?.user.id}` 
+            }, () => {
+                fetchConversations(false);
+            })
+            // Écouter les changements de profil pour l'indicateur online
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'profiles'
             }, () => {
                 fetchConversations(false);
             })

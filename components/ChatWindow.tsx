@@ -19,7 +19,8 @@ const formatPresence = (lastSeenAt?: string | null): string => {
     const now = new Date();
     const diffMins = differenceInMinutes(now, lastSeenDate);
 
-    if (diffMins < 5) return 'En ligne';
+    // Si moins de 3 minutes d'inactivité, on considère "En ligne"
+    if (diffMins < 3) return 'En ligne';
     return `Vu ${formatDistanceToNow(lastSeenDate, { locale: fr, addSuffix: true })}`;
 };
 
@@ -69,6 +70,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { fetchUnreadCount } = useUnreadMessages();
 
+  // Rafraîchir le libellé "Vu il y a..." toutes les minutes localement
+  useEffect(() => {
+    if (!otherParticipant) return;
+    const interval = setInterval(() => {
+        setPresenceStatus(formatPresence(otherParticipant.last_seen_at));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [otherParticipant]);
+
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -115,7 +125,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     setEditingMessage(msg);
     setReplyingToMessage(null);
     setNewMessage(msg.content || '');
-    // Focus et ajuster hauteur
     setTimeout(() => {
         textareaRef.current?.focus();
         adjustHeight();
@@ -141,7 +150,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     if (!isSilent) setLoading(true);
     
     try {
-      const { data: participantData, error: pError } = await supabase
+      const { data: participantData } = await supabase
         .from('conversation_participants')
         .select('profiles:user_id(*)')
         .eq('conversation_id', conversationId)
@@ -182,9 +191,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     fetchData(); 
   }, [fetchData]);
 
-  // Realtime subscription
   useEffect(() => {
-    if (!conversationId || !session?.user) return;
+    if (!conversationId || !session?.user || !otherParticipant) return;
 
     const channel = supabase.channel(`chat_room_${conversationId}`)
       .on('postgres_changes', { 
@@ -195,7 +203,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, (payload) => {
           if (payload.eventType === 'INSERT') {
             const incoming = payload.new as Message;
-            
             setMessages(current => {
                 if (current.some(m => m.id === incoming.id)) return current;
                 const optimisticIdx = current.findIndex(m => 
@@ -223,19 +230,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           else if (payload.eventType === 'UPDATE') {
             setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
           } 
-          else if (payload.eventType === 'DELETE') {
-            setMessages(current => current.filter(m => m.id !== payload.old.id));
-          }
+      })
+      .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${otherParticipant.id}`
+      }, (payload) => {
+          const updatedProfile = payload.new as Profile;
+          setOtherParticipant(updatedProfile);
+          setPresenceStatus(formatPresence(updatedProfile.last_seen_at));
       })
       .subscribe((status) => {
           setRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' ? 'error' : 'connecting');
-          if (status === 'SUBSCRIBED') fetchData(true);
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, session?.user.id, otherParticipant, currentUserProfile, markMessagesAsRead, fetchData]);
+  }, [conversationId, session?.user.id, otherParticipant, currentUserProfile, markMessagesAsRead]);
 
   useEffect(() => { 
     if (!loading) scrollToBottom(messages.length > 50 ? "auto" : "smooth"); 
@@ -248,14 +261,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     if (editingMessage) {
         const { error } = await supabase.from('messages').update({ content: newMessage, updated_at: new Date().toISOString() }).eq('id', editingMessage.id);
         if(!error) cancelEdit();
-        else alert("Erreur lors de la mise à jour");
         return;
     }
     
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const optimisticId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
         id: optimisticId,
         conversation_id: conversationId,
@@ -287,7 +299,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             mediaType = mediaFile.type;
         }
 
-        const { error } = await supabase.from('messages').insert({ 
+        await supabase.from('messages').insert({ 
             conversation_id: conversationId, 
             sender_id: session.user.id, 
             content: content, 
@@ -295,8 +307,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             media_type: mediaType, 
             replying_to_message_id: optimisticMsg.replying_to_message_id 
         });
-        
-        if (error) throw error;
     } catch (err: any) {
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
         alert("Échec de l'envoi.");
@@ -348,16 +358,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             
             {!showSearch && otherParticipant && (
                 <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
-                    <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/20 transition-all" />
+                    <div className="relative">
+                        <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/20 transition-all" />
+                        {presenceStatus === 'En ligne' && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                        )}
+                    </div>
                     <div className="min-w-0">
                         <div className="flex items-center space-x-2">
                             <h3 className="font-black text-slate-800 tracking-tight truncate group-hover:text-isig-blue transition-colors">{otherParticipant.full_name}</h3>
-                            {realtimeStatus === 'connected' ? 
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Temps réel actif"></span> : 
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" title="Connexion en cours..."></span>
-                            }
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{presenceStatus}</p> 
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${presenceStatus === 'En ligne' ? 'text-emerald-500' : 'text-slate-400'}`}>
+                            {presenceStatus}
+                        </p> 
                     </div>
                 </Link>
             )}
@@ -415,8 +428,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                     <button type="button" onClick={() => mediaRecorderRef.current?.stop()} className="bg-isig-blue text-white p-3 rounded-2xl hover:bg-blue-600 shadow-lg shadow-isig-blue/20"><StopCircle size={24} /></button>
                 </div>
             ) : (
-                <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
-                    <label className="p-4 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0">
+                <div className="flex items-end space-x-2">
+                    <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0">
                         <Paperclip size={24} />
                         <input type="file" ref={fileInputRef} onChange={handleSetFile} className="hidden" />
                     </label>
@@ -435,22 +448,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                             }
                           }}
                           placeholder="Votre message..." 
-                          className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-5 py-4 focus:ring-2 focus:ring-isig-blue outline-none transition-all font-medium text-slate-700 resize-none max-h-40 min-h-[56px] block overflow-y-hidden" 
+                          className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-4 py-3 focus:ring-2 focus:ring-isig-blue outline-none transition-all font-medium text-slate-700 resize-none max-h-40 min-h-[48px] block overflow-y-hidden" 
                         />
                     </div>
-                    <button 
-                        type="submit" 
-                        disabled={isUploading || (!newMessage.trim() && !file)} 
-                        className={`w-14 h-14 flex items-center justify-center rounded-[1.5rem] shadow-lg transition-all active:scale-95 disabled:opacity-50 flex-shrink-0 ${editingMessage ? 'bg-isig-orange shadow-isig-orange/20 hover:bg-orange-600' : 'bg-isig-blue shadow-isig-blue/20 hover:bg-blue-600'}`}
-                    >
-                        {isUploading ? <Spinner /> : <Send size={24} className="text-white" />}
-                    </button>
-                    {!newMessage.trim() && !file && !editingMessage && (
-                        <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-4 rounded-[1.5rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 flex-shrink-0">
-                            <Mic size={24} />
-                        </button>
-                    )}
-                </form>
+                    
+                    <div className="flex items-center space-x-2">
+                        {(!newMessage.trim() && !file && !editingMessage) ? (
+                            <button type="button" onClick={startRecording} className="bg-isig-blue text-white w-11 h-11 flex items-center justify-center rounded-[1.25rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95">
+                                <Mic size={20} />
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={handleSendMessage}
+                                disabled={isUploading || (!newMessage.trim() && !file)} 
+                                className={`w-11 h-11 flex items-center justify-center rounded-[1.25rem] shadow-lg transition-all active:scale-95 disabled:opacity-50 ${editingMessage ? 'bg-isig-orange shadow-isig-orange/20 hover:bg-orange-600' : 'bg-isig-blue shadow-isig-blue/20 hover:bg-blue-600'}`}
+                            >
+                                {isUploading ? <Spinner /> : <Send size={20} className="text-white" />}
+                            </button>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
       {mediaInView && <MediaViewerModal mediaUrl={mediaInView.url} mediaType={mediaInView.type} fileName={mediaInView.name} onClose={() => setMediaInView(null)} />}

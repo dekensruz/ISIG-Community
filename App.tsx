@@ -44,7 +44,6 @@ type SearchFilterContextType = {
   setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-// CORRECTION: Utilisation de createContext avec une valeur initiale undefined
 export const SearchFilterContext = createContext<SearchFilterContextType | undefined>(undefined);
 
 export const useSearchFilter = () => {
@@ -79,9 +78,23 @@ const AppContent: React.FC = () => {
     const isChatListPage = location.pathname === '/chat';
     
     const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
-    
-    // On cache les barres si on est dans une conversation de chat (mobile immersion)
     const showNavBars = !isAuthPage && !isChatConversation;
+
+    // Système de Presence (Heartbeat)
+    useEffect(() => {
+        if (!session?.user) return;
+
+        const updatePresence = async () => {
+            await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
+        };
+
+        // Mise à jour immédiate au chargement
+        updatePresence();
+
+        // Puis toutes les 2 minutes
+        const interval = setInterval(updatePresence, 120000);
+        return () => clearInterval(interval);
+    }, [session]);
 
     return (
         <div className="min-h-screen bg-slate-100">
@@ -90,7 +103,7 @@ const AppContent: React.FC = () => {
                 isAuthPage
                 ? "" 
                 : isChatConversation
-                ? "h-screen pt-0 pb-0" // Immersion totale pour le chat
+                ? "h-screen pt-0 pb-0" 
                 : isChatListPage
                 ? "h-screen pt-[60px] pb-[80px]" 
                 : "container mx-auto px-4 pt-24 pb-24" 

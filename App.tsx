@@ -44,7 +44,9 @@ type SearchFilterContextType = {
   setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export const SearchFilterContext = useContext(SearchFilterContextType | undefined);
+// CORRECTION: Utilisation de createContext avec une valeur initiale undefined
+export const SearchFilterContext = createContext<SearchFilterContextType | undefined>(undefined);
+
 export const useSearchFilter = () => {
     const context = useContext(SearchFilterContext);
     if (!context) {

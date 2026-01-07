@@ -2,7 +2,8 @@
 {
   "short_name": "ISIG Comm",
   "name": "ISIG Community",
-  "description": "Réseau social académique de l'ISIG Goma",
+  "description": "Réseau social académique officiel des étudiants de l'ISIG Goma.",
+  "categories": ["education", "social"],
   "icons": [
     {
       "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s",

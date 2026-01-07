@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck } from 'lucide-react';
 import Spinner from './Spinner';
 
 const AuthPage: React.FC = () => {
@@ -27,15 +27,6 @@ const AuthPage: React.FC = () => {
     if (msg.includes('already registered')) return "Cet email est déjà utilisé par un autre étudiant.";
     if (msg.includes('Password should be')) return "Le mot de passe doit contenir au moins 6 caractères.";
     return msg || "Une erreur est survenue. Veuillez réessayer.";
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setAvatarFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -79,7 +70,7 @@ const AuthPage: React.FC = () => {
             redirectTo: `${window.location.origin}/settings`,
         });
         if (error) throw error;
-        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail (pensez aux spams).');
+        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail.');
       }
     } catch (err: any) {
       setError(getFriendlyErrorMessage(err));
@@ -101,6 +92,10 @@ const AuthPage: React.FC = () => {
           <h1 className="text-5xl font-extrabold text-white leading-tight italic">
             L'intelligence <br/><span className="text-isig-blue text-6xl">collective</span> <br/> de l'ISIG Goma.
           </h1>
+        </div>
+        <div className="relative z-10 flex items-center space-x-3 text-white/50 text-xs font-bold uppercase tracking-widest">
+            <ShieldCheck size={16} />
+            <span>Données sécurisées par cryptage AES-256</span>
         </div>
       </div>
 
@@ -180,14 +175,22 @@ const AuthPage: React.FC = () => {
             </button>
           </form>
 
-          <p className="text-center text-slate-500 font-bold">
-            {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
-            <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
-              {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
-            </button>
-          </p>
+          <div className="text-center space-y-4">
+              <p className="text-slate-500 font-bold">
+                {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
+                <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
+                  {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
+                </button>
+              </p>
+              
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <a href="#" className="hover:text-isig-blue">Conditions d'utilisation</a>
+                  <a href="#" className="hover:text-isig-blue">Confidentialité</a>
+                  <a href="#" className="hover:text-isig-blue">Aide</a>
+              </div>
+          </div>
 
-          <div className="mt-12 text-center border-t border-slate-100 pt-8">
+          <div className="mt-8 text-center pt-4">
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Développé par</p>
             <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-3 group">
                 <img 

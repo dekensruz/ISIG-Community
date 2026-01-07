@@ -4,7 +4,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ISIG Community | Réseau Social Académique</title>
+    <title>ISIG Community | Réseau Social Académique Officiel</title>
+    
+    <!-- SEO & Reputation Tags -->
+    <meta name="description" content="Plateforme officielle de collaboration pour les étudiants de l'ISIG Goma. Partage de cours, projets et entraide académique sécurisée." />
+    <meta name="author" content="Dekens Ruzuba" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph (Facebook/LinkedIn/Bots) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ISIG Community - Collaboration Académique" />
+    <meta property="og:description" content="Rejoignez la communauté exclusive des étudiants de l'ISIG Goma." />
+    <meta property="og:image" content="https://i.ibb.co/d0GY63vw/Logo-transparent.png" />
+    <meta property="og:site_name" content="ISIG Community" />
+
     <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s" />
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +25,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // Polyfill sécurisé : on n'écrase que si process.env n'existe pas déjà
       window.process = window.process || { env: {} };
       window.process.env = window.process.env || {};
       
@@ -81,8 +93,6 @@
   .active-nav svg {
     fill: #00AEEF;
   }
-  
-  /* Custom Scrollbar Premium */
   ::-webkit-scrollbar {
     width: 6px;
   }

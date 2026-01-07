@@ -94,6 +94,11 @@ const ChatPage: React.FC = () => {
         setConversations(formattedConversations);
         if (isInitial) setLoading(false);
     }, [session?.user]);
+
+    // Cette fonction doit être stable pour éviter les boucles infinies dans ChatWindow
+    const handleMessagesRead = useCallback(() => {
+        fetchConversations(false);
+    }, [fetchConversations]);
     
     useEffect(() => {
         fetchConversations(true);
@@ -105,7 +110,6 @@ const ChatPage: React.FC = () => {
                 schema: 'public', 
                 table: 'messages'
             }, (payload: any) => {
-                // Rafraîchir uniquement si le message appartient à une conversation de l'utilisateur
                 if (payload.new && payload.new.conversation_id) {
                     fetchConversations(false);
                 }
@@ -166,7 +170,7 @@ const ChatPage: React.FC = () => {
                     <ChatWindow 
                         key={conversationId} 
                         conversationId={conversationId} 
-                        onMessagesRead={() => fetchConversations(false)} 
+                        onMessagesRead={handleMessagesRead} 
                     />
                 ) : (
                     <div className="flex-grow flex-col items-center justify-center text-center text-slate-500 p-8 hidden md:flex">

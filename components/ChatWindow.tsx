@@ -108,14 +108,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         fetchUnreadCount();
         onMessagesRead();
     }
-  }, [session, conversationId, fetchUnreadCount, onMessagesRead]);
+  }, [session?.user?.id, conversationId, fetchUnreadCount, onMessagesRead]);
 
   const fetchData = useCallback(async () => {
     if (!session?.user || !conversationId) return;
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch Participant using a more reliable query
       const { data: participantData, error: pError } = await supabase
         .from('conversation_participants')
         .select('profiles:user_id(*)')
@@ -130,7 +129,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           setOtherParticipant(p);
           setPresenceStatus(formatPresence(p.last_seen_at));
       } else {
-          // Fallback if direct query yields nothing, try the RPC as last resort
           const { data: rpcData } = await supabase.rpc('get_conversation_participant', { p_conversation_id: conversationId }).maybeSingle();
           if (rpcData) {
             setOtherParticipant(rpcData as unknown as Profile);
@@ -140,11 +138,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           }
       }
 
-      // 2. Fetch My Profile
       const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
       if (myProfile) setCurrentUserProfile(myProfile);
 
-      // 3. Fetch Messages
       const { data: messagesData, error: mError } = await supabase
         .from('messages')
         .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
@@ -154,20 +150,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       if (mError) throw mError;
       setMessages(messagesData as any[] || []);
       
-      await markMessagesAsRead();
+      // On ne l'appelle que si on a des messages non lus
+      const hasUnread = (messagesData as any[])?.some(m => !m.is_read && m.sender_id !== session.user.id);
+      if (hasUnread) {
+          markMessagesAsRead();
+      }
     } catch (err: any) {
       console.error('Error fetching chat data:', err);
       setError("Une erreur est survenue lors du chargement de la discussion.");
     } finally {
       setLoading(false);
     }
-  }, [conversationId, session?.user, markMessagesAsRead]);
+  }, [conversationId, session?.user?.id, markMessagesAsRead]);
 
   useEffect(() => { 
     fetchData(); 
   }, [fetchData]);
 
-  // Realtime subscription logic
   useEffect(() => {
     if (!conversationId || !session?.user || !otherParticipant || !currentUserProfile) return;
 

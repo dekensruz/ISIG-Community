@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { Group } from '../types';
 import { Link } from 'react-router-dom';
@@ -14,23 +14,7 @@ const GroupsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    fetchGroups();
-    
-    const groupsSubscription = supabase
-      .channel('public:groups')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
-        fetchGroups();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(groupsSubscription);
-    };
-  }, []);
-
-  const fetchGroups = async () => {
-    setLoading(true);
+  const fetchGroups = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('groups')
@@ -45,7 +29,26 @@ const GroupsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchGroups();
+    
+    // On écoute les changements sur les groupes ET sur les membres
+    const channel = supabase
+      .channel('groups_list_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
+        fetchGroups();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+        fetchGroups();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchGroups]);
 
   const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -78,7 +81,7 @@ const GroupsPage: React.FC = () => {
         </div>
       </div>
       
-      {loading ? (
+      {loading && groups.length === 0 ? (
         <div className="flex justify-center mt-20"><Spinner /></div>
       ) : (
         filteredGroups.length > 0 ? (
@@ -96,9 +99,9 @@ const GroupsPage: React.FC = () => {
                 <div className="mt-8 flex items-center justify-between border-t border-slate-50 pt-5">
                     <div className="flex items-center text-isig-blue font-black text-xs uppercase tracking-widest">
                         <Users size={16} className="mr-2" />
-                        <span>{group.group_members.length} membres</span>
+                        <span>{group.group_members?.length || 0} membre{group.group_members?.length > 1 ? 's' : ''}</span>
                     </div>
-                    <span className="text-xs font-bold text-slate-300">#{group.profiles.full_name.split(' ')[0]}</span>
+                    <span className="text-xs font-bold text-slate-300">#{group.profiles?.full_name?.split(' ')[0] || 'ISIG'}</span>
                 </div>
               </Link>
             ))}
@@ -114,7 +117,7 @@ const GroupsPage: React.FC = () => {
         )
       )}
       
-      {showCreateModal && <CreateGroupModal onClose={() => setShowCreateModal(false)} />}
+      {showCreateModal && <CreateGroupModal onClose={() => { setShowCreateModal(false); fetchGroups(); }} />}
     </div>
   );
 };

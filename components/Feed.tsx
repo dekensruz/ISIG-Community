@@ -33,11 +33,8 @@ const Feed: React.FC = () => {
 
   const fetchPosts = useCallback(async (isInitial = false) => {
     try {
-      if (isInitial) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+      if (isInitial) setLoading(true);
+      else setLoadingMore(true);
 
       const currentPage = isInitial ? 0 : page + 1;
       const from = currentPage * POSTS_PER_PAGE;
@@ -105,6 +102,7 @@ const Feed: React.FC = () => {
             if (editingPost) {
                 return prev.map(p => p.id === newPost.id ? newPost : p);
             }
+            // Injection immédiate au début de la liste
             return [newPost, ...prev];
         });
         setEditingPost(null);
@@ -165,7 +163,7 @@ const Feed: React.FC = () => {
         )}
 
         <div className="space-y-8 pb-10">
-          {loading ? (
+          {loading && posts.length === 0 ? (
              <div className="flex justify-center py-20"><Spinner /></div>
           ) : filteredPosts.length > 0 ? (
             <>
@@ -173,7 +171,7 @@ const Feed: React.FC = () => {
                 <div 
                   key={post.id} 
                   className="animate-fade-in-up" 
-                  style={{ animationDelay: `${Math.min((index % POSTS_PER_PAGE) * 0.1, 1)}s` }}
+                  style={{ animationDelay: `${Math.min((index % POSTS_PER_PAGE) * 0.05, 0.5)}s` }}
                 >
                   <PostCard post={post} onEditRequested={handleEditRequested} />
                 </div>

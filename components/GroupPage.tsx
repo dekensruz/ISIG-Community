@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest, Profile } from '../types';
+import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest } from '../types';
 import Spinner from './Spinner';
 import GroupPostCard from './GroupPostCard';
 import { Users, LogIn, LogOut, Edit, X, Clock, Check, Crown } from 'lucide-react';
@@ -63,44 +63,12 @@ const GroupPage: React.FC = () => {
       const currentUserIsMember = memberData.some((m: any) => m.user_id === session.user.id);
       setIsMember(currentUserIsMember);
 
-      const currentUserIsAdmin = memberData.find(m => m.user_id === session.user.id)?.role === 'admin';
-      const currentUserIsOwner = groupData.created_by === session.user.id;
-
-      if (currentUserIsAdmin || currentUserIsOwner) {
-        const { data: requestsData, error: requestsError } = await supabase
+      if (isAdmin || isOwner) {
+        const { data: requestsData } = await supabase
           .from('group_join_requests')
-          .select('id, group_id, user_id, created_at')
+          .select('*, profiles(*)')
           .eq('group_id', groupId);
-        if (requestsError) throw requestsError;
-
-        if (requestsData && requestsData.length > 0) {
-          const userIds = requestsData.map(r => r.user_id);
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('id', userIds);
-          
-          if (profilesError) console.warn("Could not fetch profilesData", profilesError);
-
-          const populatedRequests = requestsData.map(request => {
-            const profile = profilesData ? profilesData.find(p => p.id === request.user_id) : null;
-            return {
-                ...request,
-                profiles: profile || {
-                    id: request.user_id,
-                    full_name: `Utilisateur inconnu`,
-                    avatar_url: null,
-                    updated_at: new Date().toISOString(),
-                    role: 'user'
-                } as any
-            };
-          });
-          setJoinRequests(populatedRequests as any);
-        } else {
-          setJoinRequests([]);
-        }
-      } else {
-        setJoinRequests([]);
+        setJoinRequests(requestsData as any || []);
       }
 
       if (!currentUserIsMember) {
@@ -111,17 +79,14 @@ const GroupPage: React.FC = () => {
           .eq('user_id', session.user.id)
           .maybeSingle();
         setUserRequestStatus(requestData ? 'pending' : 'none');
-      } else {
-          setUserRequestStatus('none');
       }
 
     } catch (error: any) {
       console.error("Error fetching group data:", error.message);
-      setGroup(null);
     } finally {
       setLoadingGroup(false);
     }
-  }, [groupId, session?.user]);
+  }, [groupId, session?.user, isAdmin, isOwner]);
 
   const fetchPosts = useCallback(async () => {
     if (!groupId) return;
@@ -154,6 +119,7 @@ const GroupPage: React.FC = () => {
 
   const handlePostCreated = (newPost?: GroupPostType) => {
       if (newPost) {
+          // Injection immédiate au début de la liste locale
           setPosts(prev => [newPost, ...prev]);
       } else {
           fetchPosts();
@@ -189,18 +155,6 @@ const GroupPage: React.FC = () => {
   
   if (loadingGroup) return <div className="flex justify-center mt-8"><Spinner /></div>;
   if (!group) return <div className="text-center mt-8 text-xl text-slate-600">Groupe introuvable.</div>;
-  
-  const renderJoinButton = () => {
-    if (isOwner) return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-orange/10 text-isig-orange uppercase tracking-widest text-[10px] cursor-default"><Crown size={18}/><span>Créateur</span></button>;
-    if (isAdmin) return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-slate-100 text-slate-600 uppercase tracking-widest text-[10px] cursor-default"><Check size={18}/><span>Admin</span></button>;
-    if (isMember) return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 uppercase tracking-widest text-[10px]"><LogOut size={18}/><span>Quitter</span></button>;
-    if (group.is_private) {
-        if (userRequestStatus === 'pending') return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] cursor-default" disabled><Clock size={18}/><span>Demande envoyée</span></button>;
-        return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-blue text-white hover:bg-blue-600 shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-[10px]"><LogIn size={18}/><span>Rejoindre</span></button>;
-    }
-    return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-blue text-white hover:bg-blue-600 shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-[10px]"><LogIn size={18}/><span>Rejoindre</span></button>;
-  };
-  
 
   return (
     <>
@@ -214,7 +168,7 @@ const GroupPage: React.FC = () => {
                      </button>
                     <div>
                       <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">{group.name}</h1>
-                      <p className="text-xs text-slate-500 mt-1 uppercase font-black tracking-widest">Par <Link to={`/profile/${group.created_by}`} className="text-isig-blue hover:underline">{group.profiles.full_name}</Link></p>
+                      <p className="text-xs text-slate-500 mt-1 uppercase font-black tracking-widest">Par <Link to={`/profile/${group.created_by}`} className="text-isig-blue hover:underline">{group.profiles?.full_name || 'Chargement...'}</Link></p>
                     </div>
                 </div>
                  <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
@@ -223,7 +177,15 @@ const GroupPage: React.FC = () => {
                             <Edit size={18}/><span>Modifier</span>
                         </button>
                     )}
-                    {renderJoinButton()}
+                    {isOwner ? (
+                         <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-orange/10 text-isig-orange uppercase tracking-widest text-[10px] cursor-default"><Crown size={18}/><span>Créateur</span></button>
+                    ) : isMember ? (
+                         <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 uppercase tracking-widest text-[10px]"><LogOut size={18}/><span>Quitter</span></button>
+                    ) : userRequestStatus === 'pending' ? (
+                         <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] cursor-default" disabled><Clock size={18}/><span>En attente</span></button>
+                    ) : (
+                         <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-blue text-white hover:bg-blue-600 shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-[10px]"><LogIn size={18}/><span>Rejoindre</span></button>
+                    )}
                 </div>
             </div>
              <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-50">
@@ -237,7 +199,7 @@ const GroupPage: React.FC = () => {
                     }
                     <div className="flex -space-x-3">
                         {members.slice(0, 3).map(member => (
-                           <Avatar key={member.user_id} avatarUrl={member.profiles.avatar_url} name={member.profiles.full_name} size="sm" className="ring-2 ring-white" />
+                           <Avatar key={member.user_id} avatarUrl={member.profiles?.avatar_url} name={member.profiles?.full_name || '...'} size="sm" className="ring-2 ring-white" />
                         ))}
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-widest">
@@ -253,7 +215,7 @@ const GroupPage: React.FC = () => {
             {isMember || !group.is_private ? (
                 <>
                     {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}
-                    {loadingPosts ? (
+                    {loadingPosts && posts.length === 0 ? (
                         <div className="flex justify-center py-10"><Spinner /></div>
                     ) : posts.length > 0 ? (
                         posts.map(post => <GroupPostCard key={post.id} post={post} startWithModalOpen={post.id === openModalPostId} />)

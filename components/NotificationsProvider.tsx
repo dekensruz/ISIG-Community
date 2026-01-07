@@ -1,13 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 
-// ATTENTION: Remplacez cette clé par votre propre clé publique VAPID.
-// Vous pouvez générer des clés via des outils en ligne ou la bibliothèque 'web-push'.
-// Stockez-la de manière sécurisée, par exemple dans vos variables d'environnement.
 const VAPID_PUBLIC_KEY = 'BCx1XVKpiYEDX_pOptcyi7ikv0hVQo9iVNsww-GxbKyife7Vdln3gTOz2p0eN06twP5MBiZLVEsDMxeLSb4YOuc';
-
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -22,17 +19,15 @@ function urlBase64ToUint8Array(base64String: string) {
     return outputArray;
 }
 
-const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const NotificationsProvider: React.FC = () => {
     const { session } = useAuth();
     const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
     useEffect(() => {
-      // It's safe to access browser globals like `Notification` inside useEffect.
       if ('Notification' in window) {
         setNotificationPermission(Notification.permission);
       }
     }, []);
-
 
     const subscribeUserToPush = async () => {
         try {
@@ -40,7 +35,6 @@ const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const existingSubscription = await serviceWorker.pushManager.getSubscription();
 
             if (existingSubscription) {
-                console.log('User is already subscribed.');
                 await saveSubscription(existingSubscription);
                 return;
             }
@@ -50,7 +44,6 @@ const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
             });
             
-            console.log('User subscribed successfully.');
             await saveSubscription(subscription);
 
         } catch (error) {
@@ -60,19 +53,12 @@ const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     const saveSubscription = async (subscription: PushSubscription) => {
         if (!session?.user) return;
-
-        const { error } = await supabase
+        await supabase
             .from('push_subscriptions')
             .upsert({ 
                 user_id: session.user.id,
                 subscription: subscription.toJSON()
             }, { onConflict: 'user_id' });
-
-        if (error) {
-            console.error('Error saving subscription:', error);
-        } else {
-            console.log('Subscription saved successfully.');
-        }
     };
     
     useEffect(() => {
@@ -84,27 +70,18 @@ const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [session, notificationPermission]);
 
     const handleRequestPermission = async () => {
-        if (!('Notification' in window)) {
-            alert("Ce navigateur ne supporte pas les notifications.");
-            return;
-        }
+        if (!('Notification' in window)) return;
         const permission = await Notification.requestPermission();
         setNotificationPermission(permission);
         if (permission === 'granted') {
-            console.log('Notification permission granted.');
             await subscribeUserToPush();
-        } else {
-            console.log('Notification permission denied.');
         }
     };
 
+    if (notificationPermission !== 'default') return null;
+
     return (
-        <>
-            {session && notificationPermission === 'default' && (
-                <NotificationPermissionBanner onRequestPermission={handleRequestPermission} />
-            )}
-            {children}
-        </>
+        <NotificationPermissionBanner onRequestPermission={handleRequestPermission} />
     );
 };
 

@@ -29,4 +29,4 @@ Conçu et développé avec passion par **Dekens Ruzuba** (Software Engineer & De
 - Portfolio : [portfoliodek.netlify.app](http://portfoliodek.netlify.app/)
 
 ---
-© 2026 ISIG Goma - Tous droits réservés.
+© 2025 ISIG Goma - Tous droits réservés.

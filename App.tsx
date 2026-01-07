@@ -22,6 +22,7 @@ import NotificationsPage from './components/NotificationsPage';
 import NotificationsProvider from './components/NotificationsProvider';
 import AdminFeedbacksPage from './components/AdminFeedbacksPage';
 import FeedbackPage from './components/FeedbackPage';
+import InstallPWABanner from './components/InstallPWABanner';
 
 type AuthContextType = {
   session: Session | null;
@@ -69,6 +70,8 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 const AppContent: React.FC = () => {
     const { session } = useAuth();
     const location = useLocation();
+    const [canShowNotifications, setCanShowNotifications] = useState(false);
+    
     const isAuthPage = location.pathname === '/auth';
     const isChatPage = location.pathname.startsWith('/chat');
     const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
@@ -103,6 +106,14 @@ const AppContent: React.FC = () => {
             </main>
             {!isAuthPage && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
+            
+            {/* Logique Séquentielle : Installation puis Notifications */}
+            {session && !isAuthPage && (
+                <>
+                    <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
+                    {canShowNotifications && <NotificationsProvider />}
+                </>
+            )}
         </div>
     );
 };
@@ -137,9 +148,7 @@ const App: React.FC = () => {
         <BrowserRouter>
             <SearchFilterProvider>
                 <UnreadMessagesProvider>
-                    <NotificationsProvider>
-                        <AppContent />
-                    </NotificationsProvider>
+                    <AppContent />
                 </UnreadMessagesProvider>
             </SearchFilterProvider>
         </BrowserRouter>

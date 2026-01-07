@@ -1,20 +1,24 @@
+
 {
   "short_name": "ISIG Comm",
   "name": "ISIG Community",
+  "description": "Réseau social académique de l'ISIG Goma",
   "icons": [
     {
-      "src": "/logo192.png",
+      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s",
+      "sizes": "192x192",
       "type": "image/png",
-      "sizes": "192x192"
+      "purpose": "any maskable"
     },
     {
-      "src": "/logo512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#00AEEF",
-  "background_color": "#ffffff"
+  "background_color": "#F8FAFC"
 }

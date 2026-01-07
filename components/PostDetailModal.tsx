@@ -26,7 +26,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const [replyContent, setReplyContent] = useState('');
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   
-  // États pour l'édition et la suppression
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
@@ -45,7 +44,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (textarea) {
       textarea.style.height = 'auto';
       const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 128; // max-h-32 = 8rem = 128px
+      const maxHeight = 128;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
       textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
@@ -61,8 +60,32 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (session?.user) {
         supabase.from('profiles').select('*').eq('id', session.user.id).single()
             .then(({ data }) => setCurrentUserProfile(data));
+        
+        // Temps réel pour les commentaires
+        const commentChannel = supabase
+            .channel(`comments-${post.id}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'comments', 
+                filter: `post_id=eq.${post.id}` 
+            }, async (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    // Pour avoir le profil complet on refetch ou on attend l'insertion locale
+                    fetchComments();
+                } else if (payload.eventType === 'UPDATE') {
+                    setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+                } else if (payload.eventType === 'DELETE') {
+                    setComments(prev => prev.filter(c => c.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(commentChannel);
+        };
     }
-  }, [post, session]);
+  }, [post.id, session]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -108,7 +131,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         parent_comment_id: replyingTo?.id 
     }).select('*, profiles(*)').single();
     if (data) {
-        setComments(prev => [...prev, data as any]);
         setNewComment(''); 
         setReplyContent(''); 
         setReplyingTo(null);
@@ -124,7 +146,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (!window.confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
     const { error } = await supabase.from('comments').delete().eq('id', commentId);
     if (!error) {
-        setComments(prev => prev.filter(c => c.id !== commentId));
         setCommentMenuOpen(null);
     } else {
         alert("Erreur lors de la suppression: " + error.message);
@@ -136,7 +157,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (!editContent.trim() || !editingCommentId) return;
     const { error } = await supabase.from('comments').update({ content: editContent }).eq('id', editingCommentId);
     if (!error) {
-        setComments(prev => prev.map(c => c.id === editingCommentId ? { ...c, content: editContent } : c));
         setEditingCommentId(null);
         setEditContent('');
     } else {
@@ -146,11 +166,11 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
 
   const CommentItem: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
     <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
-        <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
+        <Avatar avatarUrl={comment.profiles?.avatar_url} name={comment.profiles?.full_name || '...'} size="sm" />
         <div className="flex-1 min-w-0">
             <div className="relative group/comment bg-slate-50 p-3 rounded-2xl border border-slate-100">
                 <div className="flex justify-between items-start">
-                    <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                    <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles?.full_name || 'Utilisateur'}</p>
                     
                     {session?.user.id === comment.user_id && (
                         <div className="relative">
@@ -161,12 +181,12 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                                 <MoreHorizontal size={14} />
                             </button>
                             {commentMenuOpen === comment.id && (
-                                <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
+                                <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
                                     <button 
                                         onClick={() => { setEditingCommentId(comment.id); setEditContent(comment.content); setCommentMenuOpen(null); }} 
                                         className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center"
                                     >
-                                        <Pencil size={12} className="mr-2 text-isig-blue" /> Modifier
+                                        <Pencil size={12} className="mr-2 text-isig-orange" /> Modifier
                                     </button>
                                     <button 
                                         onClick={() => handleDeleteComment(comment.id)} 
@@ -253,7 +273,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             <div className="p-4 sm:p-6">
                 {replyingTo && (
                     <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100 animate-fade-in">
-                        <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles.full_name}</span></p>
+                        <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles?.full_name || '...'}</span></p>
                         <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
                     </div>
                 )}

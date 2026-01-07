@@ -177,24 +177,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     return (
         <div className={`group flex items-end gap-2 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
-                <button onClick={() => setMenuOpen(!menuOpen)} className="p-1 rounded-full text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreHorizontal size={20} />
+                <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-full text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-100">
+                    <MoreHorizontal size={18} />
                 </button>
                 {menuOpen && (
-                    <div ref={menuRef} className={`absolute top-0 mt-6 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-slate-100 ${isOwnMessage ? 'right-0' : 'left-0'}`}>
-                        <button onClick={() => { onSetReplying(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><MessageSquareReply size={16} className="mr-2"/>Répondre</button>
-                        <button onClick={() => alert('Fonctionnalité bientôt disponible !')} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><Share size={16} className="mr-2"/>Transférer</button>
-                        {isOwnMessage && message.content && <button onClick={() => { onSetEditing(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><Pencil size={16} className="mr-2"/>Modifier</button>}
-                        <div className="border-t my-1"></div>
-                        <button onClick={handleDeleteForMe} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"><XCircle size={16} className="mr-2"/>Supprimer pour moi</button>
-                        {isOwnMessage && <button onClick={handleDeleteForEveryone} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={16} className="mr-2"/>Supprimer pour tous</button>}
+                    <div ref={menuRef} className={`absolute bottom-full mb-2 w-48 bg-white rounded-2xl shadow-premium py-2 z-20 border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}>
+                        <button onClick={() => { onSetReplying(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50"><MessageSquareReply size={16} className="mr-3 text-isig-blue"/>Répondre</button>
+                        {isOwnMessage && message.content && <button onClick={() => { onSetEditing(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50"><Pencil size={16} className="mr-3 text-isig-orange"/>Modifier</button>}
+                        <div className="border-t border-slate-50 my-1 mx-2"></div>
+                        <button onClick={handleDeleteForMe} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"><XCircle size={16} className="mr-3"/>Supprimer (Moi)</button>
+                        {isOwnMessage && <button onClick={handleDeleteForEveryone} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"><Trash2 size={16} className="mr-3"/>Supprimer (Tous)</button>}
                     </div>
                 )}
             </div>
-            <div className={`relative max-w-xs md:max-w-md lg:max-w-lg px-3 py-2 rounded-2xl order-2 shadow-sm ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border'}`}>
+            <div className={`relative max-w-[75%] md:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
                  {message.replied_to && (
-                     <div className={`p-2 mb-2 border-l-4 rounded-lg flex flex-col ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
-                         <p className={`font-black text-[10px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>
+                     <div className={`p-3 mb-2 border-l-4 rounded-xl flex flex-col ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
+                         <p className={`font-black text-[9px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>
                              {message.replied_to.profiles?.full_name || '...'}
                          </p>
                          <p className={`text-xs italic line-clamp-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-500'}`}>
@@ -203,8 +202,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                      </div>
                  )}
                 {renderMedia()}
-                {message.content && <p className="text-sm font-medium break-words whitespace-pre-wrap">{message.content}</p>}
-                <div className="text-right text-[10px] mt-1 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
+                {message.content && <p className="text-sm font-medium break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>}
+                <div className="text-right text-[9px] mt-1.5 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     <StatusIcon />

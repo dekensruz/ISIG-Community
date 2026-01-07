@@ -6,7 +6,7 @@ import { Message, Profile } from '../types';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
 import { Send, ArrowLeft, Paperclip, X, Info, Mic, Trash2, StopCircle, Search, AlertCircle, Wifi, WifiOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useUnreadMessages } from './UnreadMessagesProvider';
 import MessageBubble from './MessageBubble';
 import MediaViewerModal from './MediaViewerModal';
@@ -36,6 +36,7 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead }) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<Profile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
@@ -61,11 +62,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [presenceStatus, setPresenceStatus] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { fetchUnreadCount } = useUnreadMessages();
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const maxHeight = 160;
+      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+      textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+    }
+  };
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
@@ -95,6 +108,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const cancelEdit = () => {
     setEditingMessage(null);
     setNewMessage('');
+    setTimeout(adjustHeight, 0);
+  };
+
+  const handleSetEditing = (msg: Message) => {
+    setEditingMessage(msg);
+    setReplyingToMessage(null);
+    setNewMessage(msg.content || '');
+    // Focus et ajuster hauteur
+    setTimeout(() => {
+        textareaRef.current?.focus();
+        adjustHeight();
+    }, 50);
   };
 
   const markMessagesAsRead = useCallback(async () => {
@@ -172,10 +197,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             const incoming = payload.new as Message;
             
             setMessages(current => {
-                // Éviter les doublons
                 if (current.some(m => m.id === incoming.id)) return current;
-
-                // Chercher si c'est une confirmation d'un message optimiste que NOUS avons envoyé
                 const optimisticIdx = current.findIndex(m => 
                     m.id.startsWith('temp-') && 
                     m.sender_id === incoming.sender_id &&
@@ -190,8 +212,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                     updated[optimisticIdx] = enriched;
                     return updated;
                 }
-                
-                // Si c'est un message d'autrui ou un nouveau message sans version optimiste trouvée
                 return [...current, enriched];
             });
 
@@ -209,7 +229,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       })
       .subscribe((status) => {
           setRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' ? 'error' : 'connecting');
-          // En cas de reconnexion, on rafraîchit les données pour être sûr de n'avoir rien raté
           if (status === 'SUBSCRIBED') fetchData(true);
       });
 
@@ -227,15 +246,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     if ((!newMessage.trim() && !file && !audioBlob) || !session?.user || !currentUserProfile) return;
     
     if (editingMessage) {
-        await supabase.from('messages').update({ content: newMessage, updated_at: new Date().toISOString() }).eq('id', editingMessage.id);
-        cancelEdit();
+        const { error } = await supabase.from('messages').update({ content: newMessage, updated_at: new Date().toISOString() }).eq('id', editingMessage.id);
+        if(!error) cancelEdit();
+        else alert("Erreur lors de la mise à jour");
         return;
     }
     
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    // Identifiant temporaire unique
     const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const optimisticMsg: Message = {
         id: optimisticId,
@@ -254,6 +273,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     removeFile();
     setReplyingToMessage(null);
     scrollToBottom();
+    setTimeout(adjustHeight, 0);
 
     setIsUploading(true);
     try {
@@ -278,9 +298,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         
         if (error) throw error;
     } catch (err: any) {
-        // En cas d'erreur fatale, on retire le message optimiste pour éviter la confusion
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
-        alert("Échec de l'envoi. Veuillez vérifier votre connexion.");
+        alert("Échec de l'envoi.");
     } finally {
         setIsUploading(false);
     }
@@ -322,10 +341,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-        <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10">
-            <Link to="/chat" className="md:hidden mr-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors">
+        <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm">
+            <button onClick={() => navigate('/chat')} className="mr-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors">
                 <ArrowLeft size={20} />
-            </Link>
+            </button>
             
             {!showSearch && otherParticipant && (
                 <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
@@ -346,7 +365,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             <div className={`flex items-center space-x-2 ${showSearch ? 'w-full' : 'ml-auto'}`}>
                 {showSearch ? (
                     <div className="flex-grow flex items-center bg-slate-50 rounded-2xl px-4 py-1 border border-slate-100">
-                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher dans le chat..." className="w-full bg-transparent border-none py-2 text-sm focus:ring-0 outline-none font-bold" autoFocus />
+                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher..." className="w-full bg-transparent border-none py-2 text-sm focus:ring-0 outline-none font-bold" autoFocus />
                         <button onClick={() => { setShowSearch(false); setSearchQuery(''); }} className="p-1 text-slate-400 hover:text-slate-600"><X size={18} /></button>
                     </div>
                 ) : (
@@ -358,36 +377,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 min-h-0 custom-scrollbar">
-            {messages.filter(m => !searchQuery || m.content.toLowerCase().includes(searchQuery.toLowerCase())).map((msg) => (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 min-h-0 custom-scrollbar">
+            {messages.filter(m => !searchQuery || m.content?.toLowerCase().includes(searchQuery.toLowerCase())).map((msg) => (
                 <MessageBubble 
                   key={msg.id} 
                   message={msg} 
                   isOwnMessage={msg.sender_id === session?.user.id} 
-                  onSetEditing={setEditingMessage} 
+                  onSetEditing={handleSetEditing} 
                   onSetReplying={setReplyingToMessage} 
                   setMessages={setMessages} 
                   onMediaClick={(url, type, name) => setMediaInView({ url, type, name })} 
                 />
             ))}
-            <div ref={messagesEndRef} className="h-2" />
+            <div ref={messagesEndRef} className="h-4" />
         </div>
 
-        <div className="p-4 border-t border-slate-100 bg-white shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.03)]">
+        <div className="p-4 border-t border-slate-100 bg-white shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.05)]">
             {(replyingToMessage || editingMessage || filePreview) && recordingStatus === 'idle' && (
-                <div className="bg-slate-50 p-4 rounded-3xl mb-3 flex items-center justify-between border border-slate-100 animate-fade-in">
+                <div className={`p-4 rounded-3xl mb-3 flex items-center justify-between border animate-fade-in ${editingMessage ? 'bg-orange-50 border-orange-100' : 'bg-isig-blue/5 border-isig-blue/10'}`}>
                     <div className="min-w-0 flex-1">
                         <p className={`text-[9px] font-black uppercase tracking-widest ${editingMessage ? 'text-isig-orange' : 'text-isig-blue'}`}>
-                            {editingMessage ? 'Modification' : 'Réponse à ' + (replyingToMessage?.profiles?.full_name || '...')}
+                            {editingMessage ? 'Modification en cours' : 'Réponse à ' + (replyingToMessage?.profiles?.full_name || '...')}
                         </p>
                         <p className="text-xs text-slate-500 truncate mt-0.5">{editingMessage?.content || replyingToMessage?.content || file?.name}</p>
                     </div>
-                    <button onClick={() => { setReplyingToMessage(null); cancelEdit(); removeFile(); }} className="ml-4 p-2 bg-slate-200 rounded-xl hover:bg-slate-300 transition-colors"><X size={14}/></button>
+                    <button onClick={() => { setReplyingToMessage(null); cancelEdit(); removeFile(); }} className="ml-4 p-2 bg-white rounded-xl shadow-sm hover:bg-slate-100 transition-colors"><X size={14}/></button>
                 </div>
             )}
             
             {recordingStatus !== 'idle' ? (
-                <div className="flex items-center space-x-4 h-14 bg-slate-50 rounded-[1.5rem] px-4">
+                <div className="flex items-center space-x-4 h-14 bg-slate-50 rounded-[1.5rem] px-4 border border-slate-100">
                     <button type="button" onClick={cleanupRecording} className="p-3 text-red-500 hover:bg-red-50 rounded-2xl"><Trash2 size={20} /></button>
                     <div className="flex-1 flex items-center space-x-3">
                         <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
@@ -396,26 +415,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                     <button type="button" onClick={() => mediaRecorderRef.current?.stop()} className="bg-isig-blue text-white p-3 rounded-2xl hover:bg-blue-600 shadow-lg shadow-isig-blue/20"><StopCircle size={24} /></button>
                 </div>
             ) : (
-                <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                    <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl hover:bg-slate-50 transition-all">
+                <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
+                    <label className="p-4 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0">
                         <Paperclip size={24} />
                         <input type="file" ref={fileInputRef} onChange={handleSetFile} className="hidden" />
                     </label>
-                    <div className="flex-1">
-                        <input 
-                          type="text" 
+                    <div className="flex-1 min-w-0">
+                        <textarea 
+                          ref={textareaRef}
                           value={newMessage} 
-                          onChange={(e) => setNewMessage(e.target.value)} 
+                          onChange={(e) => {
+                              setNewMessage(e.target.value);
+                              adjustHeight();
+                          }} 
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                            }
+                          }}
                           placeholder="Votre message..." 
-                          className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-5 py-4 focus:ring-2 focus:ring-isig-blue outline-none transition-all font-medium text-slate-700" 
+                          className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-5 py-4 focus:ring-2 focus:ring-isig-blue outline-none transition-all font-medium text-slate-700 resize-none max-h-40 min-h-[56px] block overflow-y-hidden" 
                         />
                     </div>
-                    {(newMessage.trim() || file) ? (
-                         <button type="submit" disabled={isUploading} className="bg-isig-blue text-white w-14 h-14 flex items-center justify-center rounded-[1.5rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
-                            {isUploading ? <Spinner /> : <Send size={24} />}
-                        </button>
-                    ) : (
-                        <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-4 rounded-[1.5rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95">
+                    <button 
+                        type="submit" 
+                        disabled={isUploading || (!newMessage.trim() && !file)} 
+                        className={`w-14 h-14 flex items-center justify-center rounded-[1.5rem] shadow-lg transition-all active:scale-95 disabled:opacity-50 flex-shrink-0 ${editingMessage ? 'bg-isig-orange shadow-isig-orange/20 hover:bg-orange-600' : 'bg-isig-blue shadow-isig-blue/20 hover:bg-blue-600'}`}
+                    >
+                        {isUploading ? <Spinner /> : <Send size={24} className="text-white" />}
+                    </button>
+                    {!newMessage.trim() && !file && !editingMessage && (
+                        <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-4 rounded-[1.5rem] shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95 flex-shrink-0">
                             <Mic size={24} />
                         </button>
                     )}

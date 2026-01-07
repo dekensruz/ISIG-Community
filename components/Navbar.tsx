@@ -15,14 +15,37 @@ const Navbar: React.FC = () => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const { searchQuery, setSearchQuery } = useSearchFilter();
 
+  const fetchProfile = async () => {
+    if (session?.user) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (data) setProfile(data);
+    }
+  };
+
   useEffect(() => {
     if (session?.user) {
-        supabase.from('profiles').select('*').eq('id', session.user.id).single()
-            .then(({ data }) => setProfile(data));
+        fetchProfile();
         
         supabase.from('notifications').select('*', { count: 'exact', head: true })
             .eq('user_id', session.user.id).eq('is_read', false)
             .then(({ count }) => setUnreadNotificationsCount(count || 0));
+
+        // Abonnement temps réel pour le profil (avatar etc)
+        const profileChannel = supabase
+            .channel(`nav-profile-${session.user.id}`)
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'profiles', 
+                filter: `id=eq.${session.user.id}` 
+            }, (payload) => {
+                setProfile(payload.new as Profile);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profileChannel);
+        };
     }
   }, [session]);
 

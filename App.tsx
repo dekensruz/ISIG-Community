@@ -44,7 +44,7 @@ type SearchFilterContextType = {
   setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export const SearchFilterContext = createContext<SearchFilterContextType | undefined>(undefined);
+export const SearchFilterContext = useContext(SearchFilterContextType | undefined);
 export const useSearchFilter = () => {
     const context = useContext(SearchFilterContext);
     if (!context) {
@@ -73,16 +73,23 @@ const AppContent: React.FC = () => {
     const [canShowNotifications, setCanShowNotifications] = useState(false);
     
     const isAuthPage = location.pathname === '/auth';
-    const isChatPage = location.pathname.startsWith('/chat');
+    const isChatConversation = location.pathname.startsWith('/chat/') && location.pathname.split('/').length > 2;
+    const isChatListPage = location.pathname === '/chat';
+    
     const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
+    
+    // On cache les barres si on est dans une conversation de chat (mobile immersion)
+    const showNavBars = !isAuthPage && !isChatConversation;
 
     return (
         <div className="min-h-screen bg-slate-100">
-            {!isAuthPage && <Navbar />}
+            {showNavBars && <Navbar />}
             <main className={
                 isAuthPage
                 ? "" 
-                : isChatPage
+                : isChatConversation
+                ? "h-screen pt-0 pb-0" // Immersion totale pour le chat
+                : isChatListPage
                 ? "h-screen pt-[60px] pb-[80px]" 
                 : "container mx-auto px-4 pt-24 pb-24" 
             }>
@@ -104,13 +111,11 @@ const AppContent: React.FC = () => {
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
             </main>
-            {!isAuthPage && <TabBar />}
+            {showNavBars && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
             
-            {/* Bannière PWA visible par tous (même non connectés) */}
             <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
 
-            {/* Notifications activées uniquement si session active ET bannière traitée */}
             {session && !isAuthPage && canShowNotifications && (
                 <NotificationsProvider />
             )}

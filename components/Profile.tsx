@@ -290,7 +290,10 @@ const Profile: React.FC = () => {
                     
                     <div className="flex-shrink-0 flex items-center space-x-3 mt-6 sm:mt-24 w-full sm:w-auto">
                          {isOwnProfile ? (
-                             <button onClick={() => isEditing ? handleUpdateProfile() : setIsEditing(true)} className="flex-1 sm:flex-none py-3 px-6 bg-slate-50 text-slate-700 rounded-2xl flex items-center justify-center space-x-2 hover:bg-slate-100 font-black text-xs sm:text-sm uppercase tracking-widest transition-all active:scale-95 border border-slate-100">
+                             <button 
+                                onClick={() => isEditing ? handleUpdateProfile() : setIsEditing(true)} 
+                                className={`flex-1 sm:flex-none py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all active:scale-95 border ${isEditing ? 'bg-isig-orange text-white border-transparent shadow-lg shadow-isig-orange/20 hover:bg-orange-600' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-100'}`}
+                             >
                                 {isEditing ? <><Save size={20} /><span>Sauver</span></> : <><Edit size={20} /><span>Éditer</span></>}
                             </button>
                         ) : (

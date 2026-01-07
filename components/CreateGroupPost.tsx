@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Paperclip, X, FileText, Send } from 'lucide-react';
+import { GroupPost } from '../types';
 
 interface CreateGroupPostProps {
   groupId: string;
-  onPostCreated: () => void;
+  onPostCreated: (newPost?: GroupPost) => void;
 }
 
 const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreated }) => {
@@ -23,7 +25,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
@@ -60,45 +61,42 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     let mediaUrl: string | undefined = undefined;
     let mediaType: string | undefined = undefined;
 
-    if (file) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `group-media/${groupId}/${session.user.id}-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
-      if (uploadError) {
-        setError(uploadError.message);
+    try {
+        if (file) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `group-media/${groupId}/${session.user.id}-${Date.now()}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
+          if (uploadError) throw uploadError;
+          const { data } = supabase.storage.from('media').getPublicUrl(fileName);
+          mediaUrl = data.publicUrl;
+          mediaType = file.type;
+        }
+
+        const { data, error: insertError } = await supabase.from('group_posts').insert({
+          user_id: session.user.id,
+          group_id: groupId,
+          content,
+          media_url: mediaUrl,
+          media_type: mediaType
+        }).select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).single();
+
+        if (insertError) throw insertError;
+        
+        setContent('');
+        handleRemoveFile();
+        onPostCreated(data as any);
+    } catch (err: any) {
+        setError(err.message);
+    } finally {
         setUploading(false);
-        return;
-      }
-
-      const { data } = supabase.storage.from('media').getPublicUrl(fileName);
-      mediaUrl = data.publicUrl;
-      mediaType = file.type;
     }
-
-    const { error: insertError } = await supabase.from('group_posts').insert({
-      user_id: session.user.id,
-      group_id: groupId,
-      content,
-      media_url: mediaUrl,
-      media_type: mediaType
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-    } else {
-      setContent('');
-      handleRemoveFile();
-      onPostCreated();
-    }
-    setUploading(false);
   };
   
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
       <form onSubmit={handlePost}>
         <textarea
-            className="w-full p-2 bg-slate-50 border-slate-200 border rounded-md focus:outline-none focus:ring-2 focus:ring-isig-blue resize-none"
+            className="w-full p-3 bg-slate-50 border-slate-200 border rounded-xl focus:outline-none focus:ring-2 focus:ring-isig-blue resize-none font-medium"
             rows={3}
             placeholder="Partagez quelque chose avec le groupe..."
             value={content}
@@ -126,13 +124,12 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
                 <Paperclip size={24} />
                 <input id="group-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
             </label>
-            <button type="submit" disabled={uploading} className="bg-isig-orange text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600 transition-colors disabled:bg-orange-300 flex items-center">
-                <Send size={16} className="mr-2"/>
-                {uploading ? 'Envoi...' : 'Publier'}
+            <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-2 px-6 rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-xs">
+                {uploading ? 'Envoi...' : <><Send size={14} className="mr-2"/>Publier</>}
             </button>
         </div>
       </form>
-      {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+      {error && <p className="text-red-500 text-xs font-bold mt-2">{error}</p>}
     </div>
   );
 };

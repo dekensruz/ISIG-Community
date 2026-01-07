@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -67,9 +66,7 @@ const GroupPage: React.FC = () => {
       const currentUserIsAdmin = memberData.find(m => m.user_id === session.user.id)?.role === 'admin';
       const currentUserIsOwner = groupData.created_by === session.user.id;
 
-      // **Robust Join Request Fetching**
       if (currentUserIsAdmin || currentUserIsOwner) {
-        // Step 1: Fetch raw request data to avoid complex RLS issues with joins.
         const { data: requestsData, error: requestsError } = await supabase
           .from('group_join_requests')
           .select('id, group_id, user_id, created_at')
@@ -77,19 +74,14 @@ const GroupPage: React.FC = () => {
         if (requestsError) throw requestsError;
 
         if (requestsData && requestsData.length > 0) {
-          // Step 2: Fetch profiles for the users who made requests.
           const userIds = requestsData.map(r => r.user_id);
           const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
             .select('*')
             .in('id', userIds);
-          // We don't throw profilesError because RLS might be blocking it, which is the exact problem we want to handle gracefully.
-          if (profilesError) {
-              console.warn("Could not fetch all requester profiles, possibly due to RLS. Requests will be shown with fallback data.", profilesError);
-          }
+          
+          if (profilesError) console.warn("Could not fetch profilesData", profilesError);
 
-          // Step 3: Manually join them, providing a fallback if a profile is missing.
-          // This prevents a restrictive RLS policy on `profiles` from hiding requests.
           const populatedRequests = requestsData.map(request => {
             const profile = profilesData ? profilesData.find(p => p.id === request.user_id) : null;
             return {
@@ -98,36 +90,26 @@ const GroupPage: React.FC = () => {
                     id: request.user_id,
                     full_name: `Utilisateur inconnu`,
                     avatar_url: null,
-                    student_id: 'N/A',
-                    major: 'N/A',
-                    promotion: 'N/A',
                     updated_at: new Date().toISOString(),
-                    skills: [],
-                    courses: [],
-                    bio: 'Impossible de charger le profil.',
-                    cover_url: '',
-                } as Profile
+                    role: 'user'
+                } as any
             };
           });
-
-          setJoinRequests(populatedRequests as GroupJoinRequest[]);
+          setJoinRequests(populatedRequests as any);
         } else {
           setJoinRequests([]);
         }
       } else {
-        // Non-admins should not see any join requests.
         setJoinRequests([]);
       }
 
-      // Logic for non-members to see their own request status
       if (!currentUserIsMember) {
-        const { data: requestData, error: requestError } = await supabase
+        const { data: requestData } = await supabase
           .from('group_join_requests')
           .select('id')
           .eq('group_id', groupId)
           .eq('user_id', session.user.id)
-          .single();
-        if (requestError && requestError.code !== 'PGRST116') throw requestError;
+          .maybeSingle();
         setUserRequestStatus(requestData ? 'pending' : 'none');
       } else {
           setUserRequestStatus('none');
@@ -153,7 +135,6 @@ const GroupPage: React.FC = () => {
       
       if (error) throw error;
       setPosts(data as any);
-
     } catch (error: any) {
       console.error("Error fetching group posts:", error.message);
     } finally {
@@ -171,44 +152,33 @@ const GroupPage: React.FC = () => {
       }
   }, [isMember, group, fetchPosts]);
 
-  useEffect(() => {
-    if (!groupId) return;
-    const channel = supabase.channel(`group-page-${groupId}`);
-    channel
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'groups', filter: `id=eq.${groupId}` }, () => {
-            fetchGroupData();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${groupId}` }, () => {
-            fetchGroupData();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests', filter: `group_id=eq.${groupId}` }, () => {
-            fetchGroupData();
-        })
-        .subscribe();
-        
-    return () => { supabase.removeChannel(channel); };
-  }, [groupId, fetchGroupData]);
-  
+  const handlePostCreated = (newPost?: GroupPostType) => {
+      if (newPost) {
+          setPosts(prev => [newPost, ...prev]);
+      } else {
+          fetchPosts();
+      }
+  };
+
   const handleJoinAction = async () => {
     if (!session?.user || !groupId || !group || actionLoading || isOwner) return;
     setActionLoading(true);
 
-    if (isMember) { // Leave group
+    if (isMember) {
         const { error } = await supabase.from('group_members').delete().match({ group_id: groupId, user_id: session.user.id });
         if (!error) {
             setIsMember(false);
             fetchGroupData();
         }
-    } else { // Join or request to join
+    } else {
         if (group.is_private) {
             if (userRequestStatus === 'none') {
                  const { error } = await supabase.from('group_join_requests').insert({ group_id: groupId, user_id: session.user.id });
                  if (!error) setUserRequestStatus('pending');
             }
-        } else { // Public group, join directly
+        } else {
             const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
             if (!error) {
-                // The database trigger now handles sending notifications to admins.
                 setIsMember(true);
                 fetchGroupData();
             }
@@ -217,76 +187,52 @@ const GroupPage: React.FC = () => {
     setActionLoading(false);
   };
   
-  if (loadingGroup) {
-    return <div className="flex justify-center mt-8"><Spinner /></div>;
-  }
-
-  if (!group) {
-    return <div className="text-center mt-8 text-xl text-slate-600">Groupe introuvable.</div>;
-  }
+  if (loadingGroup) return <div className="flex justify-center mt-8"><Spinner /></div>;
+  if (!group) return <div className="text-center mt-8 text-xl text-slate-600">Groupe introuvable.</div>;
   
   const renderJoinButton = () => {
-    if (isOwner) {
-        return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-orange/10 text-isig-orange cursor-default" disabled><Crown size={18}/><span>Créateur</span></button>;
-    }
-    if (isAdmin) {
-        return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-slate-200 text-slate-600 cursor-default" disabled><Check size={18}/><span>Admin</span></button>;
-    }
-    if (isMember) {
-         return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"><LogOut size={18}/><span>Quitter</span></button>;
-    }
+    if (isOwner) return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-orange/10 text-isig-orange uppercase tracking-widest text-[10px] cursor-default"><Crown size={18}/><span>Créateur</span></button>;
+    if (isAdmin) return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-slate-100 text-slate-600 uppercase tracking-widest text-[10px] cursor-default"><Check size={18}/><span>Admin</span></button>;
+    if (isMember) return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 uppercase tracking-widest text-[10px]"><LogOut size={18}/><span>Quitter</span></button>;
     if (group.is_private) {
-        if (userRequestStatus === 'pending') {
-            return <button className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-slate-200 text-slate-600 cursor-default" disabled><Clock size={18}/><span>Demande envoyée</span></button>;
-        } else {
-            return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-blue text-white hover:bg-blue-600"><LogIn size={18}/><span>Demander à rejoindre</span></button>;
-        }
+        if (userRequestStatus === 'pending') return <button className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] cursor-default" disabled><Clock size={18}/><span>Demande envoyée</span></button>;
+        return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-blue text-white hover:bg-blue-600 shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-[10px]"><LogIn size={18}/><span>Rejoindre</span></button>;
     }
-    // Public group and not a member
-    return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-semibold py-2 px-4 rounded-lg bg-isig-blue text-white hover:bg-blue-600"><LogIn size={18}/><span>Rejoindre</span></button>;
+    return <button onClick={handleJoinAction} disabled={actionLoading} className="flex items-center justify-center space-x-2 font-black py-2 px-6 rounded-2xl bg-isig-blue text-white hover:bg-blue-600 shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-[10px]"><LogIn size={18}/><span>Rejoindre</span></button>;
   };
   
 
   return (
     <>
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-        <div className="p-4 sm:p-6">
+      <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden mb-6">
+        <div className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="flex items-center space-x-4">
                      <button onClick={() => setShowAvatarModal(true)} className="flex-shrink-0 transition-transform duration-200 hover:scale-105">
-                         <Avatar 
-                            avatarUrl={group.avatar_url} 
-                            name={group.name}
-                            size="2xl" 
-                            shape="square"
-                         />
+                         <Avatar avatarUrl={group.avatar_url} name={group.name} size="2xl" shape="square" />
                      </button>
                     <div>
-                      <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">{group.name}</h1>
-                      <p className="text-sm text-slate-500 mt-1">Créé par <Link to={`/profile/${group.created_by}`} className="font-semibold hover:underline">{group.profiles.full_name}</Link></p>
+                      <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">{group.name}</h1>
+                      <p className="text-xs text-slate-500 mt-1 uppercase font-black tracking-widest">Par <Link to={`/profile/${group.created_by}`} className="text-isig-blue hover:underline">{group.profiles.full_name}</Link></p>
                     </div>
                 </div>
                  <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
                     {canManageGroup && (
-                         <button 
-                            onClick={() => setShowEditModal(true)} 
-                            className="flex items-center space-x-2 font-semibold py-2 px-4 rounded-lg transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        >
-                            <Edit size={18}/>
-                            <span>Modifier</span>
+                         <button onClick={() => setShowEditModal(true)} className="flex items-center space-x-2 font-black py-2 px-6 rounded-2xl transition-all bg-slate-50 text-slate-600 hover:bg-slate-100 uppercase tracking-widest text-[10px]">
+                            <Edit size={18}/><span>Modifier</span>
                         </button>
                     )}
                     {renderJoinButton()}
                 </div>
             </div>
-             <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-100">
-                <p className="text-slate-600 flex-1">{group.description}</p>
-                <button onClick={() => setShowMembersModal(true)} className="relative flex items-center space-x-3 text-left p-2 rounded-lg hover:bg-slate-100 self-start md:self-end">
+             <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-50">
+                <p className="text-slate-600 flex-1 font-medium italic">{group.description || 'Bienvenue dans ce groupe académique.'}</p>
+                <button onClick={() => setShowMembersModal(true)} className="relative flex items-center space-x-3 text-left p-3 rounded-2xl hover:bg-slate-50 self-start md:self-end transition-all">
                     {canManageGroup && joinRequests.length > 0 && 
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5">
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 z-10">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-isig-orange opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-5 w-5 bg-isig-orange text-white text-xs items-center justify-center">{joinRequests.length}</span>
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-isig-orange text-white text-[10px] font-black items-center justify-center border-2 border-white">{joinRequests.length}</span>
                         </span>
                     }
                     <div className="flex -space-x-3">
@@ -294,13 +240,9 @@ const GroupPage: React.FC = () => {
                            <Avatar key={member.user_id} avatarUrl={member.profiles.avatar_url} name={member.profiles.full_name} size="sm" className="ring-2 ring-white" />
                         ))}
                     </div>
-                    <div className="text-sm">
-                        <p className="font-semibold text-slate-700">{members.length} Membre{members.length > 1 ? 's' : ''}</p>
-                        {canManageGroup ? (
-                            <p className="text-isig-blue font-semibold">Gérer</p>
-                        ) : (
-                            <p className="text-slate-500">Voir tout</p>
-                        )}
+                    <div className="text-[10px] font-black uppercase tracking-widest">
+                        <p className="text-slate-700">{members.length} Membre{members.length > 1 ? 's' : ''}</p>
+                        <p className="text-isig-blue">Gérer • Voir</p>
                     </div>
                 </button>
              </div>
@@ -310,21 +252,21 @@ const GroupPage: React.FC = () => {
         <div className="space-y-6">
             {isMember || !group.is_private ? (
                 <>
-                    {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={fetchPosts} />}
+                    {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}
                     {loadingPosts ? (
-                        <div className="flex justify-center"><Spinner /></div>
+                        <div className="flex justify-center py-10"><Spinner /></div>
                     ) : posts.length > 0 ? (
                         posts.map(post => <GroupPostCard key={post.id} post={post} startWithModalOpen={post.id === openModalPostId} />)
                     ) : (
-                        <div className="bg-white text-center p-8 rounded-xl shadow-sm border border-slate-200">
-                            <p className="text-slate-500">Aucune publication dans ce groupe pour le moment.</p>
+                        <div className="bg-white text-center p-12 rounded-[2rem] shadow-soft border border-slate-100">
+                            <p className="text-slate-400 font-bold italic">Aucune publication dans ce groupe pour le moment.</p>
                         </div>
                     )}
                 </>
             ) : (
-                <div className="bg-white text-center p-8 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="text-xl font-bold text-slate-700">Ceci est un groupe privé</h3>
-                    <p className="text-slate-600 mt-2">Demandez à rejoindre le groupe pour voir les publications et participer.</p>
+                <div className="bg-white text-center p-16 rounded-[2.5rem] shadow-soft border border-slate-100">
+                    <h3 className="text-xl font-black text-slate-700 italic uppercase">Groupe privé</h3>
+                    <p className="text-slate-500 mt-2 font-medium">Rejoignez le groupe pour voir et participer aux discussions.</p>
                 </div>
             )}
         </div>
@@ -351,9 +293,9 @@ const GroupPage: React.FC = () => {
     )}
 
     {showAvatarModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowAvatarModal(false)}>
-            <img src={group.avatar_url || `https://placehold.co/150x150/00AEEF/FFFFFF?text=${group.name.charAt(0)}`} alt={group.name} className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"/>
-            <button className="absolute top-4 right-4 text-white hover:text-gray-300">
+        <div className="fixed inset-0 bg-brand-dark/95 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setShowAvatarModal(false)}>
+            <img src={group.avatar_url || `https://placehold.co/150x150/00AEEF/FFFFFF?text=${group.name.charAt(0)}`} alt={group.name} className="max-w-[90vw] max-h-[90vh] object-contain rounded-3xl shadow-2xl"/>
+            <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-all bg-white/10 p-3 rounded-full">
                 <X size={32} />
             </button>
         </div>

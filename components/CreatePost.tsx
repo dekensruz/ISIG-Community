@@ -7,7 +7,7 @@ import { Paperclip, X, FileText, Send, RotateCcw } from 'lucide-react';
 import Spinner from './Spinner';
 
 interface CreatePostProps {
-  onPostCreated: () => void;
+  onPostCreated: (newPost?: PostType) => void;
   editingPost?: PostType | null;
   onCancelEdit?: () => void;
 }
@@ -30,7 +30,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     }
   };
 
-  // Charger le post en cours d'édition
   useEffect(() => {
     if (editingPost) {
       setContent(editingPost.content);
@@ -39,7 +38,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       } else {
         setPreviewUrl(null);
       }
-      // Ajuster la hauteur après un court délai pour que le contenu soit rendu
       setTimeout(adjustHeight, 0);
     } else {
         setContent('');
@@ -56,10 +54,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-    }
-
+    if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
@@ -73,13 +68,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
 
   const handleRemoveFile = () => {
     setFile(null);
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handlePost = async () => {
@@ -101,55 +92,45 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     if (file) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
       if (uploadError) {
         setError(uploadError.message);
         setUploading(false);
         return;
       }
-
-      const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('media').getPublicUrl(fileName);
       mediaUrl = data.publicUrl;
       mediaType = file.type.startsWith('image/') ? 'image' : 'document';
     }
 
-    if (editingPost) {
-        // Mise à jour
-        const { error: updateError } = await supabase
-            .from('posts')
-            .update({
+    try {
+        if (editingPost) {
+            const { data, error: updateError } = await supabase
+                .from('posts')
+                .update({ content, media_url: mediaUrl, media_type: mediaType })
+                .eq('id', editingPost.id)
+                .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`).single();
+
+            if (updateError) throw updateError;
+            onPostCreated(data as any);
+        } else {
+            const { data, error: insertError } = await supabase.from('posts').insert({
+                user_id: session.user.id,
                 content,
                 media_url: mediaUrl,
                 media_type: mediaType
-            })
-            .eq('id', editingPost.id);
+            }).select(`*, profiles(*), comments(*, profiles(*)), likes(*)`).single();
 
-        if (updateError) {
-            setError(updateError.message);
-        } else {
-            onPostCreated();
-        }
-    } else {
-        // Insertion
-        const { error: insertError } = await supabase.from('posts').insert({
-            user_id: session.user.id,
-            content,
-            media_url: mediaUrl,
-            media_type: mediaType
-        });
-
-        if (insertError) {
-            setError(insertError.message);
-        } else {
+            if (insertError) throw insertError;
             setContent('');
             handleRemoveFile();
-            onPostCreated();
+            onPostCreated(data as any);
         }
+    } catch (err: any) {
+        setError(err.message);
+    } finally {
+        setUploading(false);
     }
-    setUploading(false);
   };
   
   return (
@@ -181,7 +162,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       
       {previewUrl && (
         <div className="mt-4 relative inline-block group">
-            {editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage') ? (
+            {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
                 <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
             ) : (
                 <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">

@@ -63,7 +63,11 @@ const Feed: React.FC = () => {
         }
         setPage(0);
       } else {
-        setPosts(prev => [...prev, ...newPosts]);
+        setPosts(prev => {
+            const combined = [...prev, ...newPosts];
+            const unique = combined.filter((p, idx, self) => self.findIndex(t => t.id === p.id) === idx);
+            return unique;
+        });
         setPage(currentPage);
       }
 
@@ -77,7 +81,6 @@ const Feed: React.FC = () => {
     }
   }, [page]);
 
-  // Observer pour l'Infinite Scroll
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery) {
@@ -96,6 +99,21 @@ const Feed: React.FC = () => {
     fetchPosts(true);
   }, []);
 
+  const handlePostCreated = (newPost?: PostType) => {
+    if (newPost) {
+        setPosts(prev => {
+            if (editingPost) {
+                return prev.map(p => p.id === newPost.id ? newPost : p);
+            }
+            return [newPost, ...prev];
+        });
+        setEditingPost(null);
+    } else {
+        fetchPosts(true);
+        setEditingPost(null);
+    }
+  };
+
   const handleEditRequested = (post: PostType) => {
     setEditingPost(post);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -111,8 +129,6 @@ const Feed: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto w-full">
       <div className="space-y-6">
-        
-        {/* Barre de recherche responsive visible surtout sur mobile */}
         <div className="md:hidden mb-4">
             <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-isig-blue transition-colors" size={18} />
@@ -124,10 +140,7 @@ const Feed: React.FC = () => {
                     className="w-full pl-12 pr-12 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"
                 />
                 {searchQuery && (
-                    <button 
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
-                    >
+                    <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
                         <X size={18} />
                     </button>
                 )}
@@ -136,7 +149,7 @@ const Feed: React.FC = () => {
 
         {session ? (
           <CreatePost 
-            onPostCreated={() => { fetchPosts(true); setEditingPost(null); }} 
+            onPostCreated={handlePostCreated} 
             editingPost={editingPost}
             onCancelEdit={() => setEditingPost(null)}
           />
@@ -165,8 +178,6 @@ const Feed: React.FC = () => {
                   <PostCard post={post} onEditRequested={handleEditRequested} />
                 </div>
               ))}
-              
-              {/* Element invisible qui déclenche le chargement suivant */}
               <div ref={loaderRef} className="h-24 flex items-center justify-center">
                 {loadingMore && <Spinner />}
               </div>
@@ -179,12 +190,7 @@ const Feed: React.FC = () => {
                 <p className="text-slate-500 font-bold text-lg">Aucune publication pour le moment.</p>
                 <p className="text-slate-400 text-sm mt-1">Soyez le premier à partager quelque chose !</p>
                 {searchQuery && (
-                    <button 
-                        onClick={() => setSearchQuery('')}
-                        className="mt-4 text-isig-blue font-black uppercase tracking-widest text-xs hover:underline"
-                    >
-                        Effacer la recherche
-                    </button>
+                    <button onClick={() => setSearchQuery('')} className="mt-4 text-isig-blue font-black uppercase tracking-widest text-xs hover:underline">Effacer la recherche</button>
                 )}
             </div>
           )}

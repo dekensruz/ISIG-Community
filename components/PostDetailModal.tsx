@@ -61,7 +61,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         supabase.from('profiles').select('*').eq('id', session.user.id).single()
             .then(({ data }) => setCurrentUserProfile(data));
         
-        // Temps réel pour les commentaires
         const commentChannel = supabase
             .channel(`comments-${post.id}`)
             .on('postgres_changes', { 
@@ -69,9 +68,15 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                 schema: 'public', 
                 table: 'comments', 
                 filter: `post_id=eq.${post.id}` 
-            }, async (payload) => {
+            }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    // Pour avoir le profil complet on refetch ou on attend l'insertion locale
+                    // Pour les autres utilisateurs, on rafraîchit
+                    const incoming = payload.new as CommentType;
+                    setComments(prev => {
+                        if (prev.some(c => c.id === incoming.id)) return prev;
+                        return [...prev, incoming];
+                    });
+                    // On refetch pour avoir les profils complets
                     fetchComments();
                 } else if (payload.eventType === 'UPDATE') {
                     setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
@@ -122,30 +127,42 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = replyingTo ? replyContent : newComment;
-    if (!content.trim() || !session?.user) return;
+    if (!content.trim() || !session?.user || !currentUserProfile) return;
     setIsPostingComment(true);
-    const { data } = await supabase.from('comments').insert({ 
-        post_id: post.id, 
-        user_id: session.user.id, 
-        content, 
-        parent_comment_id: replyingTo?.id 
-    }).select('*, profiles(*)').single();
-    if (data) {
-        setNewComment(''); 
-        setReplyContent(''); 
-        setReplyingTo(null);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.overflowY = 'hidden';
+    
+    try {
+        const { data, error } = await supabase.from('comments').insert({ 
+            post_id: post.id, 
+            user_id: session.user.id, 
+            content, 
+            parent_comment_id: replyingTo?.id 
+        }).select('*, profiles(*)').single();
+
+        if (error) throw error;
+
+        if (data) {
+            // Mise à jour immédiate de l'état pour une sensation de temps réel
+            setComments(prev => [...prev, data as any]);
+            setNewComment(''); 
+            setReplyContent(''); 
+            setReplyingTo(null);
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+              textareaRef.current.style.overflowY = 'hidden';
+            }
         }
+    } catch (err) {
+        console.error("Erreur commentaire:", err);
+    } finally {
+        setIsPostingComment(false);
     }
-    setIsPostingComment(false);
   };
 
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
     const { error } = await supabase.from('comments').delete().eq('id', commentId);
     if (!error) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
         setCommentMenuOpen(null);
     } else {
         alert("Erreur lors de la suppression: " + error.message);
@@ -157,6 +174,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (!editContent.trim() || !editingCommentId) return;
     const { error } = await supabase.from('comments').update({ content: editContent }).eq('id', editingCommentId);
     if (!error) {
+        setComments(prev => prev.map(c => c.id === editingCommentId ? {...c, content: editContent} : c));
         setEditingCommentId(null);
         setEditContent('');
     } else {

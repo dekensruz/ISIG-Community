@@ -32,7 +32,7 @@ const Profile: React.FC = () => {
   
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null); // Initialisé à null pour le chargement
   const [followLoading, setFollowLoading] = useState(false);
 
   const [modalImage, setModalImage] = useState<string | null>(null);
@@ -70,9 +70,12 @@ const Profile: React.FC = () => {
       setFollowerCount(followers || 0);
       setFollowingCount(following || 0);
 
+      // Vérification immédiate du statut d'abonnement
       if (session?.user && !isOwnProfile) {
-        const { data: followData } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).single();
+        const { data: followData } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).maybeSingle();
         setIsFollowing(!!followData);
+      } else {
+        setIsFollowing(false);
       }
       
       setLoadingProfile(false);
@@ -297,12 +300,14 @@ const Profile: React.FC = () => {
                                 {isEditing ? <><Save size={20} /><span>Sauver</span></> : <><Edit size={20} /><span>Éditer</span></>}
                             </button>
                         ) : (
-                            <>
+                            <div className="flex-1 sm:flex-none flex items-center space-x-3">
                                 <button onClick={handleSendMessage} className="flex-1 py-3 px-6 bg-slate-50 text-slate-700 rounded-2xl flex items-center justify-center space-x-2 hover:bg-slate-100 font-black text-xs sm:text-sm uppercase tracking-widest transition-all border border-slate-100">
                                     <MessageCircle size={20} className="text-isig-blue"/>
                                     <span>Chat</span>
                                 </button>
-                                {isFollowing ? (
+                                {isFollowing === null ? (
+                                    <div className="w-24 h-12 bg-slate-50 rounded-2xl animate-pulse"></div>
+                                ) : isFollowing ? (
                                     <button onClick={handleUnfollow} disabled={followLoading} className="flex-1 py-3 px-6 bg-isig-blue text-white rounded-2xl flex items-center justify-center space-x-2 hover:bg-blue-600 font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg shadow-isig-blue/20">
                                         <UserCheck size={20} />
                                         <span>Abonné</span>
@@ -313,7 +318,7 @@ const Profile: React.FC = () => {
                                         <span>Suivre</span>
                                     </button>
                                 )}
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>

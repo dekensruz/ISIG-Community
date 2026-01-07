@@ -46,7 +46,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     if (textarea) {
       textarea.style.height = 'auto';
       const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 128; // max-h-32 = 128px
+      const maxHeight = 128;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
       textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
@@ -73,8 +73,32 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     if (session?.user) {
         supabase.from('profiles').select('*').eq('id', session.user.id).single()
             .then(({ data }) => setCurrentUserProfile(data));
+        
+        const channel = supabase.channel(`group-comments-${postInitial.id}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'group_post_comments', 
+                filter: `group_post_id=eq.${postInitial.id}` 
+            }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    const incoming = payload.new as GroupPostComment;
+                    setComments(prev => {
+                        if (prev.some(c => c.id === incoming.id)) return prev;
+                        return [...prev, incoming];
+                    });
+                    fetchComments();
+                } else if (payload.eventType === 'UPDATE') {
+                    setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+                } else if (payload.eventType === 'DELETE') {
+                    setComments(prev => prev.filter(c => c.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+            
+        return () => { supabase.removeChannel(channel); };
     }
-  }, [session]);
+  }, [postInitial.id, session]);
 
   const nestedComments = useMemo(() => {
     const commentMap: { [key: string]: GroupPostComment } = {};
@@ -115,35 +139,62 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !session?.user) return;
+    if (!newComment.trim() || !session?.user || !currentUserProfile) return;
     setIsPostingComment(true);
-    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content: newComment }).select('*, profiles(*)').single();
-    if (data) {
-        setComments(prev => [...prev, data as any]);
-        setNewComment('');
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.overflowY = 'hidden';
+    
+    try {
+        const { data, error } = await supabase.from('group_post_comments').insert({ 
+            group_post_id: post.id, 
+            user_id: session.user.id, 
+            content: newComment 
+        }).select('*, profiles(*)').single();
+
+        if (error) throw error;
+
+        if (data) {
+            setComments(prev => [...prev, data as any]);
+            setNewComment('');
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+              textareaRef.current.style.overflowY = 'hidden';
+            }
         }
+    } catch (err) {
+        console.error("Erreur groupe commentaire:", err);
+    } finally {
+        setIsPostingComment(false);
     }
-    setIsPostingComment(false);
   };
 
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyContent.trim() || !session?.user || !replyingTo) return;
+    if (!replyContent.trim() || !session?.user || !replyingTo || !currentUserProfile) return;
     setIsPostingComment(true);
-    const { data } = await supabase.from('group_post_comments').insert({ group_post_id: post.id, user_id: session.user.id, content: replyContent, parent_comment_id: replyingTo.id }).select('*, profiles(*)').single();
-    if (data) {
-        setComments(prev => [...prev, data as any]);
-        setReplyContent('');
-        setReplyingTo(null);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.overflowY = 'hidden';
+    
+    try {
+        const { data, error } = await supabase.from('group_post_comments').insert({ 
+            group_post_id: post.id, 
+            user_id: session.user.id, 
+            content: replyContent, 
+            parent_comment_id: replyingTo.id 
+        }).select('*, profiles(*)').single();
+
+        if (error) throw error;
+
+        if (data) {
+            setComments(prev => [...prev, data as any]);
+            setReplyContent('');
+            setReplyingTo(null);
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+              textareaRef.current.style.overflowY = 'hidden';
+            }
         }
+    } catch (err) {
+        console.error("Erreur réponse groupe:", err);
+    } finally {
+        setIsPostingComment(false);
     }
-    setIsPostingComment(false);
   };
 
   const handleDeleteComment = async (commentId: string) => {

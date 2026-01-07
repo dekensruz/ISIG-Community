@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { Message, Profile } from '../types';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
-import { Send, ArrowLeft, Paperclip, X, Info, Mic, Trash2, StopCircle, Search } from 'lucide-react';
+import { Send, ArrowLeft, Paperclip, X, Info, Mic, Trash2, StopCircle, Search, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUnreadMessages } from './UnreadMessagesProvider';
 import MessageBubble from './MessageBubble';
@@ -40,6 +40,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const [otherParticipant, setOtherParticipant] = useState<Profile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -112,30 +113,51 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const fetchData = useCallback(async () => {
     if (!session?.user || !conversationId) return;
     setLoading(true);
+    setError(null);
     try {
-      // Fetch profiles
-      const [participantRes, myProfileRes] = await Promise.all([
-          supabase.rpc('get_conversation_participant', { p_conversation_id: conversationId }).single(),
-          supabase.from('profiles').select('*').eq('id', session.user.id).single()
-      ]);
+      // 1. Fetch Participant using a more reliable query
+      const { data: participantData, error: pError } = await supabase
+        .from('conversation_participants')
+        .select('profiles:user_id(*)')
+        .eq('conversation_id', conversationId)
+        .neq('user_id', session.user.id)
+        .maybeSingle();
 
-      if (participantRes.data) {
-          const p = participantRes.data as unknown as Profile;
+      if (pError) throw pError;
+      
+      if (participantData?.profiles) {
+          const p = participantData.profiles as unknown as Profile;
           setOtherParticipant(p);
           setPresenceStatus(formatPresence(p.last_seen_at));
+      } else {
+          // Fallback if direct query yields nothing, try the RPC as last resort
+          const { data: rpcData } = await supabase.rpc('get_conversation_participant', { p_conversation_id: conversationId }).maybeSingle();
+          if (rpcData) {
+            setOtherParticipant(rpcData as unknown as Profile);
+            setPresenceStatus(formatPresence((rpcData as any).last_seen_at));
+          } else {
+            setError("Impossible de trouver le participant de cette discussion.");
+          }
       }
-      if (myProfileRes.data) setCurrentUserProfile(myProfileRes.data);
 
-      const { data: messagesData } = await supabase
+      // 2. Fetch My Profile
+      const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (myProfile) setCurrentUserProfile(myProfile);
+
+      // 3. Fetch Messages
+      const { data: messagesData, error: mError } = await supabase
         .from('messages')
         .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
       
+      if (mError) throw mError;
       setMessages(messagesData as any[] || []);
+      
       await markMessagesAsRead();
-    } catch (error) {
-      console.error('Error fetching chat data:', error);
+    } catch (err: any) {
+      console.error('Error fetching chat data:', err);
+      setError("Une erreur est survenue lors du chargement de la discussion.");
     } finally {
       setLoading(false);
     }
@@ -159,25 +181,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           const newMessage = payload.new as Message;
           
           setMessages(prev => {
-              // Check for optimistic match
               const optimisticIdx = prev.findIndex(m => 
                 (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content)
               );
 
               if (optimisticIdx !== -1) {
-                  // Replace temp with real but keep profile
                   const updated = [...prev];
-                  updated[optimisticIdx] = { 
-                      ...newMessage, 
-                      profiles: prev[optimisticIdx].profiles 
-                  };
+                  updated[optimisticIdx] = { ...newMessage, profiles: prev[optimisticIdx].profiles };
                   return updated;
               }
 
-              // Check if already exists by ID
               if (prev.some(m => m.id === newMessage.id)) return prev;
 
-              // Append new message from other
               const profile = newMessage.sender_id === session.user.id ? currentUserProfile : otherParticipant;
               return [...prev, { ...newMessage, profiles: profile }];
           });
@@ -227,7 +242,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    // Optimistic Update
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
         id: optimisticId,
@@ -275,13 +289,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             .single();
 
         if (error) throw error;
-
-        // Replace optimistic with real data
         if (data) {
             setMessages(prev => prev.map(m => m.id === optimisticId ? (data as any) : m));
             onMessagesRead();
         }
-
     } catch (err: any) {
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
         console.error("Chat send error:", err);
@@ -315,13 +326,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     } catch (err) { alert("Microphone inaccessible."); }
   };
 
-  if (loading || !otherParticipant) {
+  if (loading) {
     return (
         <div className="flex-1 flex flex-col items-center justify-center bg-white">
             <Spinner />
-            <p className="mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">Chargement de la conversation...</p>
+            <p className="mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">Initialisation...</p>
         </div>
     );
+  }
+
+  if (error || !otherParticipant) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center bg-white p-6 text-center">
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle size={40} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase italic">Oups !</h3>
+            <p className="text-slate-500 font-medium mt-2 max-w-xs">{error || "Nous n'avons pas pu charger cette conversation."}</p>
+            <Link to="/chat" className="mt-6 px-8 py-3 bg-isig-blue text-white font-black rounded-2xl shadow-lg shadow-isig-blue/20 uppercase tracking-widest text-xs">Retour aux messages</Link>
+        </div>
+      );
   }
 
   return (

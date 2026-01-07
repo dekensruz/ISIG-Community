@@ -107,12 +107,12 @@ const AppContent: React.FC = () => {
             {!isAuthPage && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
             
-            {/* Logique Séquentielle : Installation puis Notifications */}
-            {session && !isAuthPage && (
-                <>
-                    <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
-                    {canShowNotifications && <NotificationsProvider />}
-                </>
+            {/* Bannière PWA visible par tous (même non connectés) */}
+            <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
+
+            {/* Notifications activées uniquement si session active ET bannière traitée */}
+            {session && !isAuthPage && canShowNotifications && (
+                <NotificationsProvider />
             )}
         </div>
     );

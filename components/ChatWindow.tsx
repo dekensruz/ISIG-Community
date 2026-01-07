@@ -38,6 +38,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const { session } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<Profile | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -112,12 +113,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     if (!session?.user || !conversationId) return;
     setLoading(true);
     try {
-      const { data: participantData, error: participantError } = await supabase.rpc('get_conversation_participant', { p_conversation_id: conversationId }).single();
-      if (participantError) throw participantError;
-      
-      const participantProfile = participantData as unknown as Profile;
-      setOtherParticipant(participantProfile);
-      setPresenceStatus(formatPresence(participantProfile.last_seen_at));
+      // Fetch profiles
+      const [participantRes, myProfileRes] = await Promise.all([
+          supabase.rpc('get_conversation_participant', { p_conversation_id: conversationId }).single(),
+          supabase.from('profiles').select('*').eq('id', session.user.id).single()
+      ]);
+
+      if (participantRes.data) {
+          const p = participantRes.data as unknown as Profile;
+          setOtherParticipant(p);
+          setPresenceStatus(formatPresence(p.last_seen_at));
+      }
+      if (myProfileRes.data) setCurrentUserProfile(myProfileRes.data);
 
       const { data: messagesData } = await supabase
         .from('messages')
@@ -138,9 +145,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     fetchData(); 
   }, [fetchData]);
 
-  // Realtime : On écoute les messages des AUTRES. Les nôtres sont gérés par handleSendMessage.
+  // Realtime subscription logic
   useEffect(() => {
-    if (!conversationId || !session?.user) return;
+    if (!conversationId || !session?.user || !otherParticipant || !currentUserProfile) return;
 
     const channel = supabase.channel(`chat:${conversationId}`)
       .on('postgres_changes', { 
@@ -151,23 +158,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, async (payload) => {
           const newMessage = payload.new as Message;
           
-          // On n'ajoute via realtime QUE si c'est un message de l'autre
-          // ou si pour une raison X notre message n'est pas déjà dans la liste
           setMessages(prev => {
-              const exists = prev.some(m => m.id === newMessage.id || 
-                (m.sender_id === newMessage.sender_id && m.content === newMessage.content && m.id.startsWith('temp-')));
-              
-              if (exists && newMessage.sender_id === session.user.id) {
-                  // On remplace le temp par le réel si pas déjà fait
-                  return prev.map(m => (m.sender_id === newMessage.sender_id && m.content === newMessage.content && m.id.startsWith('temp-')) ? { ...newMessage, profiles: m.profiles } : m);
+              // Check for optimistic match
+              const optimisticIdx = prev.findIndex(m => 
+                (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content)
+              );
+
+              if (optimisticIdx !== -1) {
+                  // Replace temp with real but keep profile
+                  const updated = [...prev];
+                  updated[optimisticIdx] = { 
+                      ...newMessage, 
+                      profiles: prev[optimisticIdx].profiles 
+                  };
+                  return updated;
               }
 
-              if (exists) return prev;
+              // Check if already exists by ID
+              if (prev.some(m => m.id === newMessage.id)) return prev;
 
-              // Récupérer les infos manquantes (profil) pour le nouveau message
-              // Dans un vrai flux, on pourrait optimiser ça
-              fetchData(); 
-              return prev;
+              // Append new message from other
+              const profile = newMessage.sender_id === session.user.id ? currentUserProfile : otherParticipant;
+              return [...prev, { ...newMessage, profiles: profile }];
           });
 
           if (newMessage.sender_id !== session.user.id) {
@@ -196,7 +208,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, session?.user.id, markMessagesAsRead, fetchData]);
+  }, [conversationId, session?.user.id, otherParticipant, currentUserProfile, markMessagesAsRead]);
 
   useEffect(() => { 
     if (!loading) scrollToBottom("auto"); 
@@ -204,7 +216,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
   const handleSendMessage = async (e?: React.FormEvent, audioBlob?: Blob) => {
     e?.preventDefault();
-    if ((!newMessage.trim() && !file && !audioBlob) || !session?.user) return;
+    if ((!newMessage.trim() && !file && !audioBlob) || !session?.user || !currentUserProfile) return;
     
     if (editingMessage) {
         await supabase.from('messages').update({ content: newMessage, updated_at: new Date().toISOString() }).eq('id', editingMessage.id);
@@ -215,7 +227,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    // 1. AJOUT OPTIMISTE IMMÉDIAT
+    // Optimistic Update
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
         id: optimisticId,
@@ -223,7 +235,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         sender_id: session.user.id,
         content: content,
         created_at: new Date().toISOString(),
-        profiles: { id: session.user.id, full_name: 'Vous' } as any,
+        profiles: currentUserProfile,
         replying_to_message_id: replyingToMessage?.id,
         replied_to: replyingToMessage ? { ...replyingToMessage } : undefined,
         is_read: false
@@ -256,7 +268,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             replying_to_message_id: optimisticMsg.replying_to_message_id 
         };
 
-        // 2. INSERTION ET RÉCUPÉRATION DIRECTE DE LA RÉPONSE
         const { data, error } = await supabase
             .from('messages')
             .insert(msgData)
@@ -265,16 +276,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
         if (error) throw error;
 
-        // 3. REMPLACEMENT DU MESSAGE OPTIMISTE PAR LE RÉEL
+        // Replace optimistic with real data
         if (data) {
             setMessages(prev => prev.map(m => m.id === optimisticId ? (data as any) : m));
-            // Notifier le parent pour la miniature
             onMessagesRead();
         }
 
     } catch (err: any) {
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
-        alert("Échec de l'envoi : " + err.message);
+        console.error("Chat send error:", err);
     } finally {
         setIsUploading(false);
     }

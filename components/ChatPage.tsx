@@ -60,14 +60,14 @@ const ChatPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchConversations = useCallback(async () => {
+    const fetchConversations = useCallback(async (isInitial = false) => {
         if (!session?.user) return;
-        setError(null);
+        if (isInitial) setLoading(true);
 
         const { data: convData, error: rpcError } = await supabase.rpc('get_user_conversations_with_unread_count');
         
         if (rpcError) {
-            console.error('Error fetching conversations:', JSON.stringify(rpcError, null, 2));
+            console.error('Error fetching conversations:', rpcError);
             setError(`Échec du chargement des conversations.`);
             setLoading(false);
             return;
@@ -92,22 +92,23 @@ const ChatPage: React.FC = () => {
         }));
         
         setConversations(formattedConversations);
-        setLoading(false);
+        if (isInitial) setLoading(false);
     }, [session?.user]);
     
     useEffect(() => {
-        fetchConversations();
+        fetchConversations(true);
 
-        // Écoute globale des messages pour mettre à jour les miniatures
         const channel = supabase
             .channel('conversations-miniatures')
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'messages'
-            }, () => {
-                // Dès qu'un message change dans la DB, on rafraîchit la liste
-                fetchConversations();
+            }, (payload: any) => {
+                // Rafraîchir uniquement si le message appartient à une conversation de l'utilisateur
+                if (payload.new && payload.new.conversation_id) {
+                    fetchConversations(false);
+                }
             })
             .on('postgres_changes', { 
                 event: 'INSERT', 
@@ -115,7 +116,7 @@ const ChatPage: React.FC = () => {
                 table: 'conversation_participants', 
                 filter: `user_id=eq.${session?.user.id}` 
             }, () => {
-                fetchConversations();
+                fetchConversations(false);
             })
             .subscribe();
 
@@ -165,7 +166,7 @@ const ChatPage: React.FC = () => {
                     <ChatWindow 
                         key={conversationId} 
                         conversationId={conversationId} 
-                        onMessagesRead={fetchConversations} 
+                        onMessagesRead={() => fetchConversations(false)} 
                     />
                 ) : (
                     <div className="flex-grow flex-col items-center justify-center text-center text-slate-500 p-8 hidden md:flex">

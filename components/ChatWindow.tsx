@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { Message, Profile } from '../types';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
-import { Send, ArrowLeft, Paperclip, X, Info, Mic, Trash2, StopCircle, Search, AlertCircle } from 'lucide-react';
+import { Send, ArrowLeft, Paperclip, X, Info, Mic, Trash2, StopCircle, Search, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUnreadMessages } from './UnreadMessagesProvider';
 import MessageBubble from './MessageBubble';
@@ -45,6 +45,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
@@ -133,8 +134,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           if (rpcData) {
             setOtherParticipant(rpcData as unknown as Profile);
             setPresenceStatus(formatPresence((rpcData as any).last_seen_at));
-          } else {
-            setError("Impossible de trouver le participant de cette discussion.");
           }
       }
 
@@ -150,7 +149,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       if (mError) throw mError;
       setMessages(messagesData as any[] || []);
       
-      // On ne l'appelle que si on a des messages non lus
       const hasUnread = (messagesData as any[])?.some(m => !m.is_read && m.sender_id !== session.user.id);
       if (hasUnread) {
           markMessagesAsRead();
@@ -170,54 +168,49 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   useEffect(() => {
     if (!conversationId || !session?.user || !otherParticipant || !currentUserProfile) return;
 
-    const channel = supabase.channel(`chat:${conversationId}`)
+    setRealtimeStatus('connecting');
+    const channel = supabase.channel(`realtime:chat:${conversationId}`)
       .on('postgres_changes', { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'messages', 
           filter: `conversation_id=eq.${conversationId}`
       }, async (payload) => {
-          const newMessage = payload.new as Message;
-          
-          setMessages(prev => {
-              const optimisticIdx = prev.findIndex(m => 
-                (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content)
-              );
-
-              if (optimisticIdx !== -1) {
-                  const updated = [...prev];
-                  updated[optimisticIdx] = { ...newMessage, profiles: prev[optimisticIdx].profiles };
-                  return updated;
-              }
-
-              if (prev.some(m => m.id === newMessage.id)) return prev;
-
-              const profile = newMessage.sender_id === session.user.id ? currentUserProfile : otherParticipant;
-              return [...prev, { ...newMessage, profiles: profile }];
-          });
-
-          if (newMessage.sender_id !== session.user.id) {
-              markMessagesAsRead();
+          if (payload.eventType === 'INSERT') {
+            const newMessage = payload.new as Message;
+            setMessages(prev => {
+                if (prev.some(m => m.id === newMessage.id)) return prev;
+                const optimisticIdx = prev.findIndex(m => 
+                  m.id.startsWith('temp-') && 
+                  m.sender_id === newMessage.sender_id && 
+                  m.content === newMessage.content
+                );
+                const profile = newMessage.sender_id === session.user.id ? currentUserProfile : otherParticipant;
+                const enrichedMessage = { ...newMessage, profiles: profile };
+                if (optimisticIdx !== -1) {
+                    const updated = [...prev];
+                    updated[optimisticIdx] = enrichedMessage;
+                    return updated;
+                }
+                return [...prev, enrichedMessage];
+            });
+            if (newMessage.sender_id !== session.user.id) markMessagesAsRead();
+            scrollToBottom();
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+          } else if (payload.eventType === 'DELETE') {
+            setMessages(prev => prev.filter(m => m.id !== payload.old.id));
           }
-          scrollToBottom();
       })
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'messages', 
-          filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
-      })
-      .on('postgres_changes', { 
-          event: 'DELETE', 
-          schema: 'public', 
-          table: 'messages', 
-          filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
-      })
-      .subscribe();
+      .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('connected');
+              console.log('✅ Temps réel activé pour cette discussion');
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              setRealtimeStatus('error');
+              console.error('❌ Erreur temps réel (Vérifiez la configuration Replication de Supabase)');
+          }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -281,20 +274,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             replying_to_message_id: optimisticMsg.replying_to_message_id 
         };
 
-        const { data, error } = await supabase
-            .from('messages')
-            .insert(msgData)
-            .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
-            .single();
-
+        const { error } = await supabase.from('messages').insert(msgData);
         if (error) throw error;
-        if (data) {
-            setMessages(prev => prev.map(m => m.id === optimisticId ? (data as any) : m));
-            onMessagesRead();
-        }
     } catch (err: any) {
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
         console.error("Chat send error:", err);
+        alert("Erreur lors de l'envoi. Vérifiez votre connexion.");
     } finally {
         setIsUploading(false);
     }
@@ -329,7 +314,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     return (
         <div className="flex-1 flex flex-col items-center justify-center bg-white">
             <Spinner />
-            <p className="mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">Initialisation...</p>
+            <p className="mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">Chargement...</p>
         </div>
     );
   }
@@ -357,7 +342,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                 <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
                     <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/20 transition-all" />
                     <div className="min-w-0">
-                        <h3 className="font-black text-slate-800 tracking-tight truncate group-hover:text-isig-blue transition-colors">{otherParticipant.full_name}</h3>
+                        <div className="flex items-center space-x-2">
+                            <h3 className="font-black text-slate-800 tracking-tight truncate group-hover:text-isig-blue transition-colors">{otherParticipant.full_name}</h3>
+                            {realtimeStatus === 'connected' ? 
+                                <Wifi size={14} className="text-emerald-500 opacity-50" title="Connecté en temps réel" /> : 
+                                <WifiOff size={14} className="text-amber-500 opacity-50 animate-pulse" title="Vérification de la connexion temps réel..." />
+                            }
+                        </div>
                         <div className="flex items-center">
                             <div className={`w-2 h-2 rounded-full mr-1.5 ${presenceStatus === 'En ligne' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{presenceStatus}</p> 
@@ -382,6 +373,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50 min-h-0 custom-scrollbar">
+            {realtimeStatus === 'error' && (
+                <div className="mx-auto max-w-xs p-3 bg-amber-50 border border-amber-100 rounded-xl mb-4 flex items-start space-x-3">
+                    <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] font-bold text-amber-700 leading-tight">Le mode temps réel est désactivé. Les messages s'afficheront après actualisation.</p>
+                </div>
+            )}
             {messages.filter(m => !searchQuery || m.content.toLowerCase().includes(searchQuery.toLowerCase())).map((msg) => (
                 <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.sender_id === session?.user.id} onSetEditing={setEditingMessage} onSetReplying={setReplyingToMessage} setMessages={setMessages} onMediaClick={(url, type, name) => setMediaInView({ url, type, name })} />
             ))}

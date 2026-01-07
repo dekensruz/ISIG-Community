@@ -29,7 +29,6 @@ const formatTime = (seconds: number) => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
-// Fix: Define the missing ChatWindowProps interface
 interface ChatWindowProps {
   conversationId: string;
   onMessagesRead: () => void;
@@ -139,7 +138,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     fetchData(); 
   }, [fetchData]);
 
-  // Gestion du Realtime optimisée pour éviter les doublons
+  // Realtime : On écoute les messages des AUTRES. Les nôtres sont gérés par handleSendMessage.
   useEffect(() => {
     if (!conversationId || !session?.user) return;
 
@@ -152,43 +151,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, async (payload) => {
           const newMessage = payload.new as Message;
           
-          // Récupérer le profil de l'expéditeur
-          const { data: senderProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', newMessage.sender_id)
-            .single();
-
-          // Récupérer le message répondu si nécessaire pour l'enrichir
-          let repliedToMsg = null;
-          if (newMessage.replying_to_message_id) {
-              const { data } = await supabase
-                .from('messages')
-                .select('*, profiles:sender_id(*)')
-                .eq('id', newMessage.replying_to_message_id)
-                .single();
-              repliedToMsg = data;
-          }
-
+          // On n'ajoute via realtime QUE si c'est un message de l'autre
+          // ou si pour une raison X notre message n'est pas déjà dans la liste
           setMessages(prev => {
-              const existingIndex = prev.findIndex(m => 
-                  (m.id.startsWith('temp-') && m.sender_id === newMessage.sender_id && m.content === newMessage.content) ||
-                  m.id === newMessage.id
-              );
-
-              const enrichedMessage = { 
-                  ...newMessage, 
-                  profiles: senderProfile as any,
-                  replied_to: repliedToMsg as any 
-              };
-
-              if (existingIndex !== -1) {
-                  const newMessages = [...prev];
-                  newMessages[existingIndex] = enrichedMessage;
-                  return newMessages;
-              }
+              const exists = prev.some(m => m.id === newMessage.id || 
+                (m.sender_id === newMessage.sender_id && m.content === newMessage.content && m.id.startsWith('temp-')));
               
-              return [...prev, enrichedMessage];
+              if (exists && newMessage.sender_id === session.user.id) {
+                  // On remplace le temp par le réel si pas déjà fait
+                  return prev.map(m => (m.sender_id === newMessage.sender_id && m.content === newMessage.content && m.id.startsWith('temp-')) ? { ...newMessage, profiles: m.profiles } : m);
+              }
+
+              if (exists) return prev;
+
+              // Récupérer les infos manquantes (profil) pour le nouveau message
+              // Dans un vrai flux, on pourrait optimiser ça
+              fetchData(); 
+              return prev;
           });
 
           if (newMessage.sender_id !== session.user.id) {
@@ -217,7 +196,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, session?.user.id, markMessagesAsRead]);
+  }, [conversationId, session?.user.id, markMessagesAsRead, fetchData]);
 
   useEffect(() => { 
     if (!loading) scrollToBottom("auto"); 
@@ -236,7 +215,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     const content = newMessage;
     const mediaFile = file || (audioBlob ? new File([audioBlob], "voix.webm", { type: "audio/webm" }) : null);
 
-    // MISE À JOUR OPTIMISTE
+    // 1. AJOUT OPTIMISTE IMMÉDIAT
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
         id: optimisticId,
@@ -246,7 +225,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         created_at: new Date().toISOString(),
         profiles: { id: session.user.id, full_name: 'Vous' } as any,
         replying_to_message_id: replyingToMessage?.id,
-        // ENRICHISSEMENT OPTIMISTE : On inclut l'objet du message répondu pour l'UI
         replied_to: replyingToMessage ? { ...replyingToMessage } : undefined,
         is_read: false
     };
@@ -277,8 +255,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             media_type: mediaType, 
             replying_to_message_id: optimisticMsg.replying_to_message_id 
         };
-        const { error } = await supabase.from('messages').insert(msgData);
+
+        // 2. INSERTION ET RÉCUPÉRATION DIRECTE DE LA RÉPONSE
+        const { data, error } = await supabase
+            .from('messages')
+            .insert(msgData)
+            .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+            .single();
+
         if (error) throw error;
+
+        // 3. REMPLACEMENT DU MESSAGE OPTIMISTE PAR LE RÉEL
+        if (data) {
+            setMessages(prev => prev.map(m => m.id === optimisticId ? (data as any) : m));
+            // Notifier le parent pour la miniature
+            onMessagesRead();
+        }
+
     } catch (err: any) {
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
         alert("Échec de l'envoi : " + err.message);

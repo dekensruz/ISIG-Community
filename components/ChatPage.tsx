@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -8,7 +9,7 @@ import ChatWindow from './ChatWindow';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { MessageSquarePlus, Check, CheckCheck, Users } from 'lucide-react';
+import { MessageSquarePlus, CheckCheck, Users } from 'lucide-react';
 
 const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boolean }> = ({ conversation, isActive }) => {
     const { session } = useAuth();
@@ -38,7 +39,7 @@ const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boo
                 </div>
                 <div className="flex justify-between items-center mt-1">
                      <p className={`text-sm truncate ${unread_count > 0 ? 'text-slate-800 font-semibold' : 'text-slate-500'}`}>
-                        {last_message ? last_message.content : 'Aucun message'}
+                        {last_message ? (last_message.content || 'Fichier joint') : 'Aucun message'}
                     </p>
                     {unread_count > 0 && (
                         <span className="bg-isig-orange text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">
@@ -61,15 +62,13 @@ const ChatPage: React.FC = () => {
 
     const fetchConversations = useCallback(async () => {
         if (!session?.user) return;
-        // Don't set loading to true on refetch to avoid flicker
-        // setLoading(true); 
         setError(null);
 
         const { data: convData, error: rpcError } = await supabase.rpc('get_user_conversations_with_unread_count');
         
         if (rpcError) {
             console.error('Error fetching conversations:', JSON.stringify(rpcError, null, 2));
-            setError(`Échec du chargement des conversations. Détails : ${rpcError.message}`);
+            setError(`Échec du chargement des conversations.`);
             setLoading(false);
             return;
         }
@@ -99,14 +98,23 @@ const ChatPage: React.FC = () => {
     useEffect(() => {
         fetchConversations();
 
+        // Écoute globale des messages pour mettre à jour les miniatures
         const channel = supabase
-            .channel('chat-updates')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, 
-            () => {
+            .channel('conversations-miniatures')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'messages'
+            }, () => {
+                // Dès qu'un message change dans la DB, on rafraîchit la liste
                 fetchConversations();
             })
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_participants', filter: `user_id=eq.${session?.user.id}` }, 
-            () => {
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'conversation_participants', 
+                filter: `user_id=eq.${session?.user.id}` 
+            }, () => {
                 fetchConversations();
             })
             .subscribe();
@@ -154,7 +162,11 @@ const ChatPage: React.FC = () => {
             </aside>
             <main className={`${conversationId ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 flex-col`}>
                 {conversationId ? (
-                    <ChatWindow key={conversationId} conversationId={conversationId} onMessagesRead={fetchConversations} />
+                    <ChatWindow 
+                        key={conversationId} 
+                        conversationId={conversationId} 
+                        onMessagesRead={fetchConversations} 
+                    />
                 ) : (
                     <div className="flex-grow flex-col items-center justify-center text-center text-slate-500 p-8 hidden md:flex">
                         <MessageSquarePlus size={64} className="text-slate-300 mb-4" />

@@ -30,6 +30,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       setFile(selectedFile);
       if (selectedFile.type.startsWith('image/')) {
         setPreviewUrl(URL.createObjectURL(selectedFile));
+      } else {
+        setPreviewUrl(null);
       }
     } else {
       setFile(null);
@@ -91,6 +93,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         setUploading(false);
     }
   };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
   
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -110,20 +116,31 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
                 ) : (
                     <div className="flex items-center p-2 bg-slate-100 rounded-lg">
                         <FileText className="text-slate-500 mr-2" />
-                        <p className="text-sm text-slate-600">{file.name}</p>
+                        <p className="text-sm text-slate-600 max-w-[150px] truncate">{file.name}</p>
                     </div>
                 )}
-                <button type="button" onClick={handleRemoveFile} className="absolute -top-2 -right-2 bg-slate-700 text-white rounded-full p-0.5 hover:bg-slate-900 transition-colors">
+                <button type="button" onClick={handleRemoveFile} className="absolute -top-2 -right-2 bg-slate-700 text-white rounded-full p-0.5 hover:bg-slate-900 transition-colors z-10">
                     <X size={16} />
                 </button>
             </div>
         )}
 
         <div className="flex justify-between items-center mt-2">
-            <label htmlFor="group-file-upload" className="cursor-pointer text-slate-500 hover:text-isig-blue p-2 rounded-full hover:bg-slate-100">
+            <button 
+              type="button" 
+              onClick={triggerFileInput} 
+              className="text-slate-500 hover:text-isig-blue p-2 rounded-full hover:bg-slate-100 transition-all"
+              title="Ajouter un fichier"
+            >
                 <Paperclip size={24} />
-                <input id="group-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-            </label>
+                <input 
+                  id="group-file-upload" 
+                  type="file" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                />
+            </button>
             <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-2 px-6 rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-xs">
                 {uploading ? 'Envoi...' : <><Send size={14} className="mr-2"/>Publier</>}
             </button>

@@ -117,10 +117,56 @@ const GroupPage: React.FC = () => {
       }
   }, [isMember, group, fetchPosts]);
 
+  // Temps réel pour les posts du groupe
+  useEffect(() => {
+    if (!groupId) return;
+
+    const channel = supabase
+      .channel(`group-posts-${groupId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'group_posts',
+        filter: `group_id=eq.${groupId}`
+      }, async (payload) => {
+        const { data } = await supabase
+          .from('group_posts')
+          .select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`)
+          .eq('id', payload.new.id)
+          .single();
+        if (data) {
+          setPosts(prev => {
+            if (prev.some(p => p.id === data.id)) return prev;
+            return [data as any, ...prev];
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'group_posts' }, (payload) => {
+        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_posts' }, async (payload) => {
+        const { data } = await supabase
+          .from('group_posts')
+          .select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`)
+          .eq('id', payload.new.id)
+          .single();
+        if (data) {
+          setPosts(prev => prev.map(p => p.id === data.id ? data as any : p));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [groupId]);
+
   const handlePostCreated = (newPost?: GroupPostType) => {
       if (newPost) {
-          // Injection immédiate au début de la liste locale
-          setPosts(prev => [newPost, ...prev]);
+          setPosts(prev => {
+            if (prev.some(p => p.id === newPost.id)) return prev;
+            return [newPost, ...prev];
+          });
       } else {
           fetchPosts();
       }

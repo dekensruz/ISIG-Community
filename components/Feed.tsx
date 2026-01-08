@@ -79,6 +79,51 @@ const Feed: React.FC = () => {
   }, [page]);
 
   useEffect(() => {
+    fetchPosts(true);
+
+    // Temps réel : Écouter les nouveaux posts
+    const channel = supabase
+      .channel('feed-realtime')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'posts' 
+      }, async (payload) => {
+        // On récupère le post complet car le payload ne contient pas les jointures (profiles)
+        const { data } = await supabase
+          .from('posts')
+          .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
+          .eq('id', payload.new.id)
+          .single();
+        
+        if (data) {
+          setPosts(prev => {
+            if (prev.some(p => p.id === data.id)) return prev;
+            return [data as any, ...prev];
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
+        const { data } = await supabase
+          .from('posts')
+          .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
+          .eq('id', payload.new.id)
+          .single();
+        if (data) {
+          setPosts(prev => prev.map(p => p.id === data.id ? data as any : p));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery) {
         fetchPosts(false);
@@ -92,17 +137,13 @@ const Feed: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, searchQuery, fetchPosts]);
 
-  useEffect(() => {
-    fetchPosts(true);
-  }, []);
-
   const handlePostCreated = (newPost?: PostType) => {
     if (newPost) {
         setPosts(prev => {
             if (editingPost) {
                 return prev.map(p => p.id === newPost.id ? newPost : p);
             }
-            // Injection immédiate au début de la liste
+            if (prev.some(p => p.id === newPost.id)) return prev;
             return [newPost, ...prev];
         });
         setEditingPost(null);

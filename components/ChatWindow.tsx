@@ -93,7 +93,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior });
-    }, 50);
+    }, 100);
   };
   
   const handleSetFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +192,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   }, [fetchData]);
 
   useEffect(() => {
-    if (!conversationId || !session?.user || !otherParticipant) return;
+    if (!conversationId || !session?.user) return;
 
     const channel = supabase.channel(`chat_room_${conversationId}`)
       .on('postgres_changes', { 
@@ -200,32 +200,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           schema: 'public', 
           table: 'messages', 
           filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
+      }, async (payload) => {
           if (payload.eventType === 'INSERT') {
-            const incoming = payload.new as Message;
-            setMessages(current => {
-                if (current.some(m => m.id === incoming.id)) return current;
-                const optimisticIdx = current.findIndex(m => 
-                    m.id.startsWith('temp-') && 
-                    m.sender_id === incoming.sender_id &&
-                    (m.content === incoming.content || (m.media_url && incoming.media_url))
-                );
+            // Refetch le message avec son profil car le payload est incomplet
+            const { data } = await supabase
+              .from('messages')
+              .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+              .eq('id', payload.new.id)
+              .single();
 
-                const profile = incoming.sender_id === session.user.id ? currentUserProfile : otherParticipant;
-                const enriched = { ...incoming, profiles: profile };
-
+            if (data) {
+              setMessages(current => {
+                if (current.some(m => m.id === data.id)) return current;
+                // Remplacer le message optimiste si présent
+                const optimisticIdx = current.findIndex(m => m.id.startsWith('temp-') && m.content === data.content);
                 if (optimisticIdx !== -1) {
-                    const updated = [...current];
-                    updated[optimisticIdx] = enriched;
-                    return updated;
+                  const updated = [...current];
+                  updated[optimisticIdx] = data as any;
+                  return updated;
                 }
-                return [...current, enriched];
-            });
-
-            if (incoming.sender_id !== session.user.id) {
+                return [...current, data as any];
+              });
+              
+              if (data.sender_id !== session.user.id) {
                 markMessagesAsRead();
+              }
+              scrollToBottom();
             }
-            scrollToBottom();
           } 
           else if (payload.eventType === 'UPDATE') {
             setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
@@ -234,12 +235,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${otherParticipant.id}`
+          table: 'profiles'
       }, (payload) => {
-          const updatedProfile = payload.new as Profile;
-          setOtherParticipant(updatedProfile);
-          setPresenceStatus(formatPresence(updatedProfile.last_seen_at));
+          if (otherParticipant && payload.new.id === otherParticipant.id) {
+            const updatedProfile = payload.new as Profile;
+            setOtherParticipant(updatedProfile);
+            setPresenceStatus(formatPresence(updatedProfile.last_seen_at));
+          }
       })
       .subscribe((status) => {
           setRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' ? 'error' : 'connecting');
@@ -248,7 +250,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, session?.user.id, otherParticipant, currentUserProfile, markMessagesAsRead]);
+  }, [conversationId, session?.user.id, otherParticipant, markMessagesAsRead]);
 
   useEffect(() => { 
     if (!loading) scrollToBottom(messages.length > 50 ? "auto" : "smooth"); 

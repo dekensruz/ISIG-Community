@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Paperclip, X, FileText, Send } from 'lucide-react';
 import { GroupPost } from '../types';
+import Spinner from './Spinner';
 
 interface CreateGroupPostProps {
   groupId: string;
@@ -33,9 +34,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       } else {
         setPreviewUrl(null);
       }
-    } else {
-      setFile(null);
-      setPreviewUrl(null);
     }
   };
 
@@ -94,59 +92,59 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     }
   };
 
-  const triggerFileInput = () => {
+  const triggerFileInput = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     fileInputRef.current?.click();
   };
   
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+    <div className="bg-white p-4 rounded-3xl shadow-soft border border-slate-100">
       <form onSubmit={handlePost}>
         <textarea
-            className="w-full p-3 bg-slate-50 border-slate-200 border rounded-xl focus:outline-none focus:ring-2 focus:ring-isig-blue resize-none font-medium"
-            rows={3}
+            className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px]"
             placeholder="Partagez quelque chose avec le groupe..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
         />
         
         {file && (
-            <div className="mt-2 relative inline-block">
+            <div className="mt-3 relative inline-block">
                 {previewUrl ? (
-                    <img src={previewUrl} alt="Aperçu" className="rounded-lg max-h-40 w-auto" />
+                    <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
                 ) : (
-                    <div className="flex items-center p-2 bg-slate-100 rounded-lg">
-                        <FileText className="text-slate-500 mr-2" />
-                        <p className="text-sm text-slate-600 max-w-[150px] truncate">{file.name}</p>
+                    <div className="flex items-center p-3 bg-slate-100 rounded-xl border border-slate-200">
+                        <FileText className="text-isig-blue mr-3" />
+                        <p className="text-xs font-bold text-slate-600 max-w-[150px] truncate">{file.name}</p>
                     </div>
                 )}
-                <button type="button" onClick={handleRemoveFile} className="absolute -top-2 -right-2 bg-slate-700 text-white rounded-full p-0.5 hover:bg-slate-900 transition-colors z-10">
+                <button type="button" onClick={handleRemoveFile} className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors z-10">
                     <X size={16} />
                 </button>
             </div>
         )}
 
-        <div className="flex justify-between items-center mt-2">
+        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
             <button 
               type="button" 
               onClick={triggerFileInput} 
-              className="text-slate-500 hover:text-isig-blue p-2 rounded-full hover:bg-slate-100 transition-all"
+              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0"
               title="Ajouter un fichier"
             >
                 <Paperclip size={24} />
                 <input 
-                  id="group-file-upload" 
                   type="file" 
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                 />
             </button>
-            <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-2 px-6 rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-xs">
-                {uploading ? 'Envoi...' : <><Send size={14} className="mr-2"/>Publier</>}
+            <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]">
+                {uploading ? <Spinner /> : <><Send size={14} className="mr-2"/>Publier</>}
             </button>
         </div>
       </form>
-      {error && <p className="text-red-500 text-xs font-bold mt-2">{error}</p>}
+      {error && <p className="text-red-500 text-[10px] font-bold mt-2 ml-2">{error}</p>}
     </div>
   );
 };

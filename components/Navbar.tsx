@@ -22,15 +22,22 @@ const Navbar: React.FC = () => {
     }
   };
 
+  const fetchNotificationCount = async () => {
+    if (!session?.user) return;
+    const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id)
+        .eq('is_read', false);
+    setUnreadNotificationsCount(count || 0);
+  };
+
   useEffect(() => {
     if (session?.user) {
         fetchProfile();
-        
-        supabase.from('notifications').select('*', { count: 'exact', head: true })
-            .eq('user_id', session.user.id).eq('is_read', false)
-            .then(({ count }) => setUnreadNotificationsCount(count || 0));
+        fetchNotificationCount();
 
-        // Abonnement temps réel pour le profil (avatar etc)
+        // Abonnement temps réel pour le profil
         const profileChannel = supabase
             .channel(`nav-profile-${session.user.id}`)
             .on('postgres_changes', { 
@@ -43,8 +50,22 @@ const Navbar: React.FC = () => {
             })
             .subscribe();
 
+        // Abonnement temps réel pour les notifications (IMPORTANT)
+        const notificationChannel = supabase
+            .channel(`nav-notifications-${session.user.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${session.user.id}`
+            }, () => {
+                fetchNotificationCount();
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(profileChannel);
+            supabase.removeChannel(notificationChannel);
         };
     }
   }, [session]);

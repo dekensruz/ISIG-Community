@@ -93,7 +93,7 @@ const ChatPage: React.FC = () => {
                 id: c.participant_id,
                 full_name: c.participant_full_name,
                 avatar_url: c.participant_avatar_url,
-                last_seen_at: c.participant_last_seen_at // Assurez-vous que cette colonne est retournée par le RPC
+                last_seen_at: c.participant_last_seen_at
             },
             last_message: c.last_message_id ? {
                 id: c.last_message_id,
@@ -116,26 +116,24 @@ const ChatPage: React.FC = () => {
     useEffect(() => {
         fetchConversations(true);
 
+        // On écoute TOUS les messages pour rafraîchir la liste (très important pour les miniatures)
         const channel = supabase
-            .channel('conversations-miniatures')
+            .channel('global-messages-sync')
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'messages'
-            }, (payload: any) => {
-                if (payload.new && payload.new.conversation_id) {
-                    fetchConversations(false);
-                }
+            }, () => {
+                fetchConversations(false);
             })
             .on('postgres_changes', { 
-                event: 'INSERT', 
+                event: '*', 
                 schema: 'public', 
                 table: 'conversation_participants', 
                 filter: `user_id=eq.${session?.user.id}` 
             }, () => {
                 fetchConversations(false);
             })
-            // Écouter les changements de profil pour l'indicateur online
             .on('postgres_changes', {
                 event: 'UPDATE',
                 schema: 'public',

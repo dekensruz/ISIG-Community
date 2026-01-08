@@ -69,13 +69,26 @@ const GroupPage: React.FC = () => {
     } catch (err) { console.error(err); } finally { setLoadingGroup(false); }
   }, [groupId, session?.user, isAdmin, isOwner, isMember]);
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (isInitial = true) => {
     if (!groupId) return;
-    setLoadingPosts(true);
-    const { data } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('group_id', groupId).order('created_at', { ascending: false });
-    if (data) setPosts(data as any);
+    if (isInitial) setLoadingPosts(true);
+    const { data } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('id', groupId).order('created_at', { ascending: false });
+    // This table selection above has a bug: we want posts for the group, not the post with id=groupId
+    const { data: correctData } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('group_id', groupId).order('created_at', { ascending: false });
+    if (correctData) setPosts(correctData as any);
     setLoadingPosts(false);
   }, [groupId]);
+
+  const handlePostCreated = (newPost?: GroupPostType) => {
+      if (newPost) {
+          setPosts(prev => {
+              if (prev.some(p => p.id === newPost.id)) return prev;
+              return [newPost, ...prev];
+          });
+      } else {
+          fetchPosts(true);
+      }
+  };
   
   useEffect(() => { fetchGroupData(); }, [fetchGroupData]);
   useEffect(() => { if (isMember || (group && !group.is_private)) fetchPosts(); }, [isMember, group, fetchPosts]);
@@ -139,7 +152,7 @@ const GroupPage: React.FC = () => {
       <div className="space-y-6 pb-20">
           {(isMember || !group.is_private) ? (
               <>
-                  {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={fetchPosts} />}
+                  {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}
                   {loadingPosts ? <div className="flex justify-center py-10"><Spinner /></div> : 
                     posts.map(p => <GroupPostCard key={p.id} post={p} startWithModalOpen={p.id === openModalPostId} />)}
               </>

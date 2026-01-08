@@ -201,7 +201,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     return (
         <div className={`group flex items-end gap-1 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
-                <button onClick={() => setMenuOpen(true)} className="p-2 rounded-full text-slate-400 opacity-0 group-hover:opacity-100 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:opacity-100 focus:opacity-100">
+                <button onClick={() => setMenuOpen(true)} className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100">
                     <MoreHorizontal size={18} />
                 </button>
                 {menuOpen && <OptionsMenu />}

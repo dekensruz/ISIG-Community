@@ -99,9 +99,12 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
         if (insertError) throw insertError;
         
+        // Reset local state
         setContent('');
         handleRemoveFile();
         if (textareaRef.current) textareaRef.current.style.height = '100px';
+        
+        // Success callback
         onPostCreated(data as any);
     } catch (err: any) {
         console.error("Upload error:", err);
@@ -112,7 +115,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   };
   
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in">
+    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
       <div className="space-y-4">
         <textarea
             ref={textareaRef}

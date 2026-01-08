@@ -293,9 +293,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 value={newMessage} 
                                 onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
                                 placeholder={editingMessage ? "Modifier le message..." : "Écrire un message..."} 
-                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" 
-                                style={{ minHeight: '48px' }}
+                                className="chat-textarea w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
+                                style={{ 
+                                    minHeight: '48px',
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none'
+                                }}
                             />
+                            <style>{`
+                                .chat-textarea::-webkit-scrollbar {
+                                    display: none;
+                                }
+                            `}</style>
                         </div>
                         <div className="flex items-center shrink-0">
                             {!newMessage.trim() && !file ? (

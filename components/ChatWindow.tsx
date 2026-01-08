@@ -94,7 +94,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       .is('is_read', false);
 
     if (!error) {
-        // IMPORTANT: On force le rafraîchissement global des compteurs
+        // IMPORTANT: On force le rafraîchissement global des compteurs immédiatement
         fetchUnreadCount();
         onMessagesRead();
     }
@@ -129,7 +129,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       
       setMessages(messagesData as any[] || []);
       
-      // On marque comme lu immédiatement après le fetch si nécessaire
+      // On marque comme lu immédiatement après le chargement des messages
       if (messagesData?.some(m => !m.is_read && m.sender_id !== session.user.id)) {
           markMessagesAsRead();
       }
@@ -155,7 +155,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           filter: `conversation_id=eq.${conversationId}`
       }, async (payload) => {
           if (payload.eventType === 'INSERT') {
-             // Si c'est un message reçu, on marque comme lu
+             // Si c'est un message reçu, on marque comme lu et on force la maj du compteur
              if (payload.new.sender_id !== session.user.id) {
                 markMessagesAsRead();
              }
@@ -261,7 +261,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                   key={msg.id} 
                   message={msg} 
                   isOwnMessage={msg.sender_id === session?.user.id} 
-                  onSetEditing={setEditingMessage} 
+                  onSetEditing={(m) => {/* TODO */}} 
                   onSetReplying={setReplyingToMessage} 
                   setMessages={setMessages} 
                   onMediaClick={(url, type, name) => setMediaInView({ url, type, name })} 

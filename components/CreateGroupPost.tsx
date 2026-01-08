@@ -91,12 +91,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         setUploading(false);
     }
   };
-
-  const triggerFileInput = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    fileInputRef.current?.click();
-  };
   
   return (
     <div className="bg-white p-4 rounded-3xl shadow-soft border border-slate-100">
@@ -125,10 +119,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
-            <button 
-              type="button" 
-              onClick={triggerFileInput} 
-              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0"
+            <label 
+              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer"
               title="Ajouter un fichier"
             >
                 <Paperclip size={24} />
@@ -138,7 +130,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                 />
-            </button>
+            </label>
             <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]">
                 {uploading ? <Spinner /> : <><Send size={14} className="mr-2"/>Publier</>}
             </button>

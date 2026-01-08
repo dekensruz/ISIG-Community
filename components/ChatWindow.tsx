@@ -65,7 +65,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = '48px'; // Hauteur de base pour éviter le saut au reset
+      textarea.style.height = '48px';
       const nextHeight = Math.min(textarea.scrollHeight, 160);
       textarea.style.height = `${nextHeight}px`;
     }
@@ -140,6 +140,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   useEffect(() => {
     if (!conversationId || !session?.user || !otherParticipant) return;
 
+    // Suppression des anciens canaux pour éviter les fuites de mémoire
     const channel = supabase.channel(`chat_room_${conversationId}`)
       .on('postgres_changes', { 
           event: 'INSERT', 
@@ -149,24 +150,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, async (payload) => {
           const newMessageData = payload.new as Message;
           
-          const { data: enrichedMessage } = await supabase
-              .from('messages')
-              .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
-              .eq('id', newMessageData.id)
-              .single();
-
-          if (enrichedMessage) {
-            setMessages(prev => {
-                if (prev.some(m => m.id === enrichedMessage.id)) return prev;
-                return [...prev, enrichedMessage];
-            });
-            
-            if (enrichedMessage.sender_id !== session.user.id) {
-                markMessagesAsRead();
-                setOtherUserTyping(false);
-            }
-            scrollToBottom();
-          }
+          // On évite les doublons si déjà ajouté par la mise à jour optimiste
+          setMessages(prev => {
+              if (prev.some(m => m.id === newMessageData.id)) return prev;
+              
+              // On fetch les détails manquants (profils, reply)
+              const fetchEnriched = async () => {
+                  const { data } = await supabase
+                      .from('messages')
+                      .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+                      .eq('id', newMessageData.id)
+                      .single();
+                  
+                  if (data) {
+                      setMessages(current => {
+                          const exists = current.findIndex(m => m.id === data.id);
+                          if (exists !== -1) {
+                              const updated = [...current];
+                              updated[exists] = data as Message;
+                              return updated;
+                          }
+                          return [...current, data as Message];
+                      });
+                      if (data.sender_id !== session.user.id) {
+                          markMessagesAsRead();
+                          setOtherUserTyping(false);
+                      }
+                      scrollToBottom();
+                  }
+              };
+              fetchEnriched();
+              return prev;
+          });
       })
       .on('postgres_changes', {
           event: 'UPDATE',
@@ -245,16 +260,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             mediaType = mediaFile.type;
         }
 
-        const { error: insertError } = await supabase.from('messages').insert({ 
+        const messageToInsert = { 
             conversation_id: conversationId, 
             sender_id: session.user.id, 
             content: newMessage, 
             media_url: mediaUrl, 
             media_type: mediaType, 
             replying_to_message_id: replyingToMessage?.id 
-        });
+        };
+
+        const { data: insertedData, error: insertError } = await supabase
+            .from('messages')
+            .insert(messageToInsert)
+            .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+            .single();
 
         if (insertError) throw insertError;
+
+        // Mise à jour optimiste/immédiate locale
+        if (insertedData) {
+            setMessages(prev => {
+                if (prev.some(m => m.id === insertedData.id)) return prev;
+                return [...prev, insertedData as Message];
+            });
+        }
+
         setNewMessage('');
         setFile(null);
         setFilePreview(null);
@@ -298,8 +328,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   return (
     <div className="flex flex-col h-full bg-white relative">
         <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            <button onClick={() => navigate('/chat')} className="mr-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors md:hidden">
-                <ArrowLeft size={20} />
+            {/* Bouton Back toujours présent sur mobile/tablette */}
+            <button onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all md:hidden text-slate-600 bg-slate-100/50">
+                <ArrowLeft size={22} strokeWidth={2.5} />
             </button>
             {otherParticipant && (
                 <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
@@ -327,7 +358,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                 />
             ))}
             {otherUserTyping && (
-                <div className="flex items-center space-x-2 p-2 bg-white rounded-2xl w-fit shadow-soft animate-pulse border border-slate-100">
+                <div className="flex items-center space-x-2 p-3 bg-white rounded-2xl w-fit shadow-soft animate-pulse border border-slate-100 ml-2">
                     <div className="flex space-x-1">
                         <div className="w-1.5 h-1.5 bg-isig-blue rounded-full"></div>
                         <div className="w-1.5 h-1.5 bg-isig-blue rounded-full"></div>
@@ -341,26 +372,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
         <div className="p-4 border-t border-slate-100 bg-white shrink-0">
             {recordingStatus === 'recording' ? (
-                <div className="flex items-center space-x-4 h-14 bg-red-50 rounded-2xl px-4 border border-red-100">
+                <div className="flex items-center space-x-4 h-14 bg-red-50 rounded-2xl px-4 border border-red-100 animate-pulse">
                     <div className="flex-1 flex items-center space-x-3">
-                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-red-700 font-black">{formatTime(recordingTime)}</span>
+                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
+                        <span className="text-red-700 font-black tracking-tighter">{formatTime(recordingTime)}</span>
+                        <span className="text-red-400 text-[10px] font-bold uppercase tracking-widest">Enregistrement...</span>
                     </div>
-                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2 rounded-xl"><StopCircle size={24} /></button>
+                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2.5 rounded-xl shadow-lg shadow-red-200"><StopCircle size={24} /></button>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {replyingToMessage && (
-                        <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100 text-xs animate-fade-in">
+                        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl mb-2 border border-slate-100 text-xs animate-fade-in-up">
                             <div className="truncate pr-4">
-                                <span className="font-black text-isig-blue">Répondre à : </span>
-                                <span className="text-slate-500 italic">{replyingToMessage.content || 'Média'}</span>
+                                <span className="font-black text-isig-blue uppercase tracking-widest text-[9px] mr-2">Réponse :</span>
+                                <span className="text-slate-500 italic font-medium">{replyingToMessage.content || 'Média'}</span>
                             </div>
-                            <button onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
+                            <button onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1"><X size={16}/></button>
                         </div>
                     )}
                     <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
-                        <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0">
+                        <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0 transition-colors">
                             <Paperclip size={24} />
                             <input type="file" onChange={(e) => {
                                 if (e.target.files?.[0]) {
@@ -371,25 +403,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                         </label>
                         <div className="flex-1 min-w-0">
                             {filePreview && (
-                                <div className="flex items-center bg-isig-blue/10 p-2 mb-2 rounded-xl text-xs text-isig-blue">
-                                    <span className="truncate flex-1">{filePreview}</span>
-                                    <button type="button" onClick={() => { setFile(null); setFilePreview(null); }}><X size={14}/></button>
+                                <div className="flex items-center bg-isig-blue/10 p-2 mb-2 rounded-xl text-[10px] font-black uppercase text-isig-blue border border-isig-blue/20">
+                                    <span className="truncate flex-1 ml-2">{filePreview}</span>
+                                    <button type="button" onClick={() => { setFile(null); setFilePreview(null); }} className="p-1"><X size={14}/></button>
                                 </div>
                             )}
                             <textarea 
                                 ref={textareaRef}
                                 value={newMessage} 
                                 onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
-                                placeholder="Votre message..." 
-                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium" 
+                                placeholder="Écrire un message..." 
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
                                 style={{ minHeight: '48px' }}
                             />
                         </div>
                         <div className="flex items-center shrink-0">
                             {!newMessage.trim() && !file ? (
-                                <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-3 rounded-2xl shadow-lg shadow-isig-blue/20 transition-all active:scale-90"><Mic size={24} /></button>
+                                <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-3.5 rounded-2xl shadow-lg shadow-isig-blue/20 transition-all active:scale-90 hover:bg-blue-600"><Mic size={24} /></button>
                             ) : (
-                                <button type="submit" disabled={isUploading} className="bg-isig-blue text-white p-3 rounded-2xl disabled:opacity-50 shadow-lg shadow-isig-blue/20 transition-all active:scale-90">
+                                <button type="submit" disabled={isUploading} className="bg-isig-blue text-white p-3.5 rounded-2xl disabled:opacity-50 shadow-lg shadow-isig-blue/20 transition-all active:scale-90 hover:bg-blue-600">
                                     {isUploading ? <Spinner /> : <Send size={24} />}
                                 </button>
                             )}

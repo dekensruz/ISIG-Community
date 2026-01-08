@@ -13,9 +13,7 @@ import { MessageSquarePlus, CheckCheck, Users, Search } from 'lucide-react';
 
 const isUserOnline = (lastSeenAt?: string | null): boolean => {
     if (!lastSeenAt) return false;
-    const lastSeenDate = new Date(lastSeenAt);
-    const now = new Date();
-    return differenceInMinutes(now, lastSeenDate) < 3;
+    return differenceInMinutes(new Date(), new Date(lastSeenAt)) < 3;
 };
 
 const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boolean }> = ({ conversation, isActive }) => {
@@ -44,7 +42,7 @@ const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boo
                 <div className="flex justify-between items-center mt-1">
                      <p className={`text-xs truncate font-medium ${unread_count > 0 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
                         {isLastMessageFromMe && <span className="mr-1">{last_message?.is_read ? <CheckCheck size={14} className="inline text-isig-orange" /> : <CheckCheck size={14} className="inline text-slate-300" />}</span>}
-                        {last_message ? (last_message.content || 'Fichier joint') : 'Nouvelle conversation'}
+                        {last_message ? (last_message.content || 'Média') : 'Nouvelle conversation'}
                     </p>
                     {unread_count > 0 && (
                         <span className="bg-isig-orange text-white text-[10px] font-black rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2 shadow-sm">
@@ -57,7 +55,6 @@ const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boo
     );
 };
 
-
 const ChatPage: React.FC = () => {
     const { conversationId } = useParams<{ conversationId: string }>();
     const { session } = useAuth();
@@ -65,71 +62,52 @@ const ChatPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchConversations = useCallback(async (isInitial = false) => {
-        if (!session?.user) return;
-        if (isInitial) setLoading(true);
-
-        const { data: convData, error: rpcError } = await supabase.rpc('get_user_conversations_with_unread_count');
-        
-        if (rpcError) {
-            console.error('Error fetching conversations:', rpcError);
-            setLoading(false);
-            return;
-        }
-        
-        const formattedConversations: Conversation[] = convData.map((c: any) => ({
-            id: c.conversation_id,
-            created_at: c.created_at,
-            other_participant: {
-                id: c.participant_id,
-                full_name: c.participant_full_name,
-                avatar_url: c.participant_avatar_url,
-                last_seen_at: c.participant_last_seen_at
-            },
-            last_message: c.last_message_id ? {
-                id: c.last_message_id,
-                content: c.last_message_content,
-                created_at: c.last_message_created_at,
-                sender_id: c.last_message_sender_id,
-                is_read: c.last_message_is_read,
-            } : null,
-            unread_count: c.unread_count,
-        }));
-        
-        // Tri explicite par date du dernier message (décroissant)
-        const sortedConversations = formattedConversations.sort((a, b) => {
+    const sortConversations = (list: Conversation[]) => {
+        return [...list].sort((a, b) => {
             const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.created_at).getTime();
             const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.created_at).getTime();
             return timeB - timeA;
         });
+    };
 
-        setConversations(sortedConversations);
-        if (isInitial) setLoading(false);
+    const fetchConversations = useCallback(async (isInitial = false) => {
+        if (!session?.user) return;
+        if (isInitial) setLoading(true);
+        const { data, error } = await supabase.rpc('get_user_conversations_with_unread_count');
+        if (!error && data) {
+            const formatted: Conversation[] = data.map((c: any) => ({
+                id: c.conversation_id,
+                created_at: c.created_at,
+                other_participant: {
+                    id: c.participant_id,
+                    full_name: c.participant_full_name,
+                    avatar_url: c.participant_avatar_url,
+                    last_seen_at: c.participant_last_seen_at
+                },
+                last_message: c.last_message_id ? {
+                    id: c.last_message_id,
+                    content: c.last_message_content,
+                    created_at: c.last_message_created_at,
+                    sender_id: c.last_message_sender_id,
+                    is_read: c.last_message_is_read,
+                } : null,
+                unread_count: c.unread_count,
+            }));
+            setConversations(sortConversations(formatted));
+        }
+        setLoading(false);
     }, [session?.user]);
 
-    const handleMessagesRead = useCallback(() => {
-        fetchConversations(false);
-    }, [fetchConversations]);
-    
     useEffect(() => {
         fetchConversations(true);
-
-        // Écouter les messages pour remonter la conversation active
-        const channel = supabase
-            .channel('conversations-list-realtime')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'messages' 
-            }, (payload) => {
-                // Dès qu'un message change (nouveau ou lu), on réactualise et on trie
+        const channel = supabase.channel('chat_list_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
                 fetchConversations(false);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_participants' }, () => {
                 fetchConversations(false);
             })
             .subscribe();
-
         return () => { supabase.removeChannel(channel); };
     }, [fetchConversations]);
 
@@ -149,7 +127,7 @@ const ChatPage: React.FC = () => {
                             placeholder="Rechercher..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all"
                         />
                     </div>
                 </div>
@@ -157,16 +135,16 @@ const ChatPage: React.FC = () => {
                     {loading ? (
                         <div className="flex justify-center items-center h-full"><Spinner /></div>
                     ) : filteredConversations.length > 0 ? (
-                        <div>
+                        <div className="space-y-1">
                             {filteredConversations.map(conv => (
                                 <ConversationListItem key={conv.id} conversation={conv} isActive={conv.id === conversationId} />
                             ))}
                         </div>
                     ) : (
                         <div className="text-center p-8 text-slate-400 h-full flex flex-col justify-center items-center">
-                             <MessageSquarePlus size={48} className="mx-auto opacity-20 mb-4" />
-                            <p className="font-black text-xs uppercase tracking-widest">{searchQuery ? 'Aucun résultat' : 'Pas de chat'}</p>
-                             <Link to="/users" className="mt-6 bg-isig-blue text-white font-black py-3 px-6 rounded-2xl flex items-center space-x-2 hover:bg-blue-600 transition-all shadow-lg shadow-isig-blue/20 text-[10px] uppercase tracking-widest">
+                             <MessageSquarePlus size={48} className="opacity-20 mb-4" />
+                            <p className="font-black text-xs uppercase tracking-widest">{searchQuery ? 'Aucun résultat' : 'Pas de discussion'}</p>
+                             <Link to="/users" className="mt-6 bg-isig-blue text-white font-black py-3 px-6 rounded-2xl flex items-center space-x-2 hover:bg-blue-600 transition-all shadow-lg text-[10px] uppercase tracking-widest">
                                 <Users size={18} />
                                 <span>Découvrir</span>
                             </Link>
@@ -179,15 +157,15 @@ const ChatPage: React.FC = () => {
                     <ChatWindow 
                         key={conversationId} 
                         conversationId={conversationId} 
-                        onMessagesRead={handleMessagesRead} 
+                        onMessagesRead={() => fetchConversations(false)} 
                     />
                 ) : (
-                    <div className="flex-grow flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
+                    <div className="flex-grow flex flex-col items-center justify-center text-center p-12 bg-slate-50/30">
                         <div className="w-24 h-24 bg-white rounded-[2rem] shadow-premium flex items-center justify-center mb-6">
                             <MessageSquarePlus size={40} className="text-isig-blue animate-pulse" />
                         </div>
                         <h3 className="text-xl font-black text-slate-800 tracking-tight uppercase italic">Discussions</h3>
-                        <p className="text-sm text-slate-500 font-medium max-w-xs mt-2">Sélectionnez un étudiant pour commencer à collaborer en temps réel.</p>
+                        <p className="text-sm text-slate-500 font-medium max-w-xs mt-2">Sélectionnez un étudiant pour commencer à échanger.</p>
                     </div>
                 )}
             </main>

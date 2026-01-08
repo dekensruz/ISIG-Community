@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Paperclip, X, FileText, Send, AlertCircle } from 'lucide-react';
+import { Paperclip, X, FileText, Send, AlertCircle, ImageIcon } from 'lucide-react';
 import { GroupPost } from '../types';
 import Spinner from './Spinner';
 
@@ -21,163 +21,137 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    return () => { 
-        if (previewUrl && previewUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(previewUrl); 
-        }
-    };
+    // Nettoyer l'URL de l'aperçu pour éviter les fuites de mémoire
+    return () => { if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl); };
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-    }
-    
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      
-      // Limite de taille (ex: 10MB)
-      if (selectedFile.size > 10 * 1024 * 1024) {
-          setError("Le fichier est trop volumineux (max 10MB).");
-          return;
-      }
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
 
-      setFile(selectedFile);
-      if (selectedFile.type.startsWith('image/')) {
-        const objectUrl = URL.createObjectURL(selectedFile);
-        setPreviewUrl(objectUrl);
-      } else {
-        setPreviewUrl(null);
-      }
+    if (selectedFile.size > 15 * 1024 * 1024) {
+      setError("Fichier trop lourd (max 15Mo)");
+      return;
+    }
+
+    setFile(selectedFile);
+    if (selectedFile.type.startsWith('image/')) {
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
     }
   };
 
-  const handleRemoveFile = () => {
+  const removeFile = () => {
     setFile(null);
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-    }
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handlePost = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !file) {
-      setError("La publication ne peut pas être vide.");
-      return;
-    }
-    if (!session?.user) {
-      setError("Session expirée. Reconnectez-vous.");
-      return;
-    }
+    if (!content.trim() && !file) return;
+    if (!session?.user) return;
 
     setUploading(true);
     setError(null);
 
-    let mediaUrl: string | undefined = undefined;
-    let mediaType: string | undefined = undefined;
-
     try {
-        if (file) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `group-media/${groupId}/${session.user.id}-${Date.now()}.${fileExt}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('media')
-            .upload(fileName, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+      let mediaUrl, mediaType;
+      if (file) {
+        const ext = file.name.split('.').pop();
+        const path = `group-posts/${groupId}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('media').upload(path, file);
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from('media').getPublicUrl(path);
+        mediaUrl = data.publicUrl;
+        mediaType = file.type;
+      }
 
-          if (uploadError) throw uploadError;
+      const { data, error: insErr } = await supabase.from('group_posts').insert({
+        group_id: groupId,
+        user_id: session.user.id,
+        content,
+        media_url: mediaUrl,
+        media_type: mediaType
+      }).select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).single();
 
-          const { data } = supabase.storage.from('media').getPublicUrl(fileName);
-          mediaUrl = data.publicUrl;
-          mediaType = file.type || 'application/octet-stream';
-        }
+      if (insErr) throw insErr;
 
-        const { data, error: insertError } = await supabase.from('group_posts').insert({
-          user_id: session.user.id,
-          group_id: groupId,
-          content,
-          media_url: mediaUrl,
-          media_type: mediaType
-        }).select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).single();
-
-        if (insertError) throw insertError;
-        
-        setContent('');
-        handleRemoveFile();
-        onPostCreated(data as any);
+      setContent('');
+      removeFile();
+      onPostCreated(data as any);
     } catch (err: any) {
-        console.error("Upload error:", err);
-        setError(err.message || "Erreur lors de l'envoi. Vérifiez votre connexion.");
+      setError(err.message || "Erreur d'envoi");
     } finally {
-        setUploading(false);
+      setUploading(true); // Petit délai visuel
+      setTimeout(() => setUploading(false), 500);
     }
   };
-  
+
   return (
-    <div className="bg-white p-4 rounded-3xl shadow-soft border border-slate-100">
-      <form onSubmit={handlePost}>
+    <div className="bg-white p-5 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in">
+      <form onSubmit={handleSubmit}>
         <textarea
-            className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px]"
-            placeholder="Une question ou un document pour le groupe ?"
+            className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px] text-sm"
+            placeholder="Écrire quelque chose au groupe..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
         />
         
-        {/* L'aperçu doit être visible ici */}
+        {/* APERÇU CRITIQUE - Toujours visible en haut du bouton d'envoi */}
         {(file || previewUrl) && (
-            <div className="mt-3 relative inline-block animate-fade-in-up">
-                {previewUrl ? (
-                    <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md border border-slate-100" />
-                ) : file ? (
-                    <div className="flex items-center p-3 bg-slate-100 rounded-xl border border-slate-200">
-                        <FileText className="text-isig-blue mr-3" />
-                        <p className="text-xs font-bold text-slate-600 max-w-[150px] truncate">{file.name}</p>
-                    </div>
-                ) : null}
-                <button 
-                    type="button" 
-                    onClick={handleRemoveFile} 
-                    className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors z-10"
-                >
+            <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 relative animate-fade-in-up">
+                <button type="button" onClick={removeFile} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg z-10 hover:bg-red-600 transition-colors">
                     <X size={16} />
                 </button>
+                
+                {previewUrl ? (
+                    <div className="rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200">
+                        <img src={previewUrl} alt="Aperçu" className="w-full max-h-48 object-cover" />
+                    </div>
+                ) : (
+                    <div className="flex items-center space-x-3 p-2">
+                        <div className="p-3 bg-isig-blue/10 rounded-xl text-isig-blue">
+                            <FileText size={24} />
+                        </div>
+                        <p className="text-xs font-black text-slate-600 truncate flex-1">{file?.name}</p>
+                    </div>
+                )}
             </div>
         )}
 
-        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
-            {/* Utilisation d'un ID UNIQUE et explicite pour mobile */}
-            <label 
-              htmlFor="group-post-file-input"
-              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer flex items-center space-x-2"
-            >
-                <Paperclip size={24} />
-                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Attacher</span>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50">
+            <div className="flex items-center space-x-1">
+                <label 
+                  htmlFor="group-post-file-mobile"
+                  className="flex items-center space-x-2 text-slate-500 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                    <Paperclip size={22} />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
+                </label>
                 <input 
-                  id="group-post-file-input"
+                  id="group-post-file-mobile"
                   type="file" 
                   className="hidden" 
                   ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleFileChange}
                 />
-            </label>
+            </div>
+
             <button 
                 type="submit" 
-                disabled={uploading || (!content.trim() && !file)} 
-                className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]"
+                disabled={uploading || (!content.trim() && !file)}
+                className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px] active:scale-95"
             >
                 {uploading ? <Spinner /> : <><Send size={14} className="mr-2"/>Publier</>}
             </button>
         </div>
       </form>
       {error && (
-        <div className="mt-3 p-3 bg-red-50 text-red-600 rounded-xl flex items-center text-[10px] font-bold border border-red-100 animate-pulse">
+        <div className="mt-3 p-3 bg-red-50 text-red-600 rounded-xl flex items-center text-[9px] font-black border border-red-100 animate-pulse uppercase tracking-wider">
             <AlertCircle size={14} className="mr-2" />
             <span>{error}</span>
         </div>

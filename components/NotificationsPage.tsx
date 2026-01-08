@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -15,106 +16,45 @@ const NotificationsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => {
+    const fetchNotifications = async (showLoading = true) => {
         if (!session?.user) return;
+        if (showLoading) setLoading(true);
 
-        const markAsRead = async (ids: string[]) => {
-            if (!session?.user) return;
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*, profiles:actor_id(*)')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+        if (!error && data) {
+            setNotifications(data as any);
             
-            // Update the database
-            const { error } = await supabase
-                .from('notifications')
-                .update({ is_read: true })
-                .in('id', ids);
-
-            if (error) {
-                console.error("Error marking notifications as read:", error.message);
-            } else {
-                // Update local state for immediate UI feedback (remove blue background)
-                setNotifications(prev =>
-                    prev.map(n => (ids.includes(n.id) ? { ...n, is_read: true } : n))
-                );
+            const unreadIds = data.filter(n => !n.is_read).map(n => n.id);
+            if (unreadIds.length > 0) {
+                await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
             }
-        };
+        }
+        setLoading(false);
+    };
 
-        const fetchAndMarkRead = async () => {
-            setLoading(true);
+    useEffect(() => {
+        fetchNotifications();
 
-            // 1. Fetch notifications
-            const { data, error } = await supabase
-                .from('notifications')
-                .select('*, profiles:actor_id(*)')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false });
+        if (session?.user) {
+            const channel = supabase.channel(`notifications_page_${session.user.id}`)
+                .on('postgres_changes', { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'notifications', 
+                    filter: `user_id=eq.${session.user.id}` 
+                }, () => {
+                    // Re-fetch silencieux pour mettre à jour la liste
+                    fetchNotifications(false);
+                })
+                .subscribe();
 
-            if (error) {
-                console.error("Error fetching notifications:", error.message);
-                setLoading(false);
-                return;
-            }
-
-            if (data) {
-                setNotifications(data as any);
-
-                // 2. Identify unread notifications and mark them as read
-                const unreadIds = data.filter(n => !n.is_read).map(n => n.id);
-                if (unreadIds.length > 0) {
-                    markAsRead(unreadIds);
-                }
-            }
-            setLoading(false);
-        };
-
-        fetchAndMarkRead();
-
-        // Abonnement temps réel pour les nouvelles notifications
-        const channel = supabase
-            .channel(`notifications-page-${session.user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${session.user.id}`
-            }, async (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    // Récupérer le profil de l'acteur pour la nouvelle notification
-                    const { data: notificationData } = await supabase
-                        .from('notifications')
-                        .select('*, profiles:actor_id(*)')
-                        .eq('id', payload.new.id)
-                        .single();
-                    
-                    if (notificationData) {
-                        setNotifications(prev => {
-                            // Vérifier si la notification existe déjà
-                            if (prev.some(n => n.id === notificationData.id)) return prev;
-                            // Ajouter la nouvelle notification en haut de la liste
-                            return [notificationData as any, ...prev];
-                        });
-                    }
-                } else if (payload.eventType === 'UPDATE') {
-                    // Mettre à jour la notification existante
-                    const { data: notificationData } = await supabase
-                        .from('notifications')
-                        .select('*, profiles:actor_id(*)')
-                        .eq('id', payload.new.id)
-                        .single();
-                    
-                    if (notificationData) {
-                        setNotifications(prev =>
-                            prev.map(n => n.id === notificationData.id ? notificationData as any : n)
-                        );
-                    }
-                } else if (payload.eventType === 'DELETE') {
-                    // Supprimer la notification
-                    setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
-                }
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+            return () => { supabase.removeChannel(channel); };
+        }
     }, [session]);
 
 
@@ -205,7 +145,7 @@ const NotificationsPage: React.FC = () => {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <h1 className="text-3xl font-bold text-slate-800 mb-6">Notifications</h1>
+            <h1 className="text-3xl font-black text-slate-800 mb-6 italic uppercase tracking-tight">Notifications</h1>
 
             <div className="relative mb-6">
                 <input
@@ -213,47 +153,47 @@ const NotificationsPage: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Rechercher dans les notifications..."
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-isig-blue"
+                    className="w-full bg-white border border-slate-100 rounded-2xl pl-10 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-isig-blue shadow-soft font-bold text-sm"
                 />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden">
                 {loading ? (
                     <div className="flex justify-center p-12"><Spinner /></div>
                 ) : filteredNotifications.length > 0 ? (
-                    <ul className="divide-y divide-slate-100">
+                    <ul className="divide-y divide-slate-50">
                         {filteredNotifications.map(notification => (
                             <li key={notification.id}>
                                 <Link
                                     to={getNotificationLink(notification)}
-                                    className={`flex items-start p-4 hover:bg-slate-50 transition-colors duration-150 ${!notification.is_read ? 'bg-isig-blue/5' : ''}`}
+                                    className={`flex items-start p-6 hover:bg-slate-50 transition-all duration-300 ${!notification.is_read ? 'bg-isig-blue/5 border-l-4 border-isig-blue' : 'border-l-4 border-transparent'}`}
                                 >
                                     <div className="relative mr-4 flex-shrink-0">
                                         <Avatar avatarUrl={notification.profiles?.avatar_url} name={notification.profiles?.full_name || ''} size="lg" />
                                         {getNotificationIcon(notification)}
                                     </div>
                                     <div className="flex-grow">
-                                        <p className="text-sm text-slate-700">{getNotificationText(notification)}</p>
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-sm text-slate-700 font-medium leading-relaxed">{getNotificationText(notification)}</p>
+                                        <p className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest">
                                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: fr })}
                                         </p>
                                     </div>
                                     {!notification.is_read && (
-                                        <div className="w-2.5 h-2.5 bg-isig-blue rounded-full self-center ml-4 flex-shrink-0"></div>
+                                        <div className="w-2.5 h-2.5 bg-isig-blue rounded-full self-center ml-4 flex-shrink-0 animate-pulse"></div>
                                     )}
                                 </Link>
                             </li>
                         ))}
                     </ul>
                 ) : (
-                    <div className="text-center text-slate-500 p-8">
-                         <Bell size={48} className="mx-auto text-slate-300 mb-4" />
-                         <h3 className="text-lg font-semibold text-slate-700">
-                            {searchQuery ? 'Aucun résultat' : 'Aucune notification'}
+                    <div className="text-center text-slate-500 p-16">
+                         <Bell size={48} className="mx-auto text-slate-200 mb-6" />
+                         <h3 className="text-xl font-black text-slate-700 uppercase italic">
+                            {searchQuery ? 'Aucun résultat' : 'Le calme plat'}
                          </h3>
-                         <p className="text-sm">
-                            {searchQuery ? 'Essayez une autre recherche.' : 'Les nouvelles notifications apparaîtront ici.'}
+                         <p className="text-sm font-medium mt-2 text-slate-400">
+                            {searchQuery ? 'Essayez un autre mot-clé.' : 'Vos futures interactions apparaîtront ici.'}
                          </p>
                     </div>
                 )}

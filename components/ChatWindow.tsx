@@ -120,7 +120,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
       
-      setMessages((messagesData as any[] || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+      setMessages(messagesData as any[] || []);
       
       if (messagesData?.some(m => !m.is_read && m.sender_id !== session.user.id)) {
           markMessagesAsRead();
@@ -137,53 +137,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     fetchData(); 
   }, [fetchData]);
 
+  // TEMPS RÉEL ROBUSTE
   useEffect(() => {
-    if (!conversationId || !session?.user || !otherParticipant) return;
+    if (!conversationId || !session?.user) return;
 
-    // Suppression des anciens canaux pour éviter les fuites de mémoire
-    const channel = supabase.channel(`chat_room_${conversationId}`)
+    const channel = supabase.channel(`chat_messages_${conversationId}`)
       .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
           table: 'messages', 
           filter: `conversation_id=eq.${conversationId}`
       }, async (payload) => {
-          const newMessageData = payload.new as Message;
-          
-          // Vérifier si le message existe déjà pour éviter les doublons
-          setMessages(current => {
-              if (current.some(m => m.id === newMessageData.id)) {
-                  return current;
-              }
-              return current;
-          });
-          
-          // Fetch immédiat les détails manquants (profils, reply)
-          const { data } = await supabase
+          // Pour garantir d'avoir toutes les relations (profils), on refetch le message spécifique
+          const { data, error } = await supabase
               .from('messages')
               .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
-              .eq('id', newMessageData.id)
+              .eq('id', payload.new.id)
               .single();
           
-          if (data) {
-              setMessages(prev => {
-                  // Vérifier à nouveau si le message existe déjà
-                  const existsIndex = prev.findIndex(m => m.id === data.id);
-                  if (existsIndex !== -1) {
-                      // Mettre à jour le message existant avec les données enrichies
-                      const updated = [...prev];
-                      updated[existsIndex] = data as Message;
-                      return updated;
-                  }
-                  
-                  // Ajouter le nouveau message enrichi et trier par date
-                  const newMessages = [...prev, data as Message];
-                  return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          if (!error && data) {
+              setMessages(current => {
+                  if (current.some(m => m.id === data.id)) return current;
+                  return [...current, data as Message];
               });
               
               if (data.sender_id !== session.user.id) {
                   markMessagesAsRead();
-                  setOtherUserTyping(false);
               }
               scrollToBottom();
           }
@@ -193,68 +172,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
-      }, async (payload) => {
-          // Mettre à jour avec les données enrichies si nécessaire
-          const { data } = await supabase
-              .from('messages')
-              .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
-              .eq('id', payload.new.id)
-              .single();
-          
-          if (data) {
-              setMessages(prev => prev.map(m => m.id === data.id ? data as Message : m));
-          } else {
-              setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
-          }
+      }, (payload) => {
+          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
-      .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          const isOtherPresent = Object.values(state).flat().some((p: any) => p.user_id === otherParticipant.id);
-          setIsOnlineRealtime(isOtherPresent || isUserOnline(otherParticipant.last_seen_at));
-      })
-      .on('broadcast', { event: 'typing' }, (payload) => {
-          if (payload.payload.user_id === otherParticipant.id) {
-              setOtherUserTyping(payload.payload.isTyping);
-          }
-      })
-      .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-              await channel.track({ user_id: session.user.id, online_at: new Date().toISOString() });
-          }
-      });
+      .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [conversationId, session?.user.id, otherParticipant, markMessagesAsRead]);
+  }, [conversationId, session?.user.id, markMessagesAsRead]);
 
   const handleTyping = (isTypingNow: boolean) => {
     if (!conversationId || !session?.user) return;
-    const channel = supabase.channel(`chat_room_${conversationId}`);
+    const channel = supabase.channel(`chat_presence_${conversationId}`);
     channel.send({
       type: 'broadcast',
       event: 'typing',
       payload: { user_id: session.user.id, isTyping: isTypingNow },
     });
   };
-
-  useEffect(() => {
-    if (newMessage.length > 0 && !isTyping) {
-      setIsTyping(true);
-      handleTyping(true);
-    } else if (newMessage.length === 0 && isTyping) {
-      setIsTyping(false);
-      handleTyping(false);
-    }
-
-    if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = window.setTimeout(() => {
-        if (isTyping) {
-            setIsTyping(false);
-            handleTyping(false);
-        }
-    }, 3000);
-
-    return () => { if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current); };
-  }, [newMessage]);
 
   const handleSendMessage = async (e?: React.FormEvent, audioBlob?: Blob) => {
     e?.preventDefault();
@@ -292,16 +226,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             .single();
 
         if (insertError) throw insertError;
-
-        // Mise à jour immédiate locale avec le message enrichi
-        if (insertedData) {
-            setMessages(prev => {
-                if (prev.some(m => m.id === insertedData.id)) return prev;
-                // Ajouter le nouveau message et trier par date pour maintenir l'ordre
-                const newMessages = [...prev, insertedData as Message];
-                return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-            });
-        }
 
         setNewMessage('');
         setFile(null);
@@ -346,7 +270,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   return (
     <div className="flex flex-col h-full bg-white relative">
         <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            {/* Bouton Back visible sur tous les écrans */}
+            {/* Bouton Back TOUJOURS présent pour navigation fluide */}
             <button onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50">
                 <ArrowLeft size={22} strokeWidth={2.5} />
             </button>

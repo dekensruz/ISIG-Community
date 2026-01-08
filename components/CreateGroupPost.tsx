@@ -119,21 +119,19 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
+            {/* ID UNIQUE pour éviter les conflits de clics avec CreatePost.tsx */}
             <label 
-              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer touch-manipulation relative z-10"
+              htmlFor="file-upload-group"
+              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer"
               title="Ajouter un fichier"
-              onClick={(e) => {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-              }}
             >
                 <Paperclip size={24} />
                 <input 
+                  id="file-upload-group"
                   type="file" 
                   className="hidden" 
                   ref={fileInputRef} 
-                  onChange={handleFileChange}
-                  accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileChange} 
                 />
             </label>
             <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]">

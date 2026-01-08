@@ -5,7 +5,6 @@ import { Message } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X } from 'lucide-react';
-import { createPortal } from 'react-dom';
 
 interface MessageBubbleProps {
     message: Message;
@@ -32,9 +31,10 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
 
     const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const progressBar = e.currentTarget;
-        const clickPosition = e.clientX - progressBar.getBoundingClientRect().left;
-        const newTime = (clickPosition / progressBar.offsetWidth) * duration;
-        if (audioRef.current) audioRef.current.currentTime = newTime;
+        const rect = progressBar.getBoundingClientRect();
+        const clickPosition = e.clientX - rect.left;
+        const newTime = (clickPosition / rect.width) * duration;
+        if (audioRef.current && isFinite(newTime)) audioRef.current.currentTime = newTime;
     };
 
     useEffect(() => {
@@ -77,9 +77,9 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
             <button onClick={handlePlayPause} className={`p-2 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
                 {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
-            <div className="flex-1 flex flex-col justify-center min-w-0">
-                <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer overflow-hidden ${progressBgClass}`}>
-                    <div style={{ width: `${progress}%` }} className={`h-full rounded-full transition-all duration-100 ${progressFillClass}`}></div>
+            <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
+                <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer relative ${progressBgClass}`}>
+                    <div style={{ width: `${Math.min(progress, 100)}%` }} className={`h-full rounded-full transition-all duration-100 ${progressFillClass}`}></div>
                 </div>
                  <div className="text-[10px] font-mono mt-1 self-end opacity-80">
                     {formatTimeDisplay(currentTime)} / {formatTimeDisplay(duration)}
@@ -94,7 +94,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const menuRef = useRef<HTMLDivElement>(null);
     const time = format(new Date(message.created_at), 'HH:mm', { locale: fr });
     
-    // Correction finale du faux indicateur "modifié" (Seuil de 60 secondes pour compenser les lenteurs d'upload)
     const isEdited = message.updated_at && (new Date(message.updated_at).getTime() - new Date(message.created_at).getTime() > 60000);
 
     useEffect(() => {
@@ -120,8 +119,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         if (!message.media_url || !message.media_type) return null;
         if (message.media_type.startsWith('image/')) {
             return (
-                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-xl overflow-hidden cursor-pointer max-w-full">
-                    <img src={message.media_url} alt="Média" className="w-full max-h-64 object-cover" />
+                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-xl overflow-hidden cursor-pointer max-w-full bg-black/5">
+                    <img src={message.media_url} alt="Média" className="w-full max-h-64 object-contain" />
                 </div>
             );
         }
@@ -136,10 +135,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         );
     };
 
-    // Le menu pour mobile est injecté via un Portal pour être toujours visible
     const OptionsMenu = () => {
         const content = (
-            <>
+            <div className="flex flex-col">
                 <button onClick={() => { onSetReplying(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
                     <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
                 </button>
@@ -157,12 +155,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                         <Trash2 size={18} className="mr-4 md:mr-3"/>Supprimer (Tous)
                     </button>
                 )}
-            </>
+            </div>
         );
 
         return (
             <>
-                {/* Mobile Bottom Sheet */}
                 <div className="md:hidden fixed inset-0 z-[200] flex items-end animate-fade-in" onClick={() => setMenuOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
                     <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
@@ -177,7 +174,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     </div>
                 </div>
 
-                {/* Desktop Dropdown */}
                 <div 
                   ref={menuRef} 
                   className={`hidden md:block absolute bottom-full mb-2 w-56 bg-white rounded-2xl shadow-premium py-2 z-[60] border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
-import { Paperclip, X, FileText, Send } from 'lucide-react';
+import { Paperclip, X, FileText, Send, AlertCircle } from 'lucide-react';
 import { GroupPost } from '../types';
 import Spinner from './Spinner';
 
@@ -21,13 +21,28 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
+    return () => { 
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrl); 
+        }
+    };
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setError(null);
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+    }
+    
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
+      
+      // Limite de taille (ex: 10MB)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+          setError("Le fichier est trop volumineux (max 10MB).");
+          return;
+      }
+
       setFile(selectedFile);
       if (selectedFile.type.startsWith('image/')) {
         setPreviewUrl(URL.createObjectURL(selectedFile));
@@ -39,7 +54,9 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
   const handleRemoveFile = () => {
     setFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+    }
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -51,7 +68,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       return;
     }
     if (!session?.user) {
-      setError("Vous devez être connecté pour publier.");
+      setError("Session expirée. Reconnectez-vous.");
       return;
     }
 
@@ -65,11 +82,19 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         if (file) {
           const fileExt = file.name.split('.').pop();
           const fileName = `group-media/${groupId}/${session.user.id}-${Date.now()}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
+          
+          const { error: uploadError } = await supabase.storage
+            .from('media')
+            .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
           if (uploadError) throw uploadError;
+
           const { data } = supabase.storage.from('media').getPublicUrl(fileName);
           mediaUrl = data.publicUrl;
-          mediaType = file.type;
+          mediaType = file.type || 'application/octet-stream';
         }
 
         const { data, error: insertError } = await supabase.from('group_posts').insert({
@@ -86,7 +111,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         handleRemoveFile();
         onPostCreated(data as any);
     } catch (err: any) {
-        setError(err.message);
+        console.error("Upload error:", err);
+        setError(err.message || "Erreur lors de l'envoi. Vérifiez votre connexion.");
     } finally {
         setUploading(false);
     }
@@ -97,49 +123,61 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       <form onSubmit={handlePost}>
         <textarea
             className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px]"
-            placeholder="Partagez quelque chose avec le groupe..."
+            placeholder="Une question ou un document pour le groupe ?"
             value={content}
             onChange={(e) => setContent(e.target.value)}
         />
         
         {file && (
-            <div className="mt-3 relative inline-block">
+            <div className="mt-3 relative inline-block animate-fade-in-up">
                 {previewUrl ? (
-                    <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
+                    <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md border border-slate-100" />
                 ) : (
                     <div className="flex items-center p-3 bg-slate-100 rounded-xl border border-slate-200">
                         <FileText className="text-isig-blue mr-3" />
                         <p className="text-xs font-bold text-slate-600 max-w-[150px] truncate">{file.name}</p>
                     </div>
                 )}
-                <button type="button" onClick={handleRemoveFile} className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors z-10">
+                <button 
+                    type="button" 
+                    onClick={handleRemoveFile} 
+                    className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors z-10"
+                >
                     <X size={16} />
                 </button>
             </div>
         )}
 
         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
-            {/* ID UNIQUE pour éviter les conflits de clics avec CreatePost.tsx */}
             <label 
-              htmlFor="file-upload-group"
-              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer"
-              title="Ajouter un fichier"
+              htmlFor="group-file-upload-input"
+              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer flex items-center space-x-2"
             >
                 <Paperclip size={24} />
+                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Ajouter un fichier</span>
                 <input 
-                  id="file-upload-group"
+                  id="group-file-upload-input"
                   type="file" 
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                 />
             </label>
-            <button type="submit" disabled={uploading || (!content.trim() && !file)} className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]">
+            <button 
+                type="submit" 
+                disabled={uploading || (!content.trim() && !file)} 
+                className="bg-isig-orange text-white font-black py-3 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px]"
+            >
                 {uploading ? <Spinner /> : <><Send size={14} className="mr-2"/>Publier</>}
             </button>
         </div>
       </form>
-      {error && <p className="text-red-500 text-[10px] font-bold mt-2 ml-2">{error}</p>}
+      {error && (
+        <div className="mt-3 p-3 bg-red-50 text-red-600 rounded-xl flex items-center text-[10px] font-bold border border-red-100 animate-pulse">
+            <AlertCircle size={14} className="mr-2" />
+            <span>{error}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,7 +30,6 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType>({ session: null, loading: true });
-
 export const useAuth = () => useContext(AuthContext);
 
 type SearchFilterContextType = {
@@ -48,9 +47,7 @@ export const SearchFilterContext = createContext<SearchFilterContextType | undef
 
 export const useSearchFilter = () => {
     const context = useContext(SearchFilterContext);
-    if (!context) {
-        throw new Error('useSearchFilter must be used within a SearchFilterProvider');
-    }
+    if (!context) throw new Error('useSearchFilter must be used within a SearchFilterProvider');
     return context;
 };
 
@@ -67,7 +64,6 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 };
 
-
 const AppContent: React.FC = () => {
     const { session } = useAuth();
     const location = useLocation();
@@ -80,18 +76,12 @@ const AppContent: React.FC = () => {
     const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
     const showNavBars = !isAuthPage && !isChatConversation;
 
-    // Système de Presence (Heartbeat)
     useEffect(() => {
         if (!session?.user) return;
-
         const updatePresence = async () => {
             await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
         };
-
-        // Mise à jour immédiate au chargement
         updatePresence();
-
-        // Puis toutes les 2 minutes
         const interval = setInterval(updatePresence, 120000);
         return () => clearInterval(interval);
     }, [session]);
@@ -100,12 +90,9 @@ const AppContent: React.FC = () => {
         <div className="min-h-screen bg-slate-100">
             {showNavBars && <Navbar />}
             <main className={
-                isAuthPage
-                ? "" 
-                : isChatConversation
-                ? "h-screen pt-0 pb-0" 
-                : isChatListPage
-                ? "h-screen pt-[60px] pb-[80px]" 
+                isAuthPage ? "" 
+                : isChatConversation ? "h-screen pt-0 pb-0" 
+                : isChatListPage ? "h-screen pt-[60px] pb-[80px]" 
                 : "container mx-auto px-4 pt-24 pb-24" 
             }>
                 <Routes>
@@ -128,12 +115,8 @@ const AppContent: React.FC = () => {
             </main>
             {showNavBars && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
-            
             <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
-
-            {session && !isAuthPage && canShowNotifications && (
-                <NotificationsProvider />
-            )}
+            {session && !isAuthPage && canShowNotifications && <NotificationsProvider />}
         </div>
     );
 };
@@ -143,13 +126,25 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Timeout de sécurité : si Supabase ne répond pas en 6s, on arrête le loading
+    // pour permettre au moins l'affichage de l'écran de login ou d'une erreur
+    const timer = setTimeout(() => {
+      if (loading) setLoading(false);
+    }, 6000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      clearTimeout(timer);
+    }).catch(err => {
+      console.error("Auth Session Error:", err);
+      setLoading(false);
+      clearTimeout(timer);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -158,7 +153,10 @@ const App: React.FC = () => {
   if (loading) {
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100">
-            <Spinner />
+            <div className="flex flex-col items-center">
+                <Spinner />
+                <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Initialisation sécurisée...</p>
+            </div>
         </div>
     );
   }

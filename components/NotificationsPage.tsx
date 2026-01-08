@@ -16,8 +16,28 @@ const NotificationsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const fetchAndMarkRead = async () => {
+        if (!session?.user) return;
+
+        const markAsRead = async (ids: string[]) => {
             if (!session?.user) return;
+            
+            // Update the database
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', ids);
+
+            if (error) {
+                console.error("Error marking notifications as read:", error.message);
+            } else {
+                // Update local state for immediate UI feedback (remove blue background)
+                setNotifications(prev =>
+                    prev.map(n => (ids.includes(n.id) ? { ...n, is_read: true } : n))
+                );
+            }
+        };
+
+        const fetchAndMarkRead = async () => {
             setLoading(true);
 
             // 1. Fetch notifications
@@ -45,27 +65,56 @@ const NotificationsPage: React.FC = () => {
             setLoading(false);
         };
 
-        const markAsRead = async (ids: string[]) => {
-            if (!session?.user) return;
-            
-            // 3. Update the database
-            const { error } = await supabase
-                .from('notifications')
-                .update({ is_read: true })
-                .in('id', ids);
-
-            if (error) {
-                console.error("Error marking notifications as read:", error.message);
-            } else {
-                // 4. Update local state for immediate UI feedback (remove blue background)
-                // The real-time listener in Navbar will handle the badge update.
-                setNotifications(prev =>
-                    prev.map(n => (ids.includes(n.id) ? { ...n, is_read: true } : n))
-                );
-            }
-        };
-
         fetchAndMarkRead();
+
+        // Abonnement temps réel pour les nouvelles notifications
+        const channel = supabase
+            .channel(`notifications-page-${session.user.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${session.user.id}`
+            }, async (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    // Récupérer le profil de l'acteur pour la nouvelle notification
+                    const { data: notificationData } = await supabase
+                        .from('notifications')
+                        .select('*, profiles:actor_id(*)')
+                        .eq('id', payload.new.id)
+                        .single();
+                    
+                    if (notificationData) {
+                        setNotifications(prev => {
+                            // Vérifier si la notification existe déjà
+                            if (prev.some(n => n.id === notificationData.id)) return prev;
+                            // Ajouter la nouvelle notification en haut de la liste
+                            return [notificationData as any, ...prev];
+                        });
+                    }
+                } else if (payload.eventType === 'UPDATE') {
+                    // Mettre à jour la notification existante
+                    const { data: notificationData } = await supabase
+                        .from('notifications')
+                        .select('*, profiles:actor_id(*)')
+                        .eq('id', payload.new.id)
+                        .single();
+                    
+                    if (notificationData) {
+                        setNotifications(prev =>
+                            prev.map(n => n.id === notificationData.id ? notificationData as any : n)
+                        );
+                    }
+                } else if (payload.eventType === 'DELETE') {
+                    // Supprimer la notification
+                    setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [session]);
 
 

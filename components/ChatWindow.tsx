@@ -120,7 +120,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
       
-      setMessages(messagesData as any[] || []);
+      setMessages((messagesData as any[] || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       
       if (messagesData?.some(m => !m.is_read && m.sender_id !== session.user.id)) {
           markMessagesAsRead();
@@ -150,46 +150,62 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, async (payload) => {
           const newMessageData = payload.new as Message;
           
-          // On évite les doublons si déjà ajouté par la mise à jour optimiste
-          setMessages(prev => {
-              if (prev.some(m => m.id === newMessageData.id)) return prev;
-              
-              // On fetch les détails manquants (profils, reply)
-              const fetchEnriched = async () => {
-                  const { data } = await supabase
-                      .from('messages')
-                      .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
-                      .eq('id', newMessageData.id)
-                      .single();
-                  
-                  if (data) {
-                      setMessages(current => {
-                          const exists = current.findIndex(m => m.id === data.id);
-                          if (exists !== -1) {
-                              const updated = [...current];
-                              updated[exists] = data as Message;
-                              return updated;
-                          }
-                          return [...current, data as Message];
-                      });
-                      if (data.sender_id !== session.user.id) {
-                          markMessagesAsRead();
-                          setOtherUserTyping(false);
-                      }
-                      scrollToBottom();
-                  }
-              };
-              fetchEnriched();
-              return prev;
+          // Vérifier si le message existe déjà pour éviter les doublons
+          setMessages(current => {
+              if (current.some(m => m.id === newMessageData.id)) {
+                  return current;
+              }
+              return current;
           });
+          
+          // Fetch immédiat les détails manquants (profils, reply)
+          const { data } = await supabase
+              .from('messages')
+              .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+              .eq('id', newMessageData.id)
+              .single();
+          
+          if (data) {
+              setMessages(prev => {
+                  // Vérifier à nouveau si le message existe déjà
+                  const existsIndex = prev.findIndex(m => m.id === data.id);
+                  if (existsIndex !== -1) {
+                      // Mettre à jour le message existant avec les données enrichies
+                      const updated = [...prev];
+                      updated[existsIndex] = data as Message;
+                      return updated;
+                  }
+                  
+                  // Ajouter le nouveau message enrichi et trier par date
+                  const newMessages = [...prev, data as Message];
+                  return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+              });
+              
+              if (data.sender_id !== session.user.id) {
+                  markMessagesAsRead();
+                  setOtherUserTyping(false);
+              }
+              scrollToBottom();
+          }
       })
       .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+      }, async (payload) => {
+          // Mettre à jour avec les données enrichies si nécessaire
+          const { data } = await supabase
+              .from('messages')
+              .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
+              .eq('id', payload.new.id)
+              .single();
+          
+          if (data) {
+              setMessages(prev => prev.map(m => m.id === data.id ? data as Message : m));
+          } else {
+              setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+          }
       })
       .on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState();
@@ -277,11 +293,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
         if (insertError) throw insertError;
 
-        // Mise à jour optimiste/immédiate locale
+        // Mise à jour immédiate locale avec le message enrichi
         if (insertedData) {
             setMessages(prev => {
                 if (prev.some(m => m.id === insertedData.id)) return prev;
-                return [...prev, insertedData as Message];
+                // Ajouter le nouveau message et trier par date pour maintenir l'ordre
+                const newMessages = [...prev, insertedData as Message];
+                return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             });
         }
 
@@ -328,8 +346,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   return (
     <div className="flex flex-col h-full bg-white relative">
         <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            {/* Bouton Back toujours présent sur mobile/tablette */}
-            <button onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all md:hidden text-slate-600 bg-slate-100/50">
+            {/* Bouton Back visible sur tous les écrans */}
+            <button onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50">
                 <ArrowLeft size={22} strokeWidth={2.5} />
             </button>
             {otherParticipant && (

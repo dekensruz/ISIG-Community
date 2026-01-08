@@ -86,16 +86,16 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     const buttonBgClass = isOwnMessage ? 'bg-white/20 hover:bg-white/40' : 'bg-slate-200 hover:bg-slate-300';
 
     return (
-        <div className={`flex items-center gap-2 mt-1 w-60 sm:w-64 ${playerColorClass}`}>
+        <div className={`flex items-center gap-2 mt-1 w-full max-w-[280px] sm:max-w-xs ${playerColorClass}`}>
             <audio ref={audioRef} src={src} preload="metadata"></audio>
-            <button onClick={handlePlayPause} className={`p-2 rounded-full transition-colors ${buttonBgClass}`}>
+            <button onClick={handlePlayPause} className={`p-2 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
                 {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
-            <div className="flex-1 flex flex-col justify-center">
-                <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer ${progressBgClass}`}>
-                    <div style={{ width: `${progress}%` }} className={`h-full rounded-full ${progressFillClass}`}></div>
+            <div className="flex-1 flex flex-col justify-center min-w-0">
+                <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer overflow-hidden ${progressBgClass}`}>
+                    <div style={{ width: `${progress}%` }} className={`h-full rounded-full transition-all duration-100 ${progressFillClass}`}></div>
                 </div>
-                 <div className="text-xs font-mono mt-1 self-end opacity-80">
+                 <div className="text-[10px] font-mono mt-1 self-end opacity-80">
                     {formatTimeDisplay(currentTime)} / {formatTimeDisplay(duration)}
                 </div>
             </div>
@@ -109,8 +109,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const menuRef = useRef<HTMLDivElement>(null);
 
     const time = format(new Date(message.created_at), 'HH:mm', { locale: fr });
-    const isEdited = message.updated_at && new Date(message.updated_at).getTime() - new Date(message.created_at).getTime() > 1000;
-
+    
+    // Correction du faux indicateur "modifié" : on n'affiche que si l'écart est significatif (>10s)
+    const isEdited = message.updated_at && (new Date(message.updated_at).getTime() - new Date(message.created_at).getTime() > 10000);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -158,8 +159,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
              <button onClick={() => onMediaClick(message.media_url!, message.media_type!, message.media_url!.split('/').pop()!)} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-lg text-left ${isOwnMessage ? 'bg-black/20 hover:bg-black/30' : 'bg-slate-100 hover:bg-slate-200'}`}>
                 <Download size={32} className={textColorClass} />
                 <div className={`flex-1 min-w-0 ${textColorClass}`}>
-                    <p className="font-semibold break-words">{message.media_url!.split('/').pop()}</p>
-                    <p className="text-xs opacity-80">Fichier {message.media_type.split('/')[1] || ''}</p>
+                    <p className="font-semibold break-words truncate text-sm">{message.media_url!.split('/').pop()}</p>
+                    <p className="text-[10px] opacity-80">Fichier {message.media_type.split('/')[1] || ''}</p>
                 </div>
             </button>
         )
@@ -175,13 +176,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     };
 
     return (
-        <div className={`group flex items-end gap-2 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+        <div className={`group flex items-end gap-1 sm:gap-2 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
-                <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-full text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-100">
+                <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-full text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:opacity-100">
                     <MoreHorizontal size={18} />
                 </button>
                 {menuOpen && (
-                    <div ref={menuRef} className={`absolute bottom-full mb-2 w-48 bg-white rounded-2xl shadow-premium py-2 z-20 border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}>
+                    <div 
+                      ref={menuRef} 
+                      className={`absolute bottom-full mb-2 w-48 bg-white rounded-2xl shadow-premium py-2 z-[60] border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}
+                      style={{ transformOrigin: isOwnMessage ? 'bottom right' : 'bottom left' }}
+                    >
                         <button onClick={() => { onSetReplying(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50"><MessageSquareReply size={16} className="mr-3 text-isig-blue"/>Répondre</button>
                         {isOwnMessage && message.content && <button onClick={() => { onSetEditing(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50"><Pencil size={16} className="mr-3 text-isig-orange"/>Modifier</button>}
                         <div className="border-t border-slate-50 my-1 mx-2"></div>
@@ -190,7 +195,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     </div>
                 )}
             </div>
-            <div className={`relative max-w-[75%] md:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
+            <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
                  {message.replied_to && (
                      <div className={`p-3 mb-2 border-l-4 rounded-xl flex flex-col ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
                          <p className={`font-black text-[9px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>

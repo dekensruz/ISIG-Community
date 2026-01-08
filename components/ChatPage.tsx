@@ -96,7 +96,14 @@ const ChatPage: React.FC = () => {
             unread_count: c.unread_count,
         }));
         
-        setConversations(formattedConversations);
+        // Tri explicite par date du dernier message (décroissant)
+        const sortedConversations = formattedConversations.sort((a, b) => {
+            const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.created_at).getTime();
+            const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.created_at).getTime();
+            return timeB - timeA;
+        });
+
+        setConversations(sortedConversations);
         if (isInitial) setLoading(false);
     }, [session?.user]);
 
@@ -107,9 +114,15 @@ const ChatPage: React.FC = () => {
     useEffect(() => {
         fetchConversations(true);
 
+        // Écouter les messages pour remonter la conversation active
         const channel = supabase
             .channel('conversations-list-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'messages' 
+            }, (payload) => {
+                // Dès qu'un message change (nouveau ou lu), on réactualise et on trie
                 fetchConversations(false);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_participants' }, () => {

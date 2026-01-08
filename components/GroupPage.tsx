@@ -117,7 +117,6 @@ const GroupPage: React.FC = () => {
       }
   }, [isMember, group, fetchPosts]);
 
-  // Temps réel pour les posts du groupe
   useEffect(() => {
     if (!groupId) return;
 
@@ -208,13 +207,14 @@ const GroupPage: React.FC = () => {
       <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden mb-6">
         <div className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-4 min-w-0 flex-1">
                      <button onClick={() => setShowAvatarModal(true)} className="flex-shrink-0 transition-transform duration-200 hover:scale-105">
                          <Avatar avatarUrl={group.avatar_url} name={group.name} size="2xl" shape="square" />
                      </button>
-                    <div>
-                      <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">{group.name}</h1>
-                      <p className="text-xs text-slate-500 mt-1 uppercase font-black tracking-widest">Par <Link to={`/profile/${group.created_by}`} className="text-isig-blue hover:underline">{group.profiles?.full_name || 'Chargement...'}</Link></p>
+                    <div className="min-w-0 flex-1">
+                      {/* Correction du débordement ici avec break-words et truncate controlé */}
+                      <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight break-words leading-tight">{group.name}</h1>
+                      <p className="text-xs text-slate-500 mt-1 uppercase font-black tracking-widest truncate">Par <Link to={`/profile/${group.created_by}`} className="text-isig-blue hover:underline">{group.profiles?.full_name || 'Chargement...'}</Link></p>
                     </div>
                 </div>
                  <div className="flex items-center space-x-2 self-start sm:self-center flex-shrink-0">
@@ -235,7 +235,7 @@ const GroupPage: React.FC = () => {
                 </div>
             </div>
              <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mt-4 pt-4 border-t border-slate-50">
-                <p className="text-slate-600 flex-1 font-medium italic">{group.description || 'Bienvenue dans ce groupe académique.'}</p>
+                <p className="text-slate-600 flex-1 font-medium italic break-words">{group.description || 'Bienvenue dans ce groupe académique.'}</p>
                 <button onClick={() => setShowMembersModal(true)} className="relative flex items-center space-x-3 text-left p-3 rounded-2xl hover:bg-slate-50 self-start md:self-end transition-all">
                     {canManageGroup && joinRequests.length > 0 && 
                         <span className="absolute -top-1 -right-1 flex h-5 w-5 z-10">
@@ -257,7 +257,7 @@ const GroupPage: React.FC = () => {
         </div>
       </div>
       
-        <div className="space-y-6">
+        <div className="space-y-6 pb-12">
             {isMember || !group.is_private ? (
                 <>
                     {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}

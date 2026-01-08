@@ -45,7 +45,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
       setFile(selectedFile);
       if (selectedFile.type.startsWith('image/')) {
-        setPreviewUrl(URL.createObjectURL(selectedFile));
+        const objectUrl = URL.createObjectURL(selectedFile);
+        setPreviewUrl(objectUrl);
       } else {
         setPreviewUrl(null);
       }
@@ -128,16 +129,17 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             onChange={(e) => setContent(e.target.value)}
         />
         
-        {file && (
+        {/* L'aperçu doit être visible ici */}
+        {(file || previewUrl) && (
             <div className="mt-3 relative inline-block animate-fade-in-up">
                 {previewUrl ? (
                     <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md border border-slate-100" />
-                ) : (
+                ) : file ? (
                     <div className="flex items-center p-3 bg-slate-100 rounded-xl border border-slate-200">
                         <FileText className="text-isig-blue mr-3" />
                         <p className="text-xs font-bold text-slate-600 max-w-[150px] truncate">{file.name}</p>
                     </div>
-                )}
+                ) : null}
                 <button 
                     type="button" 
                     onClick={handleRemoveFile} 
@@ -149,18 +151,20 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
+            {/* Utilisation d'un ID UNIQUE et explicite pour mobile */}
             <label 
-              htmlFor="group-file-upload-input"
+              htmlFor="group-post-file-input"
               className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer flex items-center space-x-2"
             >
                 <Paperclip size={24} />
-                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Ajouter un fichier</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Attacher</span>
                 <input 
-                  id="group-file-upload-input"
+                  id="group-post-file-input"
                   type="file" 
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
+                  accept="image/*,.pdf,.doc,.docx"
                 />
             </label>
             <button 

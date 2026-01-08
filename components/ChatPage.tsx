@@ -107,7 +107,6 @@ const ChatPage: React.FC = () => {
     useEffect(() => {
         fetchConversations(true);
 
-        // Synchronisation temps réel optimisée de la liste
         const channel = supabase
             .channel('conversations-list-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
@@ -126,7 +125,7 @@ const ChatPage: React.FC = () => {
     );
 
     return (
-        <div className="flex h-[calc(100vh-140px)] bg-white rounded-[2.5rem] shadow-premium border border-slate-100 overflow-hidden">
+        <div className="flex h-full bg-white md:rounded-[2.5rem] md:shadow-premium md:border md:border-slate-100 overflow-hidden">
             <aside className={`${conversationId ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-slate-100 flex-col`}>
                 <div className="p-6 border-b border-slate-50">
                     <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Messages</h2>
@@ -162,7 +161,7 @@ const ChatPage: React.FC = () => {
                     )}
                 </div>
             </aside>
-            <main className={`${conversationId ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 flex-col`}>
+            <main className={`${conversationId ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 flex-col h-full`}>
                 {conversationId ? (
                     <ChatWindow 
                         key={conversationId} 

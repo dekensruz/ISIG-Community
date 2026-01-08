@@ -65,8 +65,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+      textarea.style.height = '48px'; // Hauteur de base pour éviter le saut au reset
+      const nextHeight = Math.min(textarea.scrollHeight, 160);
+      textarea.style.height = `${nextHeight}px`;
     }
   };
 
@@ -136,7 +137,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     fetchData(); 
   }, [fetchData]);
 
-  // SYSTEME TEMPS RÉEL OPTIMISÉ
   useEffect(() => {
     if (!conversationId || !session?.user || !otherParticipant) return;
 
@@ -149,7 +149,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       }, async (payload) => {
           const newMessageData = payload.new as Message;
           
-          // Récupérer le profil complet pour le message (pour l'avatar etc)
           const { data: enrichedMessage } = await supabase
               .from('messages')
               .select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))')
@@ -260,7 +259,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         setFile(null);
         setFilePreview(null);
         setReplyingToMessage(null);
-        adjustHeight();
+        setTimeout(adjustHeight, 10);
         scrollToBottom();
     } catch (err) {
         alert("Échec de l'envoi.");
@@ -298,7 +297,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-        <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm">
+        <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
             <button onClick={() => navigate('/chat')} className="mr-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors md:hidden">
                 <ArrowLeft size={20} />
             </button>
@@ -315,7 +314,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             )}
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 min-h-0 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar">
             {messages.map((msg) => (
                 <MessageBubble 
                   key={msg.id} 
@@ -340,7 +339,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             <div ref={messagesEndRef} className="h-4" />
         </div>
 
-        <div className="p-4 border-t border-slate-100 bg-white">
+        <div className="p-4 border-t border-slate-100 bg-white shrink-0">
             {recordingStatus === 'recording' ? (
                 <div className="flex items-center space-x-4 h-14 bg-red-50 rounded-2xl px-4 border border-red-100">
                     <div className="flex-1 flex items-center space-x-3">
@@ -361,7 +360,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                         </div>
                     )}
                     <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
-                        <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl">
+                        <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0">
                             <Paperclip size={24} />
                             <input type="file" onChange={(e) => {
                                 if (e.target.files?.[0]) {
@@ -370,7 +369,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 }
                             }} className="hidden" />
                         </label>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             {filePreview && (
                                 <div className="flex items-center bg-isig-blue/10 p-2 mb-2 rounded-xl text-xs text-isig-blue">
                                     <span className="truncate flex-1">{filePreview}</span>
@@ -378,14 +377,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 </div>
                             )}
                             <textarea 
-                            ref={textareaRef}
-                            value={newMessage} 
-                            onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
-                            placeholder="Votre message..." 
-                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium" 
+                                ref={textareaRef}
+                                value={newMessage} 
+                                onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
+                                placeholder="Votre message..." 
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium" 
+                                style={{ minHeight: '48px' }}
                             />
                         </div>
-                        <div className="flex items-center">
+                        <div className="flex items-center shrink-0">
                             {!newMessage.trim() && !file ? (
                                 <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-3 rounded-2xl shadow-lg shadow-isig-blue/20 transition-all active:scale-90"><Mic size={24} /></button>
                             ) : (

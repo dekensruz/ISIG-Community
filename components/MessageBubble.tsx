@@ -104,15 +104,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [menuOpen]);
     
-    const handleDeleteForMe = () => {
+    const handleDeleteForMe = (e: React.MouseEvent) => {
+        e.stopPropagation();
         setMenuOpen(false);
         setMessages(prev => prev.filter(m => m.id !== message.id));
     };
     
-    const handleDeleteForEveryone = async () => {
+    const handleDeleteForEveryone = async (e: React.MouseEvent) => {
+        e.stopPropagation();
         setMenuOpen(false);
         const { error } = await supabase.from('messages').delete().eq('id', message.id);
         if (error) alert("Erreur de suppression.");
+    };
+
+    const handleReplyAction = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSetReplying(message);
+        setMenuOpen(false);
+    };
+
+    const handleEditAction = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSetEditing(message);
+        setMenuOpen(false);
     };
 
     const renderMedia = () => {
@@ -138,11 +152,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const OptionsMenu = () => {
         const content = (
             <div className="flex flex-col">
-                <button onClick={() => { onSetReplying(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+                <button onClick={handleReplyAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
                     <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
                 </button>
                 {isOwnMessage && message.content && (
-                    <button onClick={() => { onSetEditing(message); setMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+                    <button onClick={handleEditAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
                         <Pencil size={18} className="mr-4 md:mr-3 text-isig-orange"/>Modifier
                     </button>
                 )}
@@ -160,7 +174,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
 
         return (
             <>
-                <div className="md:hidden fixed inset-0 z-[200] flex items-end animate-fade-in" onClick={() => setMenuOpen(false)}>
+                <div className="md:hidden fixed inset-0 z-[200] flex items-end animate-fade-in" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}>
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
                     <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>

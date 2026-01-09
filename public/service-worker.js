@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'isig-community-v2';
+const CACHE_NAME = 'isig-community-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -29,7 +29,24 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Stratégie Network First pour le document principal afin d'éviter l'écran blanc
+  // Stratégie spécifique pour les images (Cache First)
+  if (event.request.destination === 'image') {
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+        return fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const cacheCopy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, cacheCopy));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // Stratégie Network First pour le document principal
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -43,7 +60,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Stratégie Stale-While-Revalidate pour les autres ressources
+  // Stratégie Stale-While-Revalidate pour le reste (scripts, styles)
   event.respondWith(
     caches.match(event.request).then(response => {
       const fetchPromise = fetch(event.request).then(networkResponse => {

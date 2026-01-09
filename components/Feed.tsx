@@ -9,6 +9,11 @@ import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
 import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
 
+// Cache global simple hors du cycle de vie du composant
+let feedCache: PostType[] = [];
+let lastFetchTime: number = 0;
+const CACHE_EXPIRATION = 1000 * 60 * 5; // 5 minutes
+
 const PostSkeleton = () => (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 animate-pulse shadow-soft mb-8">
         <div className="flex items-center space-x-4 mb-6">
@@ -28,8 +33,8 @@ const PostSkeleton = () => (
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
-  const [posts, setPosts] = useState<PostType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<PostType[]>(feedCache);
+  const [loading, setLoading] = useState(feedCache.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -44,11 +49,17 @@ const Feed: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = false) => {
     if (isFetchingRef.current) return;
     
+    // Si on a déjà du cache et que ce n'est pas un rafraîchissement manuel
+    if (isInitial && feedCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
+        setLoading(false);
+        return;
+    }
+
     try {
       isFetchingRef.current = true;
-      if (isInitial) {
+      if (isInitial && posts.length === 0) {
         setLoading(true);
-      } else {
+      } else if (!isInitial) {
         setLoadingMore(true);
       }
 
@@ -74,6 +85,8 @@ const Feed: React.FC = () => {
       
       if (isInitial) {
         setPosts(newPosts);
+        feedCache = newPosts; // Mise à jour du cache
+        lastFetchTime = Date.now();
         setPage(0);
       } else {
         setPosts(prev => {
@@ -81,6 +94,7 @@ const Feed: React.FC = () => {
             const unique = combined.filter((p, idx, self) => 
                 self.findIndex(t => t.id === p.id) === idx
             );
+            feedCache = unique; // Mise à jour du cache
             return unique;
         });
         setPage(currentPage);
@@ -95,7 +109,7 @@ const Feed: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [page, sortBy]);
+  }, [page, sortBy, posts.length]);
 
   useEffect(() => {
     fetchPosts(true);
@@ -118,12 +132,18 @@ const Feed: React.FC = () => {
         if (data) {
           setPosts(prev => {
             if (prev.some(p => p.id === data.id)) return prev;
-            return [data as any, ...prev];
+            const updated = [data as any, ...prev];
+            feedCache = updated;
+            return updated;
           });
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
-        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
+        setPosts(prev => {
+            const updated = prev.filter(p => p.id !== payload.old.id);
+            feedCache = updated;
+            return updated;
+        });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
         const { data } = await supabase
@@ -132,7 +152,11 @@ const Feed: React.FC = () => {
           .eq('id', payload.new.id)
           .single();
         if (data) {
-          setPosts(prev => prev.map(p => p.id === data.id ? data as any : p));
+          setPosts(prev => {
+            const updated = prev.map(p => p.id === data.id ? data as any : p);
+            feedCache = updated;
+            return updated;
+          });
         }
       })
       .subscribe();
@@ -161,11 +185,15 @@ const Feed: React.FC = () => {
   const handlePostCreated = (newPost?: PostType) => {
     if (newPost) {
         setPosts(prev => {
+            let updated;
             if (editingPost) {
-                return prev.map(p => p.id === newPost.id ? newPost : p);
+                updated = prev.map(p => p.id === newPost.id ? newPost : p);
+            } else {
+                if (prev.some(p => p.id === newPost.id)) return prev;
+                updated = [newPost, ...prev];
             }
-            if (prev.some(p => p.id === newPost.id)) return prev;
-            return [newPost, ...prev];
+            feedCache = updated;
+            return updated;
         });
         setEditingPost(null);
     } else {

@@ -12,7 +12,12 @@
     <meta name="author" content="Dekens Ruzuba" />
     <meta name="robots" content="index, follow" />
     
-    <!-- Open Graph (Facebook/LinkedIn/Bots) -->
+    <!-- Resource Hints pour la fluidité -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://dqjshyxqtzkyymmxttyy.supabase.co"> <!-- Remplacez par votre URL Supabase si connue -->
+    
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="ISIG Community - Collaboration Académique" />
     <meta property="og:description" content="Rejoignez la communauté exclusive des étudiants de l'ISIG Goma." />
@@ -22,8 +27,6 @@
     <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s" />
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       window.process = window.process || { env: {} };
@@ -108,7 +111,6 @@
     background: #00AEEF;
   }
 
-  /* Blocage orientation paysage sur mobile */
   @media screen and (min-width: 320px) and (max-width: 900px) and (orientation: landscape) {
     #landscape-lock {
       display: flex !important;

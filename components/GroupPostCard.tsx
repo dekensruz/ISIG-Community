@@ -65,12 +65,12 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     e.stopPropagation();
     
     if (!session?.user) {
-      navigate('/auth');
+      navigate('/auth?mode=signup');
       return;
     }
     
     if (isLiked) {
-      const like = likes.find(l => l.user_id session.user.id);
+      const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
         setLikesCount(prev => Math.max(0, prev - 1));
@@ -83,7 +83,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           setLikesCount(prev => prev + 1);
       }
     }
-  }, [isLiked, likes, post.id, session?.user.id, navigate]);
+  }, [isLiked, likes, post.id, session?.user, navigate]);
 
   const getLikeSummaryText = useCallback(() => {
     const count = likesCount;

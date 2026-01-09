@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Send, Trash2, Pencil, MoreHorizontal } from 'lucide-react';
 import { Post as PostType, Like, Comment as CommentType, Profile } from '../types';
@@ -9,7 +9,7 @@ import Spinner from './Spinner';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface PostDetailModalProps {
   post: PostType;
@@ -18,6 +18,7 @@ interface PostDetailModalProps {
 
 const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [comments, setComments] = useState<CommentType[]>([]);
@@ -40,6 +41,20 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
   };
+
+  const renderContentWithLinks = useCallback((text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  }, []);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -111,7 +126,10 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const userHasLiked = likes.some(like => like.user_id === session?.user.id);
 
   const handleLike = async () => {
-    if (!session?.user) return;
+    if (!session?.user) {
+      navigate('/auth?mode=signup');
+      return;
+    }
     if (userHasLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -129,7 +147,10 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = replyingTo ? replyContent : newComment;
-    if (!content.trim() || !session?.user || !currentUserProfile) return;
+    if (!content.trim() || !session?.user || !currentUserProfile) {
+      if(!session?.user) navigate('/auth?mode=signup');
+      return;
+    }
     setIsPostingComment(true);
     
     try {
@@ -233,7 +254,9 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                         </div>
                     </form>
                 ) : (
-                    <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">{comment.content}</p>
+                    <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">
+                      {renderContentWithLinks(comment.content)}
+                    </p>
                 )}
             </div>
             
@@ -259,13 +282,17 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
             <div className="flex items-center space-x-4 mb-6">
-                <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
+                <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
+                  <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
+                </Link>
                 <div>
-                    <p className="font-extrabold text-slate-800">{post.profiles.full_name}</p>
+                    <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
+                      <p className="font-extrabold text-slate-800 hover:text-isig-blue transition-colors">{post.profiles.full_name}</p>
+                    </Link>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{post.profiles.major} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
                 </div>
             </div>
-            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{post.content}</p>
+            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{renderContentWithLinks(post.content)}</p>
             {post.media_url && post.media_type === 'image' && (
                 <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100">
                     <img src={post.media_url} alt="Média" className="w-full h-auto max-h-[500px] object-contain mx-auto" />

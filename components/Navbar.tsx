@@ -65,6 +65,9 @@ const Navbar: React.FC = () => {
             supabase.removeChannel(profileChannel);
             supabase.removeChannel(notificationChannel);
         };
+    } else {
+      setProfile(null);
+      setUnreadNotificationsCount(0);
     }
   }, [session]);
 
@@ -72,8 +75,16 @@ const Navbar: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setDropdownOpen(false);
-    await supabase.auth.signOut();
-    navigate('/auth');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erreur de déconnexion:", err);
+    } finally {
+      // On redirige quoi qu'il arrive
+      navigate('/auth');
+      window.location.reload(); // Force le nettoyage du cache React
+    }
   };
 
   return (
@@ -143,8 +154,8 @@ const Navbar: React.FC = () => {
                   )}
                </div>
             ) : (
-                <Link to="/auth" className="ml-2 bg-isig-blue text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95">
-                    Connexion
+                <Link to="/auth?mode=signup" className="ml-2 bg-isig-blue text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95">
+                    Rejoindre
                 </Link>
             )}
           </div>

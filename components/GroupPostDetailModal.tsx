@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Send, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
 import { GroupPost, GroupPostLike, GroupPostComment, Profile } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,7 @@ interface GroupPostDetailModalProps {
 
 const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial, onClose }) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [post, setPost] = useState<GroupPost>(postInitial);
   const [likes, setLikes] = useState<GroupPostLike[]>(postInitial.group_post_likes);
   const [comments, setComments] = useState<GroupPostComment[]>([]);
@@ -40,6 +41,20 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
   };
+
+  const renderContentWithLinks = useCallback((text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  }, []);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -123,7 +138,10 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   }, [comments]);
 
   const handleLike = async () => {
-    if (!session?.user) return;
+    if (!session?.user) {
+      navigate('/auth?mode=signup');
+      return;
+    }
     const userHasLiked = likes.some(like => like.user_id === session?.user.id);
     if (userHasLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
@@ -139,7 +157,10 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !session?.user || !currentUserProfile) return;
+    if (!newComment.trim() || !session?.user || !currentUserProfile) {
+      if(!session?.user) navigate('/auth?mode=signup');
+      return;
+    }
     setIsPostingComment(true);
     
     try {
@@ -255,7 +276,9 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                         </div>
                     </form>
                 ) : (
-                    <p className="text-sm text-slate-700 font-medium leading-relaxed">{comment.content}</p>
+                    <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">
+                      {renderContentWithLinks(comment.content)}
+                    </p>
                 )}
             </div>
             <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -284,14 +307,18 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
             <div className="flex items-center space-x-4 mb-6">
-                <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
+                <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
+                  <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
+                </Link>
                 <div>
-                    <p className="font-extrabold text-slate-800">{post.profiles.full_name}</p>
+                    <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
+                      <p className="font-extrabold text-slate-800 hover:text-isig-blue transition-colors">{post.profiles.full_name}</p>
+                    </Link>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
                 </div>
             </div>
 
-            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{post.content}</p>
+            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{renderContentWithLinks(post.content)}</p>
             
             {post.media_url && post.media_type?.startsWith('image/') && (
                 <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100">

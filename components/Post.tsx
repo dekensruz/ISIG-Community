@@ -32,7 +32,9 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
 
   useEffect(() => {
     setLikes(post.likes || []);
-    setLikesCount(post.likes_count ?? (post.likes?.length || 0));
+    // Always fallback to the actual array length if likes_count seems smaller than fetched likes
+    const actualCount = post.likes?.length || 0;
+    setLikesCount(Math.max(post.likes_count || 0, actualCount));
   }, [post.likes, post.likes_count]);
 
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
@@ -43,7 +45,6 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
         setLikerProfiles([]);
         return;
       }
-      // On récupère les profils des derniers likes pour l'affichage du texte "X et Y ont aimé"
       const { data } = await supabase
         .from('likes')
         .select('profiles(id, full_name, avatar_url)')
@@ -95,15 +96,18 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
         if (others.length > 0) {
             const otherName = others[0].full_name.split(' ')[0];
             if (count === 2) return `Vous et ${otherName}`;
-            return `Vous, ${otherName} et ${count - 2} autres`;
+            const remaining = count - 2;
+            return `Vous, ${otherName} et ${remaining} autre${remaining > 1 ? 's' : ''}`;
         }
-        return `Vous et ${count - 1} autres`;
+        const remaining = count - 1;
+        return `Vous et ${remaining} autre${remaining > 1 ? 's' : ''}`;
     } else {
         if (likerProfiles.length > 0) {
             const first = likerProfiles[0].full_name.split(' ')[0];
             if (count === 1) return `${first} a aimé`;
             if (count === 2) return `${first} et 1 autre`;
-            return `${first} et ${count - 1} autres`;
+            const remaining = count - 1;
+            return `${first} et ${remaining} autres`;
         }
         return `${count} J'aime`;
     }

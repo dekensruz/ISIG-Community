@@ -106,7 +106,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
             }
         };
         if (menuOpen) {
-            // Utiliser click au lieu de mousedown pour éviter de fermer avant le déclenchement de l'action React
             document.addEventListener('click', handleClickOutside);
         }
         return () => document.removeEventListener('click', handleClickOutside);
@@ -139,6 +138,27 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         e.stopPropagation();
         onSetEditing(message);
         setMenuOpen(false);
+    };
+
+    const renderContentWithLinks = (text: string) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.split(urlRegex).map((part, index) => {
+            if (part.match(urlRegex)) {
+                return (
+                    <a 
+                        key={index} 
+                        href={part} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className={`underline break-all ${isOwnMessage ? 'text-white' : 'text-isig-blue'}`} 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {part}
+                    </a>
+                );
+            }
+            return part;
+        });
     };
 
     const renderMedia = () => {
@@ -257,7 +277,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                      </div>
                  )}
                 {renderMedia()}
-                {message.content && <p className="text-sm font-medium break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>}
+                {message.content && <div className="text-sm font-medium break-words whitespace-pre-wrap leading-relaxed">{renderContentWithLinks(message.content)}</div>}
                 <div className="text-right text-[9px] mt-1.5 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}

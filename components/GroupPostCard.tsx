@@ -33,7 +33,8 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
   useEffect(() => {
     setLikes(post.group_post_likes || []);
-    setLikesCount(post.likes_count ?? (post.group_post_likes?.length || 0));
+    const actualCount = post.group_post_likes?.length || 0;
+    setLikesCount(Math.max(post.likes_count || 0, actualCount));
   }, [post.group_post_likes, post.likes_count]);
 
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
@@ -86,15 +87,18 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         if (others.length > 0) {
             const otherName = others[0].full_name.split(' ')[0];
             if (count === 2) return `Vous et ${otherName}`;
-            return `Vous, ${otherName} et ${count - 2} autres`;
+            const remaining = count - 2;
+            return `Vous, ${otherName} et ${remaining} autre${remaining > 1 ? 's' : ''}`;
         }
-        return `Vous et ${count - 1} autres`;
+        const remaining = count - 1;
+        return `Vous et ${remaining} autre${remaining > 1 ? 's' : ''}`;
     } else {
         if (likerProfiles.length > 0) {
             const first = likerProfiles[0].full_name.split(' ')[0];
             if (count === 1) return `${first} a aimé`;
             if (count === 2) return `${first} et 1 autre`;
-            return `${first} et ${count - 1} autres`;
+            const remaining = count - 1;
+            return `${first} et ${remaining} autres`;
         }
         return `${count} J'aime`;
     }

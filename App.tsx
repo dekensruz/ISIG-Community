@@ -101,11 +101,14 @@ const AppContent: React.FC = () => {
             {showNavBars && <Navbar />}
             <main className={`transition-all duration-300 ease-out ${
                 isAuthPage ? "" 
-                : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
+                : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden flex flex-col" 
                 : "container mx-auto px-4 pt-24 pb-28 sm:pb-32" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
-                    <div key={location.pathname} className="animate-fade-in">
+                    <div 
+                        key={location.pathname} 
+                        className={`animate-fade-in ${isChatConversation ? 'flex-1 min-h-0 h-full' : ''}`}
+                    >
                         <Routes location={location}>
                             <Route path="/" element={<Feed />} />
                             <Route path="/profile/:userId" element={<Profile />} />

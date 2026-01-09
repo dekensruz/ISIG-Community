@@ -32,7 +32,7 @@ const Profile: React.FC = () => {
   
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState<boolean | null>(null); // Initialisé à null pour le chargement
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
 
   const [modalImage, setModalImage] = useState<string | null>(null);
@@ -70,7 +70,6 @@ const Profile: React.FC = () => {
       setFollowerCount(followers || 0);
       setFollowingCount(following || 0);
 
-      // Vérification immédiate du statut d'abonnement
       if (session?.user && !isOwnProfile) {
         const { data: followData } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).maybeSingle();
         setIsFollowing(!!followData);
@@ -97,7 +96,7 @@ const Profile: React.FC = () => {
   }, [fetchProfileData]);
   
   const handleUpdateProfile = async () => {
-    if (!isOwnProfile) return;
+    if (!isOwnProfile || !session?.user) return;
     try {
         setLoadingProfile(true);
         const updates = {
@@ -120,7 +119,7 @@ const Profile: React.FC = () => {
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile) return;
+    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile || !session?.user) return;
     const file = event.target.files[0];
     const fileName = `avatars/${userId}-${Date.now()}`;
 
@@ -140,7 +139,7 @@ const Profile: React.FC = () => {
   }
 
   const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile) return;
+    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile || !session?.user) return;
     const file = event.target.files[0];
     const fileName = `covers/${userId}-${Date.now()}`;
 
@@ -163,7 +162,11 @@ const Profile: React.FC = () => {
   };
   
   const handleFollow = async () => {
-    if (!session?.user || isOwnProfile || followLoading) return;
+    if (!session?.user) {
+      navigate('/auth');
+      return;
+    }
+    if (isOwnProfile || followLoading) return;
     setFollowLoading(true);
     setIsFollowing(true);
     setFollowerCount(c => c + 1);
@@ -176,7 +179,11 @@ const Profile: React.FC = () => {
   };
 
   const handleUnfollow = async () => {
-    if (!session?.user || isOwnProfile || followLoading) return;
+    if (!session?.user) {
+      navigate('/auth');
+      return;
+    }
+    if (isOwnProfile || followLoading) return;
     setFollowLoading(true);
     setIsFollowing(false);
     setFollowerCount(c => c - 1);
@@ -189,7 +196,11 @@ const Profile: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!session?.user || !userId || isOwnProfile) return;
+    if (!session?.user) {
+      navigate('/auth');
+      return;
+    }
+    if (!userId || isOwnProfile) return;
     try {
       const { data, error } = await supabase.rpc('get_or_create_conversation', { other_user_id: userId });
       if (error) throw error;
@@ -264,7 +275,7 @@ const Profile: React.FC = () => {
                         >
                            <Avatar avatarUrl={profile.avatar_url} name={profile.full_name} size="3xl" className="ring-[12px] ring-white shadow-premium" />
                         </button>
-                        {isOwnProfile && (
+                        {isOwnProfile && session?.user && (
                             <label className="absolute bottom-2 right-2 bg-isig-orange text-white p-3 rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg transition-all active:scale-90 flex items-center justify-center">
                                 {avatarUploading ? <Spinner/> : <Upload size={20} />}
                                 <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading}/>
@@ -292,7 +303,7 @@ const Profile: React.FC = () => {
                     </div>
                     
                     <div className="flex-shrink-0 flex items-center space-x-3 mt-6 sm:mt-24 w-full sm:w-auto">
-                         {isOwnProfile ? (
+                         {isOwnProfile && session?.user ? (
                              <button 
                                 onClick={() => isEditing ? handleUpdateProfile() : setIsEditing(true)} 
                                 className={`flex-1 sm:flex-none py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all active:scale-95 border ${isEditing ? 'bg-isig-orange text-white border-transparent shadow-lg shadow-isig-orange/20 hover:bg-orange-600' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-100'}`}
@@ -415,7 +426,7 @@ const Profile: React.FC = () => {
                 </div>
             </div>
 
-            {isOwnProfile && editingPost && (
+            {isOwnProfile && session?.user && editingPost && (
                 <div className="mb-8">
                   <CreatePost 
                     onPostCreated={() => { fetchProfileData(); setEditingPost(null); }} 

@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Heart, MessageCircle, Share2, FileText, Trash2, Pencil, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Avatar from './Avatar';
 import GroupImageModal from './GroupImageModal';
 import GroupPostDetailModal from './GroupPostDetailModal';
@@ -20,6 +20,7 @@ interface GroupPostCardProps {
 
 const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen = false }) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [showLikersModal, setShowLikersModal] = useState(false);
@@ -62,9 +63,14 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const handleLike = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!session?.user) return;
+    
+    if (!session?.user) {
+      navigate('/auth');
+      return;
+    }
+    
     if (isLiked) {
-      const like = likes.find(l => l.user_id === session.user.id);
+      const like = likes.find(l => l.user_id session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
         setLikesCount(prev => Math.max(0, prev - 1));
@@ -77,7 +83,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           setLikesCount(prev => prev + 1);
       }
     }
-  }, [isLiked, likes, post.id, session?.user.id]);
+  }, [isLiked, likes, post.id, session?.user.id, navigate]);
 
   const getLikeSummaryText = useCallback(() => {
     const count = likesCount;

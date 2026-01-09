@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import * as locales from 'date-fns/locale';
 import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
 import Avatar from './Avatar';
@@ -20,6 +20,7 @@ interface PostProps {
 
 const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEditRequested }) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
   const [showLikersModal, setShowLikersModal] = useState(false);
@@ -61,7 +62,11 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const handleLike = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!session?.user) return;
+    
+    if (!session?.user) {
+      navigate('/auth');
+      return;
+    }
     
     if (isLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
@@ -83,7 +88,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           setLikes(prev => prev.map(l => l.id === tempId ? data : l));
       }
     }
-  }, [isLiked, likes, post.id, session?.user.id]);
+  }, [isLiked, likes, post.id, session?.user.id, navigate]);
 
   const getLikeSummaryText = useCallback(() => {
     const count = likesCount;

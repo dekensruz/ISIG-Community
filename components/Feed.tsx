@@ -7,7 +7,24 @@ import PostCard from './Post';
 import Spinner from './Spinner';
 import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
-import { Search, X, TrendingUp, Clock } from 'lucide-react';
+import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
+
+const PostSkeleton = () => (
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 animate-pulse shadow-soft mb-8">
+        <div className="flex items-center space-x-4 mb-6">
+            <div className="w-12 h-12 bg-slate-100 rounded-full"></div>
+            <div className="space-y-2">
+                <div className="h-4 w-32 bg-slate-100 rounded"></div>
+                <div className="h-3 w-20 bg-slate-50 rounded"></div>
+            </div>
+        </div>
+        <div className="space-y-3 mb-6">
+            <div className="h-4 w-full bg-slate-50 rounded"></div>
+            <div className="h-4 w-5/6 bg-slate-50 rounded"></div>
+        </div>
+        <div className="h-48 w-full bg-slate-100 rounded-[2rem]"></div>
+    </div>
+);
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
@@ -80,7 +97,6 @@ const Feed: React.FC = () => {
     }
   }, [page, sortBy]);
 
-  // Re-charger quand le tri change
   useEffect(() => {
     fetchPosts(true);
   }, [sortBy]);
@@ -173,14 +189,14 @@ const Feed: React.FC = () => {
   }, [posts, searchQuery]);
 
   return (
-    <div className="max-w-3xl mx-auto w-full">
+    <div className="max-w-3xl mx-auto w-full transition-all duration-500">
       <div className="space-y-6">
-        <div className="md:hidden mb-4">
+        <div className="md:hidden mb-4 animate-fade-in">
             <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-isig-blue transition-colors" size={18} />
                 <input 
                     type="text" 
-                    placeholder="Rechercher un post, un étudiant..." 
+                    placeholder="Rechercher sur le campus..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-12 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"
@@ -193,19 +209,18 @@ const Feed: React.FC = () => {
             </div>
         </div>
 
-        {/* Tab Selector pour le Tri */}
         {!searchQuery && (
-          <div className="flex p-1.5 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto animate-fade-in-up">
+          <div className="flex p-1 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto animate-fade-in-up shadow-sm">
               <button 
                   onClick={() => setSortBy('recent')}
-                  className={`flex items-center justify-center space-x-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 active:scale-95 ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   <Clock size={16} />
                   <span>Récent</span>
               </button>
               <button 
                   onClick={() => setSortBy('popular')}
-                  className={`flex items-center justify-center space-x-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 active:scale-95 ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                   <TrendingUp size={16} />
                   <span>Populaire</span>
@@ -220,7 +235,7 @@ const Feed: React.FC = () => {
             onCancelEdit={() => setEditingPost(null)}
           />
         ) : (
-            <div className="bg-isig-blue p-8 rounded-3xl text-white shadow-xl mb-8 relative overflow-hidden animate-fade-in-up">
+            <div className="bg-isig-blue p-8 rounded-[2.5rem] text-white shadow-xl mb-8 relative overflow-hidden animate-fade-in-up">
                 <div className="relative z-10">
                     <h2 className="text-2xl font-black italic">ISIG COMMUNITY</h2>
                     <p className="mt-2 opacity-90 text-lg">Le réseau social exclusif des étudiants de l'ISIG Goma.</p>
@@ -232,13 +247,15 @@ const Feed: React.FC = () => {
 
         <div className="space-y-8 pb-10">
           {loading && posts.length === 0 ? (
-             <div className="flex justify-center py-20"><Spinner /></div>
+             <div className="space-y-8">
+                {[1, 2, 3].map(i => <PostSkeleton key={i} />)}
+             </div>
           ) : filteredPosts.length > 0 ? (
             <>
               {filteredPosts.map((post, index) => (
                 <div 
                   key={post.id} 
-                  className="animate-fade-in-up" 
+                  className="animate-fade-in-up will-change-transform" 
                   style={{ animationDelay: `${Math.min((index % POSTS_PER_PAGE) * 0.05, 0.5)}s` }}
                 >
                   <PostCard post={post} onEditRequested={handleEditRequested} />
@@ -246,19 +263,19 @@ const Feed: React.FC = () => {
               ))}
               {hasMore && !searchQuery && (
                 <div ref={loaderRef} className="h-24 flex items-center justify-center">
-                    {loadingMore && <Spinner />}
+                    {loadingMore ? <Spinner /> : <div className="w-1.5 h-1.5 bg-slate-200 rounded-full animate-bounce"></div>}
                 </div>
               )}
             </>
           ) : (
-            <div className="text-center p-16 bg-white rounded-3xl border border-slate-200 shadow-soft animate-fade-in-up">
+            <div className="text-center p-16 bg-white rounded-[2.5rem] border border-slate-200 shadow-soft animate-fade-in-up">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+                  <Ghost className="w-10 h-10 text-slate-300" />
                 </div>
                 <p className="text-slate-500 font-bold text-lg">Aucune publication pour le moment.</p>
                 <p className="text-slate-400 text-sm mt-1">Soyez le premier à partager quelque chose !</p>
                 {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="mt-4 text-isig-blue font-black uppercase tracking-widest text-xs hover:underline">Effacer la recherche</button>
+                    <button onClick={() => setSearchQuery('')} className="mt-4 text-isig-blue font-black uppercase tracking-widest text-xs hover:underline active:scale-95 transition-all">Effacer la recherche</button>
                 )}
             </div>
           )}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import { Post as PostType, Profile, Like } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -11,7 +11,6 @@ import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
 import Avatar from './Avatar';
 import LikerListModal from './LikerListModal';
-import Spinner from './Spinner';
 
 interface PostProps {
   post: PostType;
@@ -19,7 +18,7 @@ interface PostProps {
   onEditRequested?: (post: PostType) => void;
 }
 
-const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEditRequested }) => {
+const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, onEditRequested }) => {
   const { session } = useAuth();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
@@ -31,7 +30,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
 
-  // Synchronisation de l'état local quand le post change (via Realtime dans Feed.tsx)
   useEffect(() => {
     setLikes(post.likes || []);
     setLikesCount(post.likes_count || 0);
@@ -59,7 +57,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
   useEffect(() => {
     const fetchTopLikers = async () => {
-      // On utilise le tableau 'likes' pour trouver les IDs des gens qui ont aimé
       if (likes.length === 0) {
         setLikerProfiles([]);
         return;
@@ -67,7 +64,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const likerIds = likes.slice(0, 3).map(l => l.user_id);
       const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
       if (data) {
-        // Garder l'ordre original des IDs
         const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
         setLikerProfiles(sorted);
       }
@@ -75,10 +71,12 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     fetchTopLikers();
   }, [likes]);
 
-  const handleLike = async () => {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!session?.user) return;
     
-    // Optimistic UI : On change localement avant la réponse serveur
+    // Optimistic UI pour une fluidité instantanée
     if (isLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -93,19 +91,18 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       
       const { data, error } = await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id }).select().single();
       if (error) {
-          // Rollback en cas d'erreur
           setLikes(prev => prev.filter(l => l.id !== tempId));
           setLikesCount(prev => prev - 1);
       } else if (data) {
-          // Mettre à jour avec l'ID réel
           setLikes(prev => prev.map(l => l.id === tempId ? data : l));
       }
     }
   };
 
-  const handleShare = async () => {
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const url = `${window.location.origin}/post/${post.id}`;
-    const shareText = `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community : ${url}`;
     
     try {
         if (navigator.share) {
@@ -115,15 +112,11 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                 url: url,
             });
         } else {
-            throw new Error('Web Share API non supportée');
+            await navigator.clipboard.writeText(url);
+            alert("Lien copié !");
         }
     } catch (err) {
-        try {
-            await navigator.clipboard.writeText(shareText);
-            alert("Lien copié dans votre presse-papier !");
-        } catch (copyErr) {
-            console.error("Erreur de copie", copyErr);
-        }
+        console.error(err);
     }
   };
 
@@ -133,48 +126,43 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
     if (isLiked) {
         if (count === 1) return "Vous avez aimé";
-        // Trouver une autre personne que moi dans likerProfiles
         const other = likerProfiles.find(p => p.id !== session?.user.id);
         const otherName = other?.full_name.split(' ')[0] || "quelqu'un";
-        
-        if (count === 2) return `Vous et ${otherName} avez aimé`;
-        return `Vous, ${otherName} et ${count - 2} autres`;
+        if (count === 2) return `Vous et ${otherName}`;
+        return `Vous et ${count - 1} autres`;
     } else {
         const first = likerProfiles[0]?.full_name.split(' ')[0] || "Un étudiant";
         if (count === 1) return `${first} a aimé`;
-        if (count === 2) return `${first} et 1 autre ont aimé`;
-        return `${first} et ${count - 1} autres ont aimé`;
+        return `${first} et ${count - 1} autres`;
     }
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all hover:shadow-premium group">
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card will-change-transform">
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/profile/${post.profiles.id}`}>
-            <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="ring-4 ring-slate-50 transition-transform group-hover:scale-105" />
+          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-90 duration-200">
+            <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="ring-4 ring-slate-50" />
           </Link>
-          <div>
-            <div className="flex items-center space-x-2">
-                <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors">
-                    {post.profiles.full_name}
-                </Link>
-            </div>
-            <div className="flex items-center text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                <span>{post.profiles.major}</span>
-                <span className="mx-2 text-slate-300">•</span>
-                <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: locales.fr })}</span>
+          <div className="min-w-0">
+            <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors truncate">
+                {post.profiles.full_name}
+            </Link>
+            <div className="flex items-center text-[10px] text-slate-400 font-black uppercase tracking-widest truncate">
+                <span className="truncate">{post.profiles.major}</span>
+                <span className="mx-2 text-slate-300 shrink-0">•</span>
+                <span className="shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: locales.fr })}</span>
             </div>
           </div>
         </div>
 
         {session?.user.id === post.user_id && (
           <div className="relative">
-            <button onClick={() => setShowOptions(!showOptions)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors">
+            <button onClick={() => setShowOptions(!showOptions)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors active:scale-95">
               <MoreHorizontal size={20} />
             </button>
             {showOptions && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden animate-fade-in-up">
                 <button 
                   onClick={() => { if(onEditRequested) onEditRequested(post); setShowOptions(false); }} 
                   className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
@@ -196,7 +184,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           {!isExpanded && isLongContent && <span>...</span>}
         </div>
         {isLongContent && (
-            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest hover:opacity-70">
+            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest hover:opacity-70 active:scale-95 transition-all">
                 {isExpanded ? <><ChevronUp size={14} className="inline mr-1"/>Voir moins</> : <><ChevronDown size={14} className="inline mr-1"/>Voir plus</>}
             </button>
         )}
@@ -205,11 +193,11 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       {post.media_url && (
         <div className="px-6 pb-6">
            {post.media_type === 'image' ? (
-             <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative ring-1 ring-slate-100">
-               <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />
+             <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative ring-1 ring-slate-100 group/img transition-transform duration-300 active:scale-[0.98]">
+               <img src={post.media_url} alt="Post" className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105" loading="lazy" />
              </div>
            ) : (
-             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all">
+             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all active:scale-[0.98]">
                 <FileText size={24} className="text-isig-blue mr-4" />
                 <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Consulter le document</span>
              </a>
@@ -221,7 +209,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           <div className="px-7 pb-4">
               <button 
                 onClick={() => setShowLikersModal(true)}
-                className="flex items-center space-x-3 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors group/likes"
+                className="flex items-center space-x-3 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-all active:scale-95"
               >
                   <div className="flex -space-x-2">
                       {likerProfiles.length > 0 ? (
@@ -239,18 +227,18 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
       <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <button onClick={handleLike} className={`flex items-center space-x-2 px-5 py-3 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
+          <button onClick={handleLike} className={`flex items-center space-x-2 px-5 py-3 rounded-2xl transition-all duration-300 active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={`transition-transform duration-300 ${isLiked ? 'scale-110' : ''}`} />
             <span className="text-sm font-black">{likesCount}</span>
           </button>
           
-          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-5 py-3 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
+          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-5 py-3 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
             <MessageCircle size={22} />
             <span className="text-sm font-black">{post.comments.length}</span>
           </button>
         </div>
 
-        <button onClick={handleShare} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all">
+        <button onClick={handleShare} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all active:scale-90">
             <Share2 size={22} />
         </button>
       </div>
@@ -260,6 +248,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       {showLikersModal && <LikerListModal postId={post.id} postType="feed" onClose={() => setShowLikersModal(false)} />}
     </div>
   );
-};
+});
 
-export default PostCard;
+export default memo(PostCard);

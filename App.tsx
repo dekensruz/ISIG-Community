@@ -1,27 +1,31 @@
 
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
-import AuthPage from './components/Auth';
-import Feed from './components/Feed';
-import Navbar from './components/Navbar';
-import Profile from './components/Profile';
-import SettingsPage from './components/SettingsPage';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Spinner from './components/Spinner';
-import PostPage from './components/PostPage';
-import GroupsPage from './components/GroupsPage';
-import GroupPage from './components/GroupPage';
-import UnreadMessagesProvider from './components/UnreadMessagesProvider';
-import ChatPage from './components/ChatPage';
-import UsersPage from './components/UsersPage';
+
+// Lazy loading des pages pour optimiser le bundle et la fluidité
+const AuthPage = lazy(() => import('./components/Auth'));
+const Feed = lazy(() => import('./components/Feed'));
+const Profile = lazy(() => import('./components/Profile'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const PostPage = lazy(() => import('./components/PostPage'));
+const GroupsPage = lazy(() => import('./components/GroupsPage'));
+const GroupPage = lazy(() => import('./components/GroupPage'));
+const ChatPage = lazy(() => import('./components/ChatPage'));
+const UsersPage = lazy(() => import('./components/UsersPage'));
+const SearchResultsPage = lazy(() => import('./components/SearchResultsPage'));
+const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
+const AdminFeedbacksPage = lazy(() => import('./components/AdminFeedbacksPage'));
+const FeedbackPage = lazy(() => import('./components/FeedbackPage'));
+
+// Importation des composants de structure
+import Navbar from './components/Navbar';
 import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
-import SearchResultsPage from './components/SearchResultsPage';
-import NotificationsPage from './components/NotificationsPage';
+import UnreadMessagesProvider from './components/UnreadMessagesProvider';
 import NotificationsProvider from './components/NotificationsProvider';
-import AdminFeedbacksPage from './components/AdminFeedbacksPage';
-import FeedbackPage from './components/FeedbackPage';
 import InstallPWABanner from './components/InstallPWABanner';
 
 type AuthContextType = {
@@ -64,6 +68,16 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 };
 
+// Composant de chargement intermédiaire
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[60vh] animate-pulse">
+    <div className="flex flex-col items-center">
+      <div className="w-12 h-12 border-4 border-isig-blue/20 border-t-isig-blue rounded-full animate-spin"></div>
+      <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Chargement fluide...</p>
+    </div>
+  </div>
+);
+
 const AppContent: React.FC = () => {
     const { session } = useAuth();
     const location = useLocation();
@@ -71,7 +85,6 @@ const AppContent: React.FC = () => {
     
     const isAuthPage = location.pathname === '/auth';
     const isChatConversation = location.pathname.startsWith('/chat/') && location.pathname.split('/').length > 2;
-    const isChatListPage = location.pathname === '/chat';
     
     const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
     const showNavBars = !isAuthPage && !isChatConversation;
@@ -87,31 +100,32 @@ const AppContent: React.FC = () => {
     }, [session]);
 
     return (
-        <div className="min-h-screen bg-slate-100">
+        <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white">
             {showNavBars && <Navbar />}
-            <main className={
+            <main className={`transition-all duration-300 ${
                 isAuthPage ? "" 
-                : isChatConversation ? "h-screen pt-0 pb-0" 
-                : isChatListPage ? "h-screen pt-[60px] pb-[80px]" 
+                : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
                 : "container mx-auto px-4 pt-24 pb-24" 
-            }>
-                <Routes>
-                    <Route path="/" element={<Feed />} />
-                    <Route path="/profile/:userId" element={<Profile />} />
-                    <Route path="/post/:postId" element={<PostPage />} />
-                    <Route path="/groups" element={session ? <GroupsPage /> : <Navigate to="/auth" />} />
-                    <Route path="/group/:groupId" element={session ? <GroupPage /> : <Navigate to="/auth" />} />
-                    <Route path="/chat" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
-                    <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
-                    <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
-                    <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
-                    <Route path="/feedback" element={session ? <FeedbackPage /> : <Navigate to="/auth" />} />
-                    <Route path="/admin/feedbacks" element={session ? <AdminFeedbacksPage /> : <Navigate to="/auth" />} />
-                    <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
-                    <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
-                    <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />
-                    <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
+            }`}>
+                <Suspense fallback={<PageLoader />}>
+                    <Routes location={location} key={location.pathname}>
+                        <Route path="/" element={<Feed />} />
+                        <Route path="/profile/:userId" element={<Profile />} />
+                        <Route path="/post/:postId" element={<PostPage />} />
+                        <Route path="/groups" element={session ? <GroupsPage /> : <Navigate to="/auth" />} />
+                        <Route path="/group/:groupId" element={session ? <GroupPage /> : <Navigate to="/auth" />} />
+                        <Route path="/chat" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
+                        <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
+                        <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
+                        <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
+                        <Route path="/feedback" element={session ? <FeedbackPage /> : <Navigate to="/auth" />} />
+                        <Route path="/admin/feedbacks" element={session ? <AdminFeedbacksPage /> : <Navigate to="/auth" />} />
+                        <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
+                        <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
+                        <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </Suspense>
             </main>
             {showNavBars && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
@@ -126,8 +140,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Timeout de sécurité : si Supabase ne répond pas en 6s, on arrête le loading
-    // pour permettre au moins l'affichage de l'écran de login ou d'une erreur
     const timer = setTimeout(() => {
       if (loading) setLoading(false);
     }, 6000);
@@ -155,7 +167,7 @@ const App: React.FC = () => {
         <div className="flex items-center justify-center min-h-screen bg-slate-100">
             <div className="flex flex-col items-center">
                 <Spinner />
-                <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Initialisation sécurisée...</p>
+                <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Initialisation sécurisée...</p>
             </div>
         </div>
     );

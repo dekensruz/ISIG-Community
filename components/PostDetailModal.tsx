@@ -16,6 +16,122 @@ interface PostDetailModalProps {
   onClose: () => void;
 }
 
+// Helper pour le rendu des liens
+const renderLinks = (text: string, isOwnMessage: boolean) => {
+    if (!text) return '';
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a key={index} href={part} target="_blank" rel="noopener noreferrer" className={`underline break-all ${isOwnMessage ? 'text-white' : 'text-isig-blue'}`} onClick={e => e.stopPropagation()}>
+                    {part}
+                </a>
+            );
+        }
+        return part;
+    });
+};
+
+interface CommentItemProps {
+    comment: CommentType;
+    isReply?: boolean;
+    currentUserId?: string;
+    onReply: (comment: CommentType) => void;
+    onDelete: (id: string) => void;
+    onUpdate: (id: string, content: string) => void;
+    onCloseModal: () => void;
+}
+
+const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUserId, onReply, onDelete, onUpdate, onCloseModal }) => {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(comment.content);
+
+    const handleEditSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onUpdate(comment.id, editContent);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
+            <Link to={`/profile/${comment.user_id}`} onClick={onCloseModal} className="shrink-0 transition-transform active:scale-90">
+                <Avatar avatarUrl={comment.profiles?.avatar_url} name={comment.profiles?.full_name || '...'} size="sm" />
+            </Link>
+            <div className="flex-1 min-w-0">
+                <div className="relative group/comment bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between items-start">
+                        <Link to={`/profile/${comment.user_id}`} onClick={onCloseModal} className="hover:underline">
+                            <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles?.full_name || 'Utilisateur'}</p>
+                        </Link>
+                        
+                        {currentUserId === comment.user_id && (
+                            <div className="relative">
+                                <button onClick={() => setMenuOpen(!menuOpen)} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
+                                    <MoreHorizontal size={14} />
+                                </button>
+                                {menuOpen && (
+                                    <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
+                                        <button 
+                                            onClick={() => { setIsEditing(true); setMenuOpen(false); }} 
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center"
+                                        >
+                                            <Pencil size={12} className="mr-2 text-isig-orange" /> Modifier
+                                        </button>
+                                        <button 
+                                            onClick={() => { onDelete(comment.id); setMenuOpen(false); }} 
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center"
+                                        >
+                                            <Trash2 size={12} className="mr-2" /> Supprimer
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {isEditing ? (
+                        <form onSubmit={handleEditSubmit} className="mt-1">
+                            <textarea 
+                                value={editContent} 
+                                onChange={(e) => setEditContent(e.target.value)} 
+                                className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue resize-none min-h-[60px]"
+                                autoFocus
+                            />
+                            <div className="flex space-x-3 mt-2">
+                                <button type="submit" className="text-[10px] font-black uppercase text-isig-blue hover:underline">Enregistrer</button>
+                                <button type="button" onClick={() => setIsEditing(false)} className="text-[10px] font-black uppercase text-slate-400 hover:underline">Annuler</button>
+                            </div>
+                        </form>
+                    ) : (
+                        <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">
+                            {renderLinks(comment.content, false)}
+                        </p>
+                    )}
+                </div>
+                
+                <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    <button onClick={() => onReply(comment)} className="hover:text-isig-blue transition-colors">Répondre</button>
+                    <span>•</span>
+                    <span>{formatDistanceToNow(new Date(comment.created_at), { locale: fr })}</span>
+                </div>
+                {comment.replies?.map(reply => (
+                    <CommentItem 
+                        key={reply.id} 
+                        comment={reply} 
+                        isReply 
+                        currentUserId={currentUserId}
+                        onReply={onReply}
+                        onDelete={onDelete}
+                        onUpdate={onUpdate}
+                        onCloseModal={onCloseModal}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const { session } = useAuth();
   const navigate = useNavigate();
@@ -29,38 +145,19 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const [replyContent, setReplyContent] = useState('');
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
-
   const modalRef = useRef<HTMLDivElement>(null);
   const modalRootRef = useRef(document.getElementById('modal-root'));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
-  };
-
-  const renderContentWithLinks = useCallback((text: string) => {
-    if (!text) return '';
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.split(urlRegex).map((part, index) => {
-      if (part.match(urlRegex)) {
-        return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
-            {part}
-          </a>
-        );
-      }
-      return part;
-    });
-  }, []);
+  }, [onClose]);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto'; // Changé de inherit à auto pour éviter le saut
+      textarea.style.height = '48px';
       const scrollHeight = textarea.scrollHeight;
       const maxHeight = 120;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
@@ -71,7 +168,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const fetchComments = async () => {
       const { data } = await supabase.from('comments').select(`*, profiles(*)`).eq('post_id', post.id).order('created_at', { ascending: true });
       if (data) setComments(data as any);
-  }
+  };
 
   useEffect(() => {
     fetchComments();
@@ -86,20 +183,10 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                 schema: 'public', 
                 table: 'comments', 
                 filter: `post_id=eq.${post.id}` 
-            }, (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    fetchComments();
-                } else if (payload.eventType === 'UPDATE') {
-                    setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-                } else if (payload.eventType === 'DELETE') {
-                    setComments(prev => prev.filter(c => c.id !== payload.old.id));
-                }
-            })
+            }, () => fetchComments())
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(commentChannel);
-        };
+        return () => { supabase.removeChannel(commentChannel); };
     }
   }, [post.id, session]);
 
@@ -119,13 +206,12 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     return rootComments;
   }, [comments]);
 
-  const userHasLiked = likes.some(like => like.user_id === session?.user.id);
-
   const handleLike = async () => {
     if (!session?.user) {
       navigate('/auth?mode=signup');
       return;
     }
+    const userHasLiked = likes.some(like => like.user_id === session?.user.id);
     if (userHasLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -158,15 +244,12 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
         }).select('*, profiles(*)').single();
 
         if (error) throw error;
-
         if (data) {
             setComments(prev => [...prev, data as any]);
             setNewComment(''); 
             setReplyContent(''); 
             setReplyingTo(null);
-            if (textareaRef.current) {
-              textareaRef.current.style.height = 'auto';
-            }
+            if (textareaRef.current) textareaRef.current.style.height = '48px';
         }
     } catch (err) {
         console.error("Erreur commentaire:", err);
@@ -175,107 +258,28 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
-    const { error } = await supabase.from('comments').delete().eq('id', commentId);
-    if (!error) {
-        setComments(prev => prev.filter(c => c.id !== commentId));
-        setCommentMenuOpen(null);
-    }
+  const handleDeleteComment = async (id: string) => {
+    if (!window.confirm("Supprimer ce commentaire ?")) return;
+    const { error } = await supabase.from('comments').delete().eq('id', id);
+    if (!error) setComments(prev => prev.filter(c => c.id !== id));
   };
 
-  const handleEditComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editContent.trim() || !editingCommentId) return;
-    const { error } = await supabase.from('comments').update({ content: editContent }).eq('id', editingCommentId);
-    if (!error) {
-        setComments(prev => prev.map(c => c.id === editingCommentId ? {...c, content: editContent} : c));
-        setEditingCommentId(null);
-        setEditContent('');
-    }
+  const handleUpdateComment = async (id: string, content: string) => {
+    const { error } = await supabase.from('comments').update({ content }).eq('id', id);
+    if (!error) setComments(prev => prev.map(c => c.id === id ? {...c, content} : c));
   };
-
-  const CommentItem: React.FC<{ comment: CommentType, isReply?: boolean }> = ({ comment, isReply }) => (
-    <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
-        <Link to={`/profile/${comment.user_id}`} onClick={handleClose} className="shrink-0 transition-transform active:scale-90">
-          <Avatar avatarUrl={comment.profiles?.avatar_url} name={comment.profiles?.full_name || '...'} size="sm" />
-        </Link>
-        <div className="flex-1 min-w-0">
-            <div className="relative group/comment bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <div className="flex justify-between items-start">
-                    <Link to={`/profile/${comment.user_id}`} onClick={handleClose} className="hover:underline">
-                      <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles?.full_name || 'Utilisateur'}</p>
-                    </Link>
-                    
-                    {session?.user.id === comment.user_id && (
-                        <div className="relative">
-                            <button 
-                                onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)} 
-                                className="text-slate-400 hover:text-slate-600 transition-colors p-1"
-                            >
-                                <MoreHorizontal size={14} />
-                            </button>
-                            {commentMenuOpen === comment.id && (
-                                <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
-                                    <button 
-                                        onClick={() => { setEditingCommentId(comment.id); setEditContent(comment.content); setCommentMenuOpen(null); }} 
-                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center"
-                                    >
-                                        <Pencil size={12} className="mr-2 text-isig-orange" /> Modifier
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDeleteComment(comment.id)} 
-                                        className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center"
-                                    >
-                                        <Trash2 size={12} className="mr-2" /> Supprimer
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {editingCommentId === comment.id ? (
-                    <form onSubmit={handleEditComment} className="mt-1">
-                        <textarea 
-                            value={editContent} 
-                            onChange={(e) => setEditContent(e.target.value)} 
-                            className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue resize-none min-h-[60px]"
-                            autoFocus
-                        />
-                        <div className="flex space-x-3 mt-2">
-                            <button type="submit" className="text-[10px] font-black uppercase text-isig-blue hover:underline">Enregistrer</button>
-                            <button type="button" onClick={() => setEditingCommentId(null)} className="text-[10px] font-black uppercase text-slate-400 hover:underline">Annuler</button>
-                        </div>
-                    </form>
-                ) : (
-                    <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">
-                      {renderContentWithLinks(comment.content)}
-                    </p>
-                )}
-            </div>
-            
-            <div className="flex items-center space-x-3 mt-1 ml-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                <button onClick={() => setReplyingTo(comment)} className="hover:text-isig-blue transition-colors">Répondre</button>
-                <span>•</span>
-                <span>{formatDistanceToNow(new Date(comment.created_at), { locale: fr })}</span>
-            </div>
-            {comment.replies?.map(reply => <CommentItem key={reply.id} comment={reply} isReply />)}
-        </div>
-    </div>
-  );
 
   if (!modalRootRef.current) return null;
 
   return createPortal(
     <div className={`fixed inset-0 bg-brand-dark/80 backdrop-blur-md z-[100] flex justify-center items-center p-4 transition-opacity duration-300 ${isAnimatingOut ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}>
-      <div ref={modalRef} onClick={e => e.stopPropagation()} className={`bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] overflow-hidden transition-all duration-300 ${isAnimatingOut ? 'scale-95' : 'scale-100'}`}>
+      <div onClick={e => e.stopPropagation()} className={`bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] overflow-hidden transition-all duration-300 ${isAnimatingOut ? 'scale-95' : 'scale-100'}`}>
         <div className="flex justify-between items-center p-6 border-b border-slate-50 flex-shrink-0">
             <h2 className="font-black text-xl text-slate-800 tracking-tight italic uppercase">Publication</h2>
             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth" style={{ scrollbarGutter: 'stable' }}>
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
             <div className="flex items-center space-x-4 mb-6">
                 <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
                   <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
@@ -287,7 +291,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{post.profiles.major} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
                 </div>
             </div>
-            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{renderContentWithLinks(post.content)}</p>
+            <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{renderLinks(post.content, false)}</p>
             {post.media_url && post.media_type === 'image' && (
                 <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100">
                     <img src={post.media_url} alt="Média" className="w-full h-auto max-h-[500px] object-contain mx-auto" />
@@ -295,15 +299,25 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             )}
             <div className="pt-6 space-y-2 border-t border-slate-50">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Commentaires ({comments.length})</p>
-                {nestedComments.map(comment => <CommentItem key={comment.id} comment={comment} />)}
+                {nestedComments.map(comment => (
+                    <CommentItem 
+                        key={comment.id} 
+                        comment={comment} 
+                        currentUserId={session?.user.id}
+                        onReply={setReplyingTo}
+                        onDelete={handleDeleteComment}
+                        onUpdate={handleUpdateComment}
+                        onCloseModal={handleClose}
+                    />
+                ))}
                 {comments.length === 0 && <div className="text-center py-10 opacity-40 italic text-sm font-medium">Aucun commentaire pour le moment.</div>}
             </div>
         </div>
 
         <div className="border-t border-slate-50 bg-white flex-shrink-0 relative z-10 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
             <div className="px-6 py-4 flex items-center space-x-6 border-b border-slate-50">
-                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${userHasLiked ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
-                    <Heart size={24} fill={userHasLiked ? '#FF8C00' : 'none'}/>
+                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${likes.some(l => l.user_id === session?.user.id) ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
+                    <Heart size={24} fill={likes.some(l => l.user_id === session?.user.id) ? '#FF8C00' : 'none'}/>
                     <span className="text-sm">{likesCount}</span>
                 </button>
                 <div className="flex items-center space-x-2 font-black text-slate-400">
@@ -327,9 +341,8 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                             placeholder={replyingTo ? "Écrire une réponse..." : "Ajouter un commentaire..."} 
                             value={replyingTo ? replyContent : newComment} 
                             onChange={(e) => {
-                                const val = e.target.value;
-                                if (replyingTo) setReplyContent(val);
-                                else setNewComment(val);
+                                if (replyingTo) setReplyContent(e.target.value);
+                                else setNewComment(e.target.value);
                                 adjustHeight();
                             }} 
                             className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden" 
@@ -339,7 +352,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                         {isPostingComment ? <Spinner /> : <Send size={20} />}
                     </button>
                 </form>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60">Restez courtois et respectueux.</p>
             </div>
         </div>
       </div>

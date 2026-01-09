@@ -137,7 +137,13 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
   const { session } = useAuth();
   const navigate = useNavigate();
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
-  const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  
+  // Utilisation de la même logique que PostCard pour l'initialisation précise
+  const [likesCount, setLikesCount] = useState(() => {
+    const actualArrayCount = post.likes?.length || 0;
+    return Math.max(post.likes_count || 0, actualArrayCount);
+  });
+
   const [comments, setComments] = useState<CommentType[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);

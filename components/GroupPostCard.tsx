@@ -240,7 +240,13 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       </div>
 
       {showImageModal && <GroupImageModal post={post} onClose={() => setShowImageModal(false)} onOpenComments={() => setShowPostDetailModal(true)} />}
-      {showPostDetailModal && <GroupPostDetailModal postInitial={post} onClose={() => setShowPostDetailModal(false)} onInteractionUpdate={handleInteractionUpdate} />}
+      {showPostDetailModal && (
+        <GroupPostDetailModal 
+          postInitial={{...post, group_post_likes: likes, likes_count: likesCount}} 
+          onClose={() => setShowPostDetailModal(false)} 
+          onInteractionUpdate={handleInteractionUpdate} 
+        />
+      )}
       {showLikersModal && <LikerListModal postId={post.id} postType="group" onClose={() => setShowLikersModal(false)} />}
       {showEditModal && <EditGroupPostModal post={post} onClose={() => setShowEditModal(false)} />}
     </div>

@@ -258,7 +258,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       </div>
 
       {showImageModal && <ImageModal post={post} onClose={() => setShowImageModal(false)} onOpenComments={() => setShowPostDetailModal(true)} />}
-      {showPostDetailModal && <PostDetailModal post={post} onClose={() => setShowPostDetailModal(false)} onInteractionUpdate={handleInteractionUpdate} />}
+      {showPostDetailModal && (
+        <PostDetailModal 
+          post={{...post, likes: likes, likes_count: likesCount}} 
+          onClose={() => setShowPostDetailModal(false)} 
+          onInteractionUpdate={handleInteractionUpdate} 
+        />
+      )}
       {showLikersModal && <LikerListModal postId={post.id} postType="feed" onClose={() => setShowLikersModal(false)} />}
     </div>
   );

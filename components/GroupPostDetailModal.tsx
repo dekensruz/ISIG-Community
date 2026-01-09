@@ -129,6 +129,13 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   const navigate = useNavigate();
   const [post, setPost] = useState<GroupPost>(postInitial);
   const [likes, setLikes] = useState<GroupPostLike[]>(postInitial.group_post_likes || []);
+  
+  // Utilisation de la logique MAX pour garantir la cohérence avec le Feed
+  const [likesCount, setLikesCount] = useState(() => {
+    const actualArrayCount = postInitial.group_post_likes?.length || 0;
+    return Math.max(postInitial.likes_count || 0, actualArrayCount);
+  });
+
   const [comments, setComments] = useState<GroupPostComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
@@ -225,12 +232,14 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
+        setLikesCount(prev => Math.max(0, prev - 1));
         await supabase.from('group_post_likes').delete().eq('id', like.id);
       }
     } else {
       const tempId = `temp-${Date.now()}`;
       const tempLike = { id: tempId, group_post_id: post.id, user_id: session.user.id };
       setLikes(prev => [...prev, tempLike as any]);
+      setLikesCount(prev => prev + 1);
       const { data } = await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id }).select().single();
       if(data) setLikes(prev => prev.map(l => l.id === tempId ? data : l));
     }
@@ -311,7 +320,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             <div className="flex items-center space-x-6 pb-6 border-b border-slate-50">
                 <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${likes.some(l => l.user_id === session?.user.id) ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
                     <Heart size={20} fill={likes.some(l => l.user_id === session?.user.id) ? '#FF8C00' : 'none'}/>
-                    <span className="text-sm">{likes.length}</span>
+                    <span className="text-sm">{likesCount}</span>
                 </button>
                 <div className="flex items-center space-x-2 font-black text-slate-400">
                     <MessageCircle size={20} />

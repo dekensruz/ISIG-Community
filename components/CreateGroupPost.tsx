@@ -70,12 +70,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     fileInputRef.current?.click();
   };
 
-  const handlePost = async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handlePost = async () => {
     if (!content.trim() && !file) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -129,7 +124,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   
   return (
     <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
-      <form onSubmit={handlePost} className="space-y-4">
+      <div className="space-y-4">
         <textarea
             ref={textareaRef}
             className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px] text-sm transition-all overflow-hidden"
@@ -183,7 +178,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             </div>
             
             <button 
-                type="submit" 
+                type="button" 
+                onClick={handlePost}
                 disabled={uploading || (!content.trim() && !file)}
                 className="bg-isig-orange text-white font-black py-3.5 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px] active:scale-95"
             >
@@ -197,7 +193,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
                 <span>{error}</span>
             </div>
         )}
-      </form>
+      </div>
     </div>
   );
 };

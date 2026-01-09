@@ -127,18 +127,18 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   return (
     <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-95">
+        <div className="flex items-center min-w-0 flex-1">
+          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-95 shrink-0">
             <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="mr-4" />
           </Link>
-          <div>
-            <Link to={`/profile/${post.profiles.id}`} className="font-extrabold text-slate-800 hover:text-isig-blue transition-colors">{post.profiles.full_name}</Link>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
+          <div className="min-w-0 flex-1">
+            <Link to={`/profile/${post.profiles.id}`} className="font-extrabold text-slate-800 hover:text-isig-blue transition-colors truncate block">{post.profiles.full_name}</Link>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5 truncate">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</p>
           </div>
         </div>
 
         {session?.user.id === post.user_id && (
-          <div className="relative">
+          <div className="relative shrink-0 ml-2">
             <button onClick={() => setShowOptions(!showOptions)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors active:scale-95">
               <MoreHorizontal size={20} />
             </button>

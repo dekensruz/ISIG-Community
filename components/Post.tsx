@@ -133,24 +133,24 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card animate-fade-in-up">
       <div className="p-6 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-90 duration-200">
+        <div className="flex items-center space-x-4 min-w-0 flex-1">
+          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-90 duration-200 shrink-0">
             <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="ring-4 ring-slate-50" />
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors truncate">
                 {post.profiles.full_name}
             </Link>
-            <div className="flex items-center text-[10px] text-slate-400 font-black uppercase tracking-widest truncate">
-                <span className="truncate">{post.profiles.major}</span>
-                <span className="mx-2 text-slate-300 shrink-0">•</span>
+            <div className="flex flex-wrap items-center text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
+                <span className="truncate max-w-[120px] sm:max-w-none">{post.profiles.major}</span>
+                <span className="mx-1.5 text-slate-300 shrink-0">•</span>
                 <span className="shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: locales.fr })}</span>
             </div>
           </div>
         </div>
 
         {session?.user.id === post.user_id && (
-          <div className="relative">
+          <div className="relative shrink-0 ml-2">
             <button onClick={() => setShowOptions(!showOptions)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors active:scale-95">
               <MoreHorizontal size={20} />
             </button>

@@ -35,6 +35,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
@@ -48,7 +50,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         setFile(null);
         setPreviewUrl(null);
     }
-    e.target.value = '';
   };
 
   const handleRemoveFile = (e?: React.MouseEvent) => {
@@ -62,7 +63,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   };
 
   const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) e.preventDefault();
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
     
     if (!content.trim() && !file) {
       setError("La publication ne peut pas être vide.");
@@ -115,10 +119,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   };
   
   return (
-    <form 
-      onSubmit={(e) => e.preventDefault()}
-      className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up"
-    >
+    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
               Publication de groupe
@@ -179,6 +180,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
               className="hidden" 
               accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
               onChange={handleFileChange} 
+              onClick={(e) => e.stopPropagation()}
             />
         </div>
         <button
@@ -191,7 +193,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         </button>
       </div>
       {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
-    </form>
+    </div>
   );
 };
 

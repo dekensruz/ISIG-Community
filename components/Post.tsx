@@ -29,13 +29,15 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [commentCount, setCommentCount] = useState(post.comments?.length || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
 
   useEffect(() => {
     setLikes(post.likes || []);
     const actualCount = post.likes?.length || 0;
     setLikesCount(Math.max(post.likes_count || 0, actualCount));
-  }, [post.likes, post.likes_count]);
+    setCommentCount(post.comments?.length || 0);
+  }, [post.likes, post.likes_count, post.comments]);
 
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
@@ -89,6 +91,12 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       }
     }
   }, [isLiked, likes, post.id, session?.user.id, navigate]);
+
+  const handleInteractionUpdate = (newLikes: Like[], newCommentCount: number) => {
+    setLikes(newLikes);
+    setLikesCount(newLikes.length);
+    setCommentCount(newCommentCount);
+  };
 
   const getLikeSummaryText = useCallback(() => {
     const count = likesCount;
@@ -232,7 +240,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           
           <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-5 py-3 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
             <MessageCircle size={22} />
-            <span className="text-sm font-black">{post.comments.length}</span>
+            <span className="text-sm font-black">{commentCount}</span>
           </button>
         </div>
 
@@ -250,7 +258,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       </div>
 
       {showImageModal && <ImageModal post={post} onClose={() => setShowImageModal(false)} onOpenComments={() => setShowPostDetailModal(true)} />}
-      {showPostDetailModal && <PostDetailModal post={post} onClose={() => setShowPostDetailModal(false)} />}
+      {showPostDetailModal && <PostDetailModal post={post} onClose={() => setShowPostDetailModal(false)} onInteractionUpdate={handleInteractionUpdate} />}
       {showLikersModal && <LikerListModal postId={post.id} postType="feed" onClose={() => setShowLikersModal(false)} />}
     </div>
   );

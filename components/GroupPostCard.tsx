@@ -30,13 +30,15 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
   const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes || []);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [commentCount, setCommentCount] = useState(post.group_post_comments?.length || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
 
   useEffect(() => {
     setLikes(post.group_post_likes || []);
     const actualCount = post.group_post_likes?.length || 0;
     setLikesCount(Math.max(post.likes_count || 0, actualCount));
-  }, [post.group_post_likes, post.likes_count]);
+    setCommentCount(post.group_post_comments?.length || 0);
+  }, [post.group_post_likes, post.likes_count, post.group_post_comments]);
 
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
@@ -77,13 +79,22 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         await supabase.from('group_post_likes').delete().match({ group_post_id: post.id, user_id: session.user.id });
       }
     } else {
+      const tempId = `temp-${Date.now()}`;
+      const tempLike = { id: tempId, group_post_id: post.id, user_id: session.user.id };
+      setLikes(prev => [tempLike as any, ...prev]);
+      setLikesCount(prev => prev + 1);
       const { data, error } = await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id }).select().single();
       if(!error && data) {
-          setLikes(prev => [data, ...prev]);
-          setLikesCount(prev => prev + 1);
+          setLikes(prev => prev.map(l => l.id === tempId ? data : l));
       }
     }
   }, [isLiked, likes, post.id, session?.user, navigate]);
+
+  const handleInteractionUpdate = (newLikes: GroupPostLike[], newCommentCount: number) => {
+    setLikes(newLikes);
+    setLikesCount(newLikes.length);
+    setCommentCount(newCommentCount);
+  };
 
   const getLikeSummaryText = useCallback(() => {
     const count = likesCount;
@@ -212,7 +223,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           </button>
           <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
             <MessageCircle size={20} />
-            <span className="text-sm font-bold">{post.group_post_comments.length}</span>
+            <span className="text-sm font-bold">{commentCount}</span>
           </button>
         </div>
         <button onClick={() => {
@@ -229,7 +240,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       </div>
 
       {showImageModal && <GroupImageModal post={post} onClose={() => setShowImageModal(false)} onOpenComments={() => setShowPostDetailModal(true)} />}
-      {showPostDetailModal && <GroupPostDetailModal postInitial={post} onClose={() => setShowPostDetailModal(false)} />}
+      {showPostDetailModal && <GroupPostDetailModal postInitial={post} onClose={() => setShowPostDetailModal(false)} onInteractionUpdate={handleInteractionUpdate} />}
       {showLikersModal && <LikerListModal postId={post.id} postType="group" onClose={() => setShowLikersModal(false)} />}
       {showEditModal && <EditGroupPostModal post={post} onClose={() => setShowEditModal(false)} />}
     </div>

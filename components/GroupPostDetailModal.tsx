@@ -14,6 +14,7 @@ import { fr } from 'date-fns/locale';
 interface GroupPostDetailModalProps {
   postInitial: GroupPost;
   onClose: () => void;
+  onInteractionUpdate?: (likes: GroupPostLike[], commentCount: number) => void;
 }
 
 const renderLinks = (text: string, isOwnMessage: boolean) => {
@@ -123,11 +124,11 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUser
     );
 };
 
-const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial, onClose }) => {
+const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial, onClose, onInteractionUpdate }) => {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [post, setPost] = useState<GroupPost>(postInitial);
-  const [likes, setLikes] = useState<GroupPostLike[]>(postInitial.group_post_likes);
+  const [likes, setLikes] = useState<GroupPostLike[]>(postInitial.group_post_likes || []);
   const [comments, setComments] = useState<GroupPostComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
@@ -144,6 +145,13 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
   }, [onClose]);
+
+  // Synchronisation avec le parent
+  useEffect(() => {
+    if (onInteractionUpdate) {
+        onInteractionUpdate(likes, comments.length);
+    }
+  }, [likes, comments.length, onInteractionUpdate]);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -220,8 +228,11 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
         await supabase.from('group_post_likes').delete().eq('id', like.id);
       }
     } else {
+      const tempId = `temp-${Date.now()}`;
+      const tempLike = { id: tempId, group_post_id: post.id, user_id: session.user.id };
+      setLikes(prev => [...prev, tempLike as any]);
       const { data } = await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id }).select().single();
-      if(data) setLikes(prev => [...prev, data]);
+      if(data) setLikes(prev => prev.map(l => l.id === tempId ? data : l));
     }
   };
 

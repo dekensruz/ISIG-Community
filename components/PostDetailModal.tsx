@@ -14,6 +14,7 @@ import { Link, useNavigate } from 'react-router-dom';
 interface PostDetailModalProps {
   post: PostType;
   onClose: () => void;
+  onInteractionUpdate?: (likes: Like[], commentCount: number) => void;
 }
 
 // Helper pour le rendu des liens
@@ -132,7 +133,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUser
     );
 };
 
-const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
+const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInteractionUpdate }) => {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
@@ -153,6 +154,13 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     setIsAnimatingOut(true);
     setTimeout(onClose, 300);
   }, [onClose]);
+
+  // Synchronisation avec le parent à chaque changement important
+  useEffect(() => {
+    if (onInteractionUpdate) {
+        onInteractionUpdate(likes, comments.length);
+    }
+  }, [likes, comments.length, onInteractionUpdate]);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -215,14 +223,18 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
     if (userHasLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
-        setLikes(prev => prev.filter(l => l.id !== like.id));
+        const newLikes = likes.filter(l => l.id !== like.id);
+        setLikes(newLikes);
         setLikesCount(prev => Math.max(0, prev - 1));
         await supabase.from('likes').delete().eq('id', like.id);
       }
     } else {
+      const tempId = `temp-${Date.now()}`;
+      const tempLike = { id: tempId, post_id: post.id, user_id: session.user.id };
+      setLikes(prev => [...prev, tempLike as any]);
       setLikesCount(prev => prev + 1);
       const { data } = await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id }).select().single();
-      if(data) setLikes(prev => [...prev, data]);
+      if(data) setLikes(prev => prev.map(l => l.id === tempId ? data : l));
     }
   };
 

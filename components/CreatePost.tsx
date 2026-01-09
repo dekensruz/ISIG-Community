@@ -73,6 +73,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const handlePost = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     if (!content.trim() && !file && !previewUrl) {
@@ -183,10 +187,20 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
 
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
         <div className="flex space-x-2">
-           <label htmlFor="feed-file-upload" className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all">
+           <button 
+            type="button" 
+            onClick={triggerFileInput} 
+            className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all"
+           >
             <Paperclip size={24} />
-            <input id="feed-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-          </label>
+            <input 
+              id="feed-file-upload" 
+              type="file" 
+              className="sr-only" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+            />
+          </button>
         </div>
         <button
           type="button"

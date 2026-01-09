@@ -64,6 +64,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const handlePost = async (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
@@ -88,7 +92,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
         if (file) {
           const fileExt = file.name.split('.').pop();
-          // Utilisation d'un chemin à plat pour plus de fiabilité sur le storage
           const fileName = `group-${groupId}-${session.user.id}-${Date.now()}.${fileExt}`;
           
           const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
@@ -96,7 +99,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
           const { data } = supabase.storage.from('media').getPublicUrl(fileName);
           mediaUrl = data.publicUrl;
-          // Uniformisation du type comme dans CreatePost.tsx
           mediaType = file.type.startsWith('image/') ? 'image' : 'document';
         }
 
@@ -110,12 +112,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
         if (insertError) throw insertError;
         
-        // Reset local state
         setContent('');
         handleRemoveFile();
         if (textareaRef.current) textareaRef.current.style.height = '100px';
         
-        // Success callback
         onPostCreated(data as any);
     } catch (err: any) {
         console.error("Group Post Upload error:", err);
@@ -161,11 +161,21 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-            <label htmlFor="group-post-file-upload" className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer">
+            <button 
+              type="button"
+              onClick={triggerFileInput}
+              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer"
+            >
                 <Paperclip size={24} />
                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
-                <input id="group-post-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-            </label>
+                <input 
+                  id="group-post-file-upload" 
+                  type="file" 
+                  className="sr-only" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                />
+            </button>
             
             <button 
                 type="submit" 

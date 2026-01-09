@@ -43,6 +43,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   };
 
   const renderContentWithLinks = useCallback((text: string) => {
+    if (!text) return '';
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
@@ -59,7 +60,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
+      textarea.style.height = 'inherit';
       const scrollHeight = textarea.scrollHeight;
       const maxHeight = 128;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
@@ -87,11 +88,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
                 filter: `post_id=eq.${post.id}` 
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    const incoming = payload.new as CommentType;
-                    setComments(prev => {
-                        if (prev.some(c => c.id === incoming.id)) return prev;
-                        return [...prev, incoming];
-                    });
                     fetchComments();
                 } else if (payload.eventType === 'UPDATE') {
                     setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
@@ -109,7 +105,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => { document.body.style.overflow = ''; };
   }, []);
 
   const nestedComments = useMemo(() => {
@@ -170,7 +166,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose }) => {
             setReplyingTo(null);
             if (textareaRef.current) {
               textareaRef.current.style.height = 'auto';
-              textareaRef.current.style.overflowY = 'hidden';
             }
         }
     } catch (err) {

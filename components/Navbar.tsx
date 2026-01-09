@@ -8,7 +8,7 @@ import { User, LogOut, Search, Bell, LayoutGrid, Settings } from 'lucide-react';
 import Avatar from './Avatar';
 
 const Navbar: React.FC = () => {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -27,7 +27,6 @@ const Navbar: React.FC = () => {
     const { count } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', session.user.id)
         .eq('is_read', false);
     setUnreadNotificationsCount(count || 0);
   };
@@ -54,8 +53,7 @@ const Navbar: React.FC = () => {
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${session.user.id}`
+                table: 'notifications'
             }, () => {
                 fetchNotificationCount();
             })
@@ -76,14 +74,12 @@ const Navbar: React.FC = () => {
     e.stopPropagation();
     setDropdownOpen(false);
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await supabase.auth.signOut();
     } catch (err) {
       console.error("Erreur de déconnexion:", err);
     } finally {
-      // On redirige quoi qu'il arrive
       navigate('/auth');
-      window.location.reload(); // Force le nettoyage du cache React
+      window.location.reload(); 
     }
   };
 
@@ -128,7 +124,9 @@ const Navbar: React.FC = () => {
               )}
             </Link>
 
-            {profile ? (
+            {loading ? (
+               <div className="ml-2 w-10 h-10 bg-slate-100 rounded-full animate-pulse"></div>
+            ) : profile ? (
                <div className="relative flex items-center pl-3 border-l border-slate-200 ml-2">
                   <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 group transition-transform active:scale-95">
                     <Avatar avatarUrl={profile.avatar_url} name={profile.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/30 transition-all" />

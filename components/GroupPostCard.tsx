@@ -117,6 +117,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
   const renderContentWithLinks = useCallback((text: string) => {
+    if (!text) return '';
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {

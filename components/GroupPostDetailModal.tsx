@@ -43,6 +43,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   };
 
   const renderContentWithLinks = useCallback((text: string) => {
+    if (!text) return '';
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
@@ -59,7 +60,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
+      textarea.style.height = 'inherit';
       const scrollHeight = textarea.scrollHeight;
       const maxHeight = 128;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
@@ -81,7 +82,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => { document.body.style.overflow = ''; };
   }, []);
 
   useEffect(() => {
@@ -97,11 +98,6 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                 filter: `group_post_id=eq.${postInitial.id}` 
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    const incoming = payload.new as GroupPostComment;
-                    setComments(prev => {
-                        if (prev.some(c => c.id === incoming.id)) return prev;
-                        return [...prev, incoming];
-                    });
                     fetchComments();
                 } else if (payload.eventType === 'UPDATE') {
                     setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
@@ -177,7 +173,6 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             setNewComment('');
             if (textareaRef.current) {
               textareaRef.current.style.height = 'auto';
-              textareaRef.current.style.overflowY = 'hidden';
             }
         }
     } catch (err) {
@@ -208,7 +203,6 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             setReplyingTo(null);
             if (textareaRef.current) {
               textareaRef.current.style.height = 'auto';
-              textareaRef.current.style.overflowY = 'hidden';
             }
         }
     } catch (err) {

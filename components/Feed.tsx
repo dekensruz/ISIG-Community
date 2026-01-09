@@ -7,7 +7,7 @@ import PostCard from './Post';
 import Spinner from './Spinner';
 import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { Search, X, TrendingUp, Clock } from 'lucide-react';
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
@@ -17,6 +17,7 @@ const Feed: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
+  const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
   const { searchQuery, setSearchQuery } = useSearchFilter();
   
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -38,11 +39,17 @@ const Feed: React.FC = () => {
       const from = currentPage * POSTS_PER_PAGE;
       const to = from + POSTS_PER_PAGE - 1;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('posts')
-        .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
+
+      if (sortBy === 'popular') {
+        query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      const { data, error } = await query.range(from, to);
 
       if (error) throw error;
       
@@ -54,7 +61,6 @@ const Feed: React.FC = () => {
       } else {
         setPosts(prev => {
             const combined = [...prev, ...newPosts];
-            // Déduplication stricte par ID
             const unique = combined.filter((p, idx, self) => 
                 self.findIndex(t => t.id === p.id) === idx
             );
@@ -72,11 +78,14 @@ const Feed: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [page]);
+  }, [page, sortBy]);
 
+  // Re-charger quand le tri change
   useEffect(() => {
     fetchPosts(true);
+  }, [sortBy]);
 
+  useEffect(() => {
     const channel = supabase
       .channel('feed-realtime-global')
       .on('postgres_changes', { 
@@ -183,6 +192,26 @@ const Feed: React.FC = () => {
                 )}
             </div>
         </div>
+
+        {/* Tab Selector pour le Tri */}
+        {!searchQuery && (
+          <div className="flex p-1.5 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto animate-fade-in-up">
+              <button 
+                  onClick={() => setSortBy('recent')}
+                  className={`flex items-center justify-center space-x-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Clock size={16} />
+                  <span>Récent</span>
+              </button>
+              <button 
+                  onClick={() => setSortBy('popular')}
+                  className={`flex items-center justify-center space-x-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <TrendingUp size={16} />
+                  <span>Populaire</span>
+              </button>
+          </div>
+        )}
 
         {session ? (
           <CreatePost 

@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import * as locales from 'date-fns/locale';
-import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
@@ -28,6 +28,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [isExpanded, setIsExpanded] = useState(false);
   
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
+  const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
@@ -71,11 +72,15 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
+        setLikesCount(prev => prev - 1);
         await supabase.from('likes').delete().match({ post_id: post.id, user_id: session.user.id });
       }
     } else {
       const { data, error } = await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id }).select().single();
-      if (!error && data) setLikes(prev => [data, ...prev]);
+      if (!error && data) {
+          setLikes(prev => [data, ...prev]);
+          setLikesCount(prev => prev + 1);
+      }
     }
   };
 
@@ -94,7 +99,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
             throw new Error('Web Share API non supportée');
         }
     } catch (err) {
-        // Fallback pour PC : Copie dans le presse-papier
         try {
             await navigator.clipboard.writeText(shareText);
             alert("Mention personnalisée et lien copiés dans votre presse-papier !");
@@ -105,7 +109,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   };
 
   const getLikeSummaryText = () => {
-    const count = likes.length;
+    const count = likesCount;
     if (count === 0) return null;
 
     if (isLiked) {
@@ -123,6 +127,8 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     }
   };
 
+  const isTrending = likesCount >= 5;
+
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all hover:shadow-premium group">
       <div className="p-6 flex items-center justify-between">
@@ -131,9 +137,16 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
             <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="ring-4 ring-slate-50 transition-transform group-hover:scale-105" />
           </Link>
           <div>
-            <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors">
-                {post.profiles.full_name}
-            </Link>
+            <div className="flex items-center space-x-2">
+                <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors">
+                    {post.profiles.full_name}
+                </Link>
+                {isTrending && (
+                    <div className="bg-isig-orange/10 text-isig-orange px-2 py-0.5 rounded-lg flex items-center text-[8px] font-black uppercase tracking-widest animate-pulse">
+                        <TrendingUp size={10} className="mr-1"/> Tendance
+                    </div>
+                )}
+            </div>
             <div className="flex items-center text-[10px] text-slate-400 font-black uppercase tracking-widest">
                 <span>{post.profiles.major}</span>
                 <span className="mx-2 text-slate-300">•</span>
@@ -191,7 +204,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         </div>
       )}
 
-      {likes.length > 0 && (
+      {likesCount > 0 && (
           <div className="px-7 pb-4">
               <button 
                 onClick={() => setShowLikersModal(true)}
@@ -211,7 +224,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         <div className="flex items-center space-x-2">
           <button onClick={handleLike} className={`flex items-center space-x-2 px-5 py-3 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
             <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
-            <span className="text-sm font-black">{likes.length}</span>
+            <span className="text-sm font-black">{likesCount}</span>
           </button>
           
           <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-5 py-3 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">

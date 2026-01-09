@@ -26,6 +26,7 @@ export interface Post {
   media_url?: string;
   media_type?: 'image' | 'document' | 'link';
   created_at: string;
+  likes_count: number;
   profiles: Profile; 
   comments: Comment[];
   likes: Like[];
@@ -89,6 +90,7 @@ export interface GroupPost {
     media_url?: string;
     media_type?: string;
     created_at: string;
+    likes_count: number;
     profiles: Profile;
     group_post_comments: GroupPostComment[];
     group_post_likes: GroupPostLike[];

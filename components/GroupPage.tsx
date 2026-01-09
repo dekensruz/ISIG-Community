@@ -6,7 +6,7 @@ import { useAuth } from '../App';
 import { Group as GroupType, GroupPost as GroupPostType, GroupMember, GroupJoinRequest } from '../types';
 import Spinner from './Spinner';
 import GroupPostCard from './GroupPostCard';
-import { Users, LogIn, LogOut, Edit, X, Clock, Crown } from 'lucide-react';
+import { Users, LogIn, LogOut, Edit, X, Clock, Crown, TrendingUp } from 'lucide-react';
 import CreateGroupPost from './CreateGroupPost';
 import EditGroupModal from './EditGroupModal';
 import Avatar from './Avatar';
@@ -26,6 +26,7 @@ const GroupPage: React.FC = () => {
   const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [userRequestStatus, setUserRequestStatus] = useState<'none' | 'pending'>('none');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
   
   const [loadingGroup, setLoadingGroup] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -72,10 +73,22 @@ const GroupPage: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = true) => {
     if (!groupId) return;
     if (isInitial) setLoadingPosts(true);
-    const { data: correctData } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('group_id', groupId).order('created_at', { ascending: false });
+    
+    let query = supabase
+      .from('group_posts')
+      .select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`)
+      .eq('group_id', groupId);
+
+    if (sortBy === 'popular') {
+      query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    const { data: correctData } = await query;
     if (correctData) setPosts(correctData as any);
     setLoadingPosts(false);
-  }, [groupId]);
+  }, [groupId, sortBy]);
 
   const handlePostCreated = (newPost?: GroupPostType) => {
       if (newPost) {
@@ -90,12 +103,11 @@ const GroupPage: React.FC = () => {
   
   useEffect(() => { fetchGroupData(); }, [fetchGroupData]);
   
-  // Re-déclenche le chargement des posts quand le statut de membre change
   useEffect(() => { 
     if (isMember || (group && !group.is_private)) {
       fetchPosts(); 
     }
-  }, [isMember, group, fetchPosts]);
+  }, [isMember, group, sortBy, fetchPosts]);
 
   const handleJoinAction = async () => {
     if (!session?.user || !groupId || !group || actionLoading) return;
@@ -106,7 +118,6 @@ const GroupPage: React.FC = () => {
             const { error } = await supabase.from('group_members').delete().match({ group_id: groupId, user_id: session.user.id });
             if (!error) {
                 setIsMember(false);
-                // Mise à jour locale de la liste des membres pour feedback instantané
                 setMembers(prev => prev.filter(m => m.user_id !== session.user.id));
             }
         } else {
@@ -117,7 +128,6 @@ const GroupPage: React.FC = () => {
                 const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
                 if (!error) {
                     setIsMember(true);
-                    // On ne peut pas facilement ajouter le profil complet ici sans refetch, mais on débloque l'UI
                     fetchGroupData(); 
                 }
             }
@@ -173,6 +183,23 @@ const GroupPage: React.FC = () => {
       <div className="space-y-6 pb-20">
           {(isMember || !group.is_private) ? (
               <>
+                  <div className="flex p-1.5 bg-slate-200/50 rounded-2xl w-fit animate-fade-in-up">
+                      <button 
+                          onClick={() => setSortBy('recent')}
+                          className={`flex items-center space-x-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <Clock size={14} />
+                          <span>Récent</span>
+                      </button>
+                      <button 
+                          onClick={() => setSortBy('popular')}
+                          className={`flex items-center space-x-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          <TrendingUp size={14} />
+                          <span>Populaire</span>
+                      </button>
+                  </div>
+
                   {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}
                   {loadingPosts ? <div className="flex justify-center py-10"><Spinner /></div> : 
                     posts.map(p => <GroupPostCard key={p.id} post={p} startWithModalOpen={p.id === openModalPostId} />)}

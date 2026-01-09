@@ -20,21 +20,19 @@ const Feed: React.FC = () => {
   const { searchQuery, setSearchQuery } = useSearchFilter();
   
   const loaderRef = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
   const POSTS_PER_PAGE = 10;
 
-  const shuffleArray = (array: any[]) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[shuffled[j]]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-
   const fetchPosts = useCallback(async (isInitial = false) => {
+    if (isFetchingRef.current) return;
+    
     try {
-      if (isInitial) setLoading(true);
-      else setLoadingMore(true);
+      isFetchingRef.current = true;
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
 
       const currentPage = isInitial ? 0 : page + 1;
       const from = currentPage * POSTS_PER_PAGE;
@@ -51,18 +49,15 @@ const Feed: React.FC = () => {
       const newPosts = data as any || [];
       
       if (isInitial) {
-        if (newPosts.length > 3) {
-          const topThree = newPosts.slice(0, 3);
-          const rest = newPosts.slice(3);
-          setPosts([...topThree, ...shuffleArray(rest)]);
-        } else {
-          setPosts(newPosts);
-        }
+        setPosts(newPosts);
         setPage(0);
       } else {
         setPosts(prev => {
             const combined = [...prev, ...newPosts];
-            const unique = combined.filter((p, idx, self) => self.findIndex(t => t.id === p.id) === idx);
+            // Déduplication stricte par ID
+            const unique = combined.filter((p, idx, self) => 
+                self.findIndex(t => t.id === p.id) === idx
+            );
             return unique;
         });
         setPage(currentPage);
@@ -75,21 +70,20 @@ const Feed: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   }, [page]);
 
   useEffect(() => {
     fetchPosts(true);
 
-    // Temps réel : Écouter les nouveaux posts
     const channel = supabase
-      .channel('feed-realtime')
+      .channel('feed-realtime-global')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'posts' 
       }, async (payload) => {
-        // On récupère le post complet car le payload ne contient pas les jointures (profiles)
         const { data } = await supabase
           .from('posts')
           .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
@@ -124,8 +118,10 @@ const Feed: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!hasMore || loading || loadingMore || searchQuery) return;
+
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery) {
+      if (entries[0].isIntersecting && !isFetchingRef.current) {
         fetchPosts(false);
       }
     }, { threshold: 0.1 });
@@ -159,10 +155,12 @@ const Feed: React.FC = () => {
   };
 
   const filteredPosts = useMemo(() => {
-    return posts.filter(post => {
-      const q = searchQuery.toLowerCase();
-      return post.content.toLowerCase().includes(q) || post.profiles.full_name.toLowerCase().includes(q);
-    });
+    if (!searchQuery.trim()) return posts;
+    const q = searchQuery.toLowerCase();
+    return posts.filter(post => 
+      post.content.toLowerCase().includes(q) || 
+      post.profiles.full_name.toLowerCase().includes(q)
+    );
   }, [posts, searchQuery]);
 
   return (
@@ -217,9 +215,11 @@ const Feed: React.FC = () => {
                   <PostCard post={post} onEditRequested={handleEditRequested} />
                 </div>
               ))}
-              <div ref={loaderRef} className="h-24 flex items-center justify-center">
-                {loadingMore && <Spinner />}
-              </div>
+              {hasMore && !searchQuery && (
+                <div ref={loaderRef} className="h-24 flex items-center justify-center">
+                    {loadingMore && <Spinner />}
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center p-16 bg-white rounded-3xl border border-slate-200 shadow-soft animate-fade-in-up">

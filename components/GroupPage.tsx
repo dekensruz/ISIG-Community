@@ -72,8 +72,6 @@ const GroupPage: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = true) => {
     if (!groupId) return;
     if (isInitial) setLoadingPosts(true);
-    const { data } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('id', groupId).order('created_at', { ascending: false });
-    // This table selection above has a bug: we want posts for the group, not the post with id=groupId
     const { data: correctData } = await supabase.from('group_posts').select(`*, profiles(*), group_post_comments(*, profiles(*)), group_post_likes(*)`).eq('group_id', groupId).order('created_at', { ascending: false });
     if (correctData) setPosts(correctData as any);
     setLoadingPosts(false);
@@ -91,25 +89,44 @@ const GroupPage: React.FC = () => {
   };
   
   useEffect(() => { fetchGroupData(); }, [fetchGroupData]);
-  useEffect(() => { if (isMember || (group && !group.is_private)) fetchPosts(); }, [isMember, group, fetchPosts]);
+  
+  // Re-déclenche le chargement des posts quand le statut de membre change
+  useEffect(() => { 
+    if (isMember || (group && !group.is_private)) {
+      fetchPosts(); 
+    }
+  }, [isMember, group, fetchPosts]);
 
   const handleJoinAction = async () => {
     if (!session?.user || !groupId || !group || actionLoading) return;
     setActionLoading(true);
-    if (isMember) {
-        await supabase.from('group_members').delete().match({ group_id: groupId, user_id: session.user.id });
-        setIsMember(false);
-    } else {
-        if (group.is_private) {
-            await supabase.from('group_join_requests').insert({ group_id: groupId, user_id: session.user.id });
-            setUserRequestStatus('pending');
+    
+    try {
+        if (isMember) {
+            const { error } = await supabase.from('group_members').delete().match({ group_id: groupId, user_id: session.user.id });
+            if (!error) {
+                setIsMember(false);
+                // Mise à jour locale de la liste des membres pour feedback instantané
+                setMembers(prev => prev.filter(m => m.user_id !== session.user.id));
+            }
         } else {
-            await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
-            setIsMember(true);
+            if (group.is_private) {
+                const { error } = await supabase.from('group_join_requests').insert({ group_id: groupId, user_id: session.user.id });
+                if (!error) setUserRequestStatus('pending');
+            } else {
+                const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: session.user.id, role: 'member' });
+                if (!error) {
+                    setIsMember(true);
+                    // On ne peut pas facilement ajouter le profil complet ici sans refetch, mais on débloque l'UI
+                    fetchGroupData(); 
+                }
+            }
         }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setActionLoading(false);
     }
-    fetchGroupData();
-    setActionLoading(false);
   };
   
   if (loadingGroup) return <div className="flex justify-center mt-8"><Spinner /></div>;
@@ -136,9 +153,13 @@ const GroupPage: React.FC = () => {
                     {isOwner ? (
                          <div className="bg-isig-orange/10 text-isig-orange px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center"><Crown size={14} className="mr-2"/>Admin</div>
                     ) : isMember ? (
-                         <button onClick={handleJoinAction} disabled={actionLoading} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center"><LogOut size={14} className="mr-2"/>Quitter</button>
+                         <button onClick={handleJoinAction} disabled={actionLoading} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center">
+                             {actionLoading ? <Spinner /> : <><LogOut size={14} className="mr-2"/>Quitter</>}
+                         </button>
                     ) : (
-                         <button onClick={handleJoinAction} disabled={actionLoading} className="bg-isig-blue text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-isig-blue/20">{userRequestStatus === 'pending' ? 'Attente' : 'Rejoindre'}</button>
+                         <button onClick={handleJoinAction} disabled={actionLoading} className="bg-isig-blue text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-isig-blue/20">
+                             {actionLoading ? <Spinner /> : userRequestStatus === 'pending' ? 'Attente' : 'Rejoindre'}
+                         </button>
                     )}
                 </div>
             </div>
@@ -155,6 +176,9 @@ const GroupPage: React.FC = () => {
                   {isMember && <CreateGroupPost groupId={groupId!} onPostCreated={handlePostCreated} />}
                   {loadingPosts ? <div className="flex justify-center py-10"><Spinner /></div> : 
                     posts.map(p => <GroupPostCard key={p.id} post={p} startWithModalOpen={p.id === openModalPostId} />)}
+                  {!loadingPosts && posts.length === 0 && (
+                      <div className="text-center py-12 text-slate-400 font-medium italic">Aucune publication dans ce groupe.</div>
+                  )}
               </>
           ) : (
               <div className="bg-white p-12 rounded-[2.5rem] text-center border border-slate-100 shadow-soft">

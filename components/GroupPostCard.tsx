@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { GroupPost, Profile, GroupPostLike } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -59,7 +59,9 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     fetchTopLikers();
   }, [likesCount, post.id]);
 
-  const handleLike = async () => {
+  const handleLike = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!session?.user) return;
     if (isLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
@@ -75,9 +77,9 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           setLikesCount(prev => prev + 1);
       }
     }
-  };
+  }, [isLiked, likes, post.id, session?.user.id]);
 
-  const getLikeSummaryText = () => {
+  const getLikeSummaryText = useCallback(() => {
     const count = likesCount;
     if (count === 0) return null;
 
@@ -102,13 +104,13 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         }
         return `${count} J'aime`;
     }
-  };
+  }, [isLiked, likerProfiles, likesCount, session?.user.id]);
 
   const CONTENT_LIMIT = 280;
   const isLongContent = post.content.length > CONTENT_LIMIT;
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
-  const renderContentWithLinks = (text: string) => {
+  const renderContentWithLinks = useCallback((text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
@@ -120,13 +122,13 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       }
       return part;
     });
-  };
+  }, []);
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group">
+    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <Link to={`/profile/${post.profiles.id}`}>
+          <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-95">
             <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="mr-4" />
           </Link>
           <div>
@@ -137,11 +139,11 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
         {session?.user.id === post.user_id && (
           <div className="relative">
-            <button onClick={() => setShowOptions(!showOptions)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl">
+            <button onClick={() => setShowOptions(!showOptions)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors active:scale-95">
               <MoreHorizontal size={20} />
             </button>
             {showOptions && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 animate-fade-in">
                 <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
@@ -158,16 +160,16 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         {renderContentWithLinks(displayedContent)}
         {!isExpanded && isLongContent && <span>...</span>}
         {isLongContent && (
-            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block">
+            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block transition-all active:scale-95">
                 {isExpanded ? <><ChevronUp size={14} className="inline mr-1"/>Voir moins</> : <><ChevronDown size={14} className="inline mr-1"/>Voir plus</>}
             </button>
         )}
       </div>
 
       {post.media_url && (
-        <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100">
+        <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100 transition-transform active:scale-[0.98]">
           {post.media_type === 'image' || post.media_type?.startsWith('image/') ? (
-            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} />
+            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} loading="lazy" />
           ) : (
             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4">
               <FileText size={20} className="text-isig-blue mr-3" />
@@ -181,7 +183,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
           <div className="pb-3 px-1">
               <button 
                 onClick={() => setShowLikersModal(true)}
-                className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue"
+                className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue transition-all active:scale-95"
               >
                   <div className="flex -space-x-1.5 mr-1">
                       {likerProfiles.length > 0 ? (
@@ -197,11 +199,11 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">
         <div className="flex items-center space-x-2 sm:space-x-6">
-          <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Heart size={20} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
+          <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Heart size={20} fill={isLiked ? '#FF8C00' : 'none'} className={`transition-transform duration-300 ${isLiked ? 'scale-110' : ''}`} />
             <span className="text-sm font-bold">{likesCount}</span>
           </button>
-          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
+          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
             <MessageCircle size={20} />
             <span className="text-sm font-bold">{post.group_post_comments.length}</span>
           </button>
@@ -214,7 +216,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
                 navigator.clipboard.writeText(url);
                 alert("Lien copié !");
             }
-        }} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl">
+        }} className="p-2.5 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all active:scale-90">
            <Share2 size={20} />
         </button>
       </div>
@@ -227,4 +229,4 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   );
 };
 
-export default GroupPostCard;
+export default memo(GroupPostCard);

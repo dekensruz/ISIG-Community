@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Post as PostType } from '../types';
@@ -65,24 +65,33 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       }
     } else {
         setFile(null);
+        setPreviewUrl(null);
     }
+    e.target.value = '';
   };
 
-  const handleRemoveFile = () => {
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const triggerFileInput = (e: React.MouseEvent) => {
+  const triggerFileInput = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    fileInputRef.current?.click();
-  };
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
+  }, []);
 
-  const handlePost = async (e?: React.MouseEvent) => {
+  const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault();
+    
     if (!content.trim() && !file && !previewUrl) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -170,7 +179,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       </div>
       
       {previewUrl && (
-        <div className="mt-4 relative inline-block group">
+        <div className="mt-4 relative inline-block group animate-fade-in">
             {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
                 <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
             ) : (

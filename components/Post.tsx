@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Post as PostType, Profile, Like } from '../types';
 import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
@@ -18,7 +18,7 @@ interface PostProps {
   onEditRequested?: (post: PostType) => void;
 }
 
-const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, onEditRequested }) => {
+const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEditRequested }) => {
   const { session } = useAuth();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(startWithModalOpen);
@@ -32,7 +32,6 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
 
   useEffect(() => {
     setLikes(post.likes || []);
-    // Always fallback to the actual array length if likes_count seems smaller than fetched likes
     const actualCount = post.likes?.length || 0;
     setLikesCount(Math.max(post.likes_count || 0, actualCount));
   }, [post.likes, post.likes_count]);
@@ -59,7 +58,7 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
     fetchTopLikers();
   }, [likesCount, post.id]);
 
-  const handleLike = async (e: React.MouseEvent) => {
+  const handleLike = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!session?.user) return;
@@ -84,9 +83,9 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
           setLikes(prev => prev.map(l => l.id === tempId ? data : l));
       }
     }
-  };
+  }, [isLiked, likes, post.id, session?.user.id]);
 
-  const getLikeSummaryText = () => {
+  const getLikeSummaryText = useCallback(() => {
     const count = likesCount;
     if (count === 0) return null;
 
@@ -111,13 +110,13 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
         }
         return `${count} J'aime`;
     }
-  };
+  }, [isLiked, likerProfiles, likesCount, session?.user.id]);
 
   const CONTENT_LIMIT = 280;
   const isLongContent = post.content.length > CONTENT_LIMIT;
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
-  const renderContentWithLinks = (text: string) => {
+  const renderContentWithLinks = useCallback((text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
@@ -129,10 +128,10 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
       }
       return part;
     });
-  };
+  }, []);
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card will-change-transform">
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card animate-fade-in-up">
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-90 duration-200">
@@ -156,7 +155,7 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
               <MoreHorizontal size={20} />
             </button>
             {showOptions && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden animate-fade-in-up">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden animate-fade-in">
                 <button 
                   onClick={() => { if(onEditRequested) onEditRequested(post); setShowOptions(false); }} 
                   className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
@@ -250,6 +249,6 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
       {showLikersModal && <LikerListModal postId={post.id} postType="feed" onClose={() => setShowLikersModal(false)} />}
     </div>
   );
-});
+};
 
 export default memo(PostCard);

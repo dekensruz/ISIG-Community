@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { GroupPost } from '../types';
@@ -47,23 +47,36 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       }
     } else {
         setFile(null);
+        setPreviewUrl(null);
     }
+    // Important: Clear the input value so the same file can be selected again
+    e.target.value = '';
   };
 
-  const handleRemoveFile = () => {
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const triggerFileInput = (e: React.MouseEvent) => {
+  const triggerFileInput = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    fileInputRef.current?.click();
-  };
+    // On mobile, some browsers refresh if click is not handled carefully
+    // Using a micro-task delay can sometimes help stability
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
+  }, []);
 
-  const handlePost = async () => {
+  const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
+    
     if (!content.trim() && !file) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -136,7 +149,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       </div>
 
       {previewUrl && (
-        <div className="mt-4 relative inline-block group">
+        <div className="mt-4 relative inline-block group animate-fade-in">
             <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md border border-slate-100" />
             <button
               type="button"
@@ -149,7 +162,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
       )}
 
       {file && !previewUrl && (
-        <div className="mt-4 flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+        <div className="mt-4 flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-fade-in">
             <FileText className="text-isig-blue mr-3" />
             <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file.name}</p>
             <button

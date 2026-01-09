@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
@@ -107,14 +108,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     }, [menuOpen]);
     
     const handleDeleteForMe = (e: React.MouseEvent) => {
-        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         setMessages(prev => prev.filter(m => m.id !== message.id));
     };
     
     const handleDeleteForEveryone = async (e: React.MouseEvent) => {
-        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         const { error } = await supabase.from('messages').delete().eq('id', message.id);
@@ -122,14 +121,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     };
 
     const handleReplyAction = (e: React.MouseEvent) => {
-        e.preventDefault();
         e.stopPropagation();
         onSetReplying(message);
         setMenuOpen(false);
     };
 
     const handleEditAction = (e: React.MouseEvent) => {
-        e.preventDefault();
         e.stopPropagation();
         onSetEditing(message);
         setMenuOpen(false);
@@ -196,9 +193,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const MobileOptionsMenu = () => {
         if (!modalRoot) return null;
         return createPortal(
-            <div className="fixed inset-0 z-[1000] flex items-end animate-fade-in" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); }}>
+            <div className="fixed inset-0 z-[1000] flex items-end animate-fade-in" onClick={() => setMenuOpen(false)}>
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-                <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => { e.preventDefault(); e.stopPropagation(); }}>
+                <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
                     <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-black text-slate-800 uppercase italic">Options</h3>
@@ -220,7 +217,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
                 <button 
                     type="button" 
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(true); }} 
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }} 
                     className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100"
                 >
                     <MoreHorizontal size={18} />

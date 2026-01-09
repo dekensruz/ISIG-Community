@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -63,7 +64,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handlePost = async (e?: React.MouseEvent) => {
+  const handlePost = async (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -87,14 +88,16 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
         if (file) {
           const fileExt = file.name.split('.').pop();
-          const fileName = `group-media/${groupId}/${session.user.id}-${Date.now()}.${fileExt}`;
+          // Utilisation d'un chemin à plat pour plus de fiabilité sur le storage
+          const fileName = `group-${groupId}-${session.user.id}-${Date.now()}.${fileExt}`;
           
           const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
           if (uploadError) throw uploadError;
 
           const { data } = supabase.storage.from('media').getPublicUrl(fileName);
           mediaUrl = data.publicUrl;
-          mediaType = file.type;
+          // Uniformisation du type comme dans CreatePost.tsx
+          mediaType = file.type.startsWith('image/') ? 'image' : 'document';
         }
 
         const { data, error: insertError } = await supabase.from('group_posts').insert({
@@ -115,8 +118,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         // Success callback
         onPostCreated(data as any);
     } catch (err: any) {
-        console.error("Upload error:", err);
-        setError(err.message || "Erreur d'envoi.");
+        console.error("Group Post Upload error:", err);
+        setError(err.message || "Une erreur est survenue lors de l'envoi.");
     } finally {
         setUploading(false);
     }
@@ -124,7 +127,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   
   return (
     <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
-      <div className="space-y-4">
+      <form onSubmit={handlePost} className="space-y-4">
         <textarea
             ref={textareaRef}
             className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px] text-sm transition-all overflow-hidden"
@@ -165,8 +168,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             </label>
             
             <button 
-                type="button" 
-                onClick={handlePost}
+                type="submit" 
                 disabled={uploading || (!content.trim() && !file)}
                 className="bg-isig-orange text-white font-black py-3.5 px-8 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center shadow-lg shadow-isig-orange/20 uppercase tracking-widest text-[10px] active:scale-95"
             >
@@ -180,7 +182,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
                 <span>{error}</span>
             </div>
         )}
-      </div>
+      </form>
     </div>
   );
 };

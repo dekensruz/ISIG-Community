@@ -19,6 +19,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -60,8 +61,13 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    const input = document.getElementById('group-post-file-upload') as HTMLInputElement;
-    if (input) input.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const triggerFileInput = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileInputRef.current?.click();
   };
 
   const handlePost = async (e?: React.FormEvent) => {
@@ -158,17 +164,19 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-50">
             <div className="flex items-center">
-                <label 
-                  htmlFor="group-post-file-upload"
-                  className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer"
+                <button 
+                  type="button"
+                  onClick={triggerFileInput}
+                  className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer outline-none"
+                  aria-label="Joindre un fichier"
                 >
                     <Paperclip size={24} />
                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
-                </label>
+                </button>
                 <input 
-                  id="group-post-file-upload" 
+                  ref={fileInputRef}
                   type="file" 
-                  className="sr-only" 
+                  className="hidden" 
                   accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
                   onChange={handleFileChange} 
                 />

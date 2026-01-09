@@ -48,7 +48,6 @@ const NotificationsPage: React.FC = () => {
                     table: 'notifications', 
                     filter: `user_id=eq.${session.user.id}` 
                 }, () => {
-                    // Re-fetch silencieux pour mettre à jour la liste
                     fetchNotifications(false);
                 })
                 .subscribe();
@@ -104,6 +103,7 @@ const NotificationsPage: React.FC = () => {
             case 'group_request_accepted': return `${actorName} a accepté votre demande d'adhésion.`;
             case 'group_member_left': return `${actorName} a quitté un de vos groupes.`;
             case 'group_admin_promotion': return `${actorName} vous a promu administrateur d'un groupe.`;
+            case 'new_follower': return `${actorName} s'est abonné à votre profil.`;
             default: return `Vous avez une nouvelle notification.`;
         }
     };
@@ -123,7 +123,8 @@ const NotificationsPage: React.FC = () => {
                 return <div className={iconBaseClasses}><MessageSquare className="h-5 w-5 text-green-500" fill="#22c55e" /></div>;
             case 'group_join_request':
             case 'group_member_joined':
-                return <div className={iconBaseClasses}><Users className="h-5 w-5 text-green-500" /></div>;
+            case 'new_follower':
+                return <div className={iconBaseClasses}><Users className="h-5 w-5 text-isig-blue" /></div>;
             case 'group_request_accepted':
                 return <div className={iconBaseClasses}><UserCheck className="h-5 w-5 text-green-500" /></div>;
             case 'group_member_left':

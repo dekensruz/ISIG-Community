@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Notification } from '../types';
 import { Link } from 'react-router-dom';
@@ -86,6 +87,8 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
                 return <>{actorName} a quitté un de vos groupes.</>;
             case 'group_admin_promotion':
                 return <>{actorName} vous a promu administrateur d'un groupe.</>;
+            case 'new_follower':
+                return <>{actorName} s'est abonné à votre profil.</>;
             default:
                 return <>Vous avez une nouvelle notification.</>;
         }
@@ -106,7 +109,8 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ notificat
                  return <div className={iconBaseClasses}><MessageSquare className="h-4 w-4 text-green-500" fill="#22c55e" /></div>;
             case 'group_join_request':
             case 'group_member_joined':
-                 return <div className={iconBaseClasses}><Users className="h-4 w-4 text-green-500" /></div>;
+            case 'new_follower':
+                 return <div className={iconBaseClasses}><Users className="h-4 w-4 text-isig-blue" /></div>;
             case 'group_request_accepted':
                  return <div className={iconBaseClasses}><UserCheck className="h-4 w-4 text-green-500" /></div>;
             case 'group_member_left':

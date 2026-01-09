@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { Message } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X } from 'lucide-react';
+import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X, Copy } from 'lucide-react';
 
 interface MessageBubbleProps {
     message: Message;
@@ -140,6 +140,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         setMenuOpen(false);
     };
 
+    const handleCopyAction = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (message.content) {
+            navigator.clipboard.writeText(message.content);
+            alert("Texte copié !");
+        }
+        setMenuOpen(false);
+    };
+
     const renderContentWithLinks = (text: string) => {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         return text.split(urlRegex).map((part, index) => {
@@ -190,6 +200,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
             >
                 <MessageSquareReply size={18} className="mr-3 text-isig-blue"/>Répondre
             </button>
+            {message.content && (
+                <button 
+                    type="button" 
+                    onClick={handleCopyAction} 
+                    className="w-full text-left flex items-center px-4 py-3 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                    <Copy size={18} className="mr-3 text-emerald-500"/>Copier
+                </button>
+            )}
             {isOwnMessage && message.content && (
                 <button 
                     type="button" 

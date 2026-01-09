@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { Message, Profile } from '../types';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
-import { Send, ArrowLeft, Paperclip, X, Mic, StopCircle, Pencil, RotateCcw } from 'lucide-react';
+import { Send, ArrowLeft, Paperclip, X, Mic, StopCircle, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUnreadMessages } from './UnreadMessagesProvider';
 import MessageBubble from './MessageBubble';
@@ -37,7 +37,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<Profile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(false); // On ne met pas à true par défaut pour éviter le flash
+  const [loading, setLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -85,8 +85,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
   const fetchData = useCallback(async () => {
     if (!session?.user || !conversationId) return;
-    
-    // N'afficher le loader que si on change radicalement de conversation ou au premier chargement
     if (messages.length === 0) setLoading(true);
 
     try {
@@ -109,7 +107,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   }, [conversationId, session?.user?.id]);
 
   useEffect(() => { 
-    setMessages([]); // Reset messages pour éviter l'affichage de l'ancienne conv
+    setMessages([]);
     fetchData(); 
   }, [fetchData]);
 
@@ -131,7 +129,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
-          // Utilisation de payload.old.id pour garantir le filtrage temps réel
           setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .subscribe();
@@ -182,6 +179,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     } catch (err) { console.error(err); } finally { setIsUploading(false); }
   };
 
+  const handleDeleteConversation = async () => {
+      if (!window.confirm("Voulez-vous vraiment supprimer toute cette conversation ?")) return;
+      setLoading(true);
+      try {
+          const { error } = await supabase.from('conversations').delete().eq('id', conversationId);
+          if (error) throw error;
+          navigate('/chat');
+      } catch (err) {
+          console.error(err);
+          alert("Erreur lors de la suppression.");
+          setLoading(false);
+      }
+  };
+
   const startRecording = async (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     try {
@@ -222,22 +233,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   if (loading && messages.length === 0) return <div className="flex-1 flex items-center justify-center bg-white"><Spinner /></div>;
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
-        <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            <button type="button" onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50 active:bg-slate-200">
-                <ArrowLeft size={22} strokeWidth={2.5} />
+    <div className="flex flex-col h-full bg-white relative overflow-hidden">
+        <header className="flex items-center justify-between p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
+            <div className="flex items-center min-w-0">
+                <button type="button" onClick={() => navigate('/chat')} className="mr-3 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50 active:bg-slate-200">
+                    <ArrowLeft size={22} strokeWidth={2.5} />
+                </button>
+                {otherParticipant && (
+                    <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
+                        <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" />
+                        <div className="min-w-0">
+                            <h3 className="font-black text-slate-800 tracking-tight truncate">{otherParticipant.full_name}</h3>
+                            <p className={`text-[10px] font-black uppercase tracking-widest ${isOnlineRealtime ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                {isOnlineRealtime ? 'En ligne' : otherParticipant.last_seen_at ? `Vu ${formatDistanceToNow(new Date(otherParticipant.last_seen_at), { locale: fr, addSuffix: true })}` : 'Hors ligne'}
+                            </p> 
+                        </div>
+                    </Link>
+                )}
+            </div>
+            <button 
+                onClick={handleDeleteConversation} 
+                className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all active:scale-90"
+                title="Supprimer la conversation"
+            >
+                <Trash2 size={20} />
             </button>
-            {otherParticipant && (
-                <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
-                    <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" />
-                    <div className="min-w-0">
-                        <h3 className="font-black text-slate-800 tracking-tight truncate">{otherParticipant.full_name}</h3>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${isOnlineRealtime ? 'text-emerald-500' : 'text-slate-400'}`}>
-                            {isOnlineRealtime ? 'En ligne' : otherParticipant.last_seen_at ? `Vu ${formatDistanceToNow(new Date(otherParticipant.last_seen_at), { locale: fr, addSuffix: true })}` : 'Hors ligne'}
-                        </p> 
-                    </div>
-                </Link>
-            )}
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar">

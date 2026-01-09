@@ -30,6 +30,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
+
+  // CRITIQUE : Synchroniser l'état local quand le parent (Feed) reçoit une mise à jour Realtime
+  useEffect(() => {
+    setLikes(post.likes || []);
+    setLikesCount(post.likes_count || 0);
+  }, [post.likes, post.likes_count]);
+
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
   const CONTENT_LIMIT = 280;
@@ -72,7 +79,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
-        setLikesCount(prev => prev - 1);
+        setLikesCount(prev => Math.max(0, prev - 1));
         await supabase.from('likes').delete().match({ post_id: post.id, user_id: session.user.id });
       }
     } else {
@@ -114,13 +121,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
     if (isLiked) {
         if (count === 1) return "Vous avez aimé";
-        if (count === 2) {
-            const other = likerProfiles.find(p => p.id !== session?.user.id);
-            return `Vous et ${other?.full_name.split(' ')[0] || '1 autre'} avez aimé`;
-        }
-        return `Vous, ${likerProfiles.find(p => p.id !== session?.user.id)?.full_name.split(' ')[0] || 'quelqu\'un'} et ${count - 2} autres`;
+        const other = likerProfiles.find(p => p.id !== session?.user.id);
+        const otherName = other?.full_name.split(' ')[0] || "quelqu'un";
+        
+        if (count === 2) return `Vous et ${otherName} avez aimé`;
+        return `Vous, ${otherName} et ${count - 2} autres`;
     } else {
-        const first = likerProfiles[0]?.full_name || "Un étudiant";
+        const first = likerProfiles[0]?.full_name.split(' ')[0] || "Un étudiant";
         if (count === 1) return `${first} a aimé`;
         if (count === 2) return `${first} et 1 autre ont aimé`;
         return `${first} et ${count - 1} autres ont aimé`;
@@ -204,9 +211,13 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                 className="flex items-center space-x-3 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-colors group/likes"
               >
                   <div className="flex -space-x-2">
-                      {likerProfiles.slice(0, 3).map(p => (
-                          <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
-                      ))}
+                      {likerProfiles.length > 0 ? (
+                          likerProfiles.slice(0, 3).map(p => (
+                            <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                          ))
+                      ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white"></div>
+                      )}
                   </div>
                   <span className="italic">{getLikeSummaryText()}</span>
               </button>

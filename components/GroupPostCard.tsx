@@ -28,7 +28,15 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   const [isExpanded, setIsExpanded] = useState(false);
 
   const [likes, setLikes] = useState<GroupPostLike[]>(post.group_post_likes || []);
+  const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
+
+  // Synchronisation avec les props (Realtime)
+  useEffect(() => {
+    setLikes(post.group_post_likes || []);
+    setLikesCount(post.likes_count || 0);
+  }, [post.group_post_likes, post.likes_count]);
+
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
   const CONTENT_LIMIT = 280;
@@ -71,11 +79,15 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
         setLikes(prev => prev.filter(l => l.id !== like.id));
+        setLikesCount(prev => Math.max(0, prev - 1));
         await supabase.from('group_post_likes').delete().match({ group_post_id: post.id, user_id: session.user.id });
       }
     } else {
       const { data, error } = await supabase.from('group_post_likes').insert({ group_post_id: post.id, user_id: session.user.id }).select().single();
-      if(!error && data) setLikes(prev => [data, ...prev]);
+      if(!error && data) {
+          setLikes(prev => [data, ...prev]);
+          setLikesCount(prev => prev + 1);
+      }
     }
   };
 
@@ -96,7 +108,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
     } catch (err) {
         try {
             await navigator.clipboard.writeText(shareText);
-            alert("Mention personnalisée et lien copiés dans votre presse-papier !");
+            alert("Lien copié dans votre presse-papier !");
         } catch (copyErr) {
             console.error("Erreur de copie", copyErr);
         }
@@ -104,20 +116,21 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   };
 
   const getLikeSummaryText = () => {
-    const count = likes.length;
+    const count = likesCount;
     if (count === 0) return null;
 
     if (isLiked) {
         if (count === 1) return "Vous avez aimé";
-        if (count === 2) {
-            const other = likerProfiles.find(p => p.id !== session?.user.id);
-            return `Vous et ${other?.full_name.split(' ')[0] || '1 autre'}`;
-        }
-        return `Vous et ${count - 1} autres`;
+        const other = likerProfiles.find(p => p.id !== session?.user.id);
+        const otherName = other?.full_name.split(' ')[0] || "quelqu'un";
+
+        if (count === 2) return `Vous et ${otherName} avez aimé`;
+        return `Vous, ${otherName} et ${count - 2} autres`;
     } else {
         const first = likerProfiles[0]?.full_name.split(' ')[0] || "Un étudiant";
         if (count === 1) return `${first} a aimé`;
-        return `${first} et ${count - 1} autres`;
+        if (count === 2) return `${first} et 1 autre ont aimé`;
+        return `${first} et ${count - 1} autres ont aimé`;
     }
   };
 
@@ -165,7 +178,6 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
       {post.media_url && (
         <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100">
-          {/* Correction ici : Utilisation de 'image' au lieu de startsWith('image/') pour uniformité */}
           {post.media_type === 'image' || post.media_type?.startsWith('image/') ? (
             <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} />
           ) : (
@@ -177,14 +189,18 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         </div>
       )}
 
-      {likes.length > 0 && (
+      {likesCount > 0 && (
           <div className="pb-3 px-1">
               <button 
                 onClick={() => setShowLikersModal(true)}
                 className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-isig-blue"
               >
                   <div className="flex -space-x-1.5 mr-1">
-                      {likerProfiles.slice(0, 3).map(p => <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />)}
+                      {likerProfiles.length > 0 ? (
+                        likerProfiles.slice(0, 3).map(p => <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />)
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-slate-100 border-2 border-white"></div>
+                      )}
                   </div>
                   <span className="italic">{getLikeSummaryText()}</span>
               </button>
@@ -195,7 +211,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         <div className="flex items-center space-x-2 sm:space-x-6">
           <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
             <Heart size={20} fill={isLiked ? '#FF8C00' : 'none'} className={isLiked ? 'scale-110' : ''} />
-            <span className="text-sm font-bold">{likes.length}</span>
+            <span className="text-sm font-bold">{likesCount}</span>
           </button>
           <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
             <MessageCircle size={20} />

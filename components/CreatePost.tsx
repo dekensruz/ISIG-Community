@@ -84,9 +84,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   const triggerFileInput = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setTimeout(() => {
-      fileInputRef.current?.click();
-    }, 0);
+    // Suppression du setTimeout pour garantir une action utilisateur synchrone sur mobile
+    fileInputRef.current?.click();
   }, []);
 
   const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -152,7 +151,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   };
   
   return (
-    <div className={`bg-white p-6 rounded-[2rem] shadow-soft border transition-all duration-500 animate-fade-in-up ${editingPost ? 'ring-2 ring-isig-blue border-transparent' : 'border-slate-100'}`}>
+    <form 
+      onSubmit={(e) => e.preventDefault()}
+      className={`bg-white p-6 rounded-[2rem] shadow-soft border transition-all duration-500 animate-fade-in-up ${editingPost ? 'ring-2 ring-isig-blue border-transparent' : 'border-slate-100'}`}
+    >
       <div className="flex items-center justify-between mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
               {editingPost ? 'Modification en cours' : 'Nouvelle publication'}
@@ -226,7 +228,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
         </button>
       </div>
       {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
-    </div>
+    </form>
   );
 };
 

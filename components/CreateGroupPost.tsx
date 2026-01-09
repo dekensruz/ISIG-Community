@@ -67,11 +67,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const triggerFileInput = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // On mobile, some browsers refresh if click is not handled carefully
-    // Using a micro-task delay can sometimes help stability
-    setTimeout(() => {
-      fileInputRef.current?.click();
-    }, 0);
+    // Action synchrone pour éviter les blocages/rafraîchissements mobiles
+    fileInputRef.current?.click();
   }, []);
 
   const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -128,7 +125,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   };
   
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
+    <form 
+      onSubmit={(e) => e.preventDefault()}
+      className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up"
+    >
       <div className="flex items-center justify-between mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
               Publication de groupe
@@ -202,7 +202,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         </button>
       </div>
       {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
-    </div>
+    </form>
   );
 };
 

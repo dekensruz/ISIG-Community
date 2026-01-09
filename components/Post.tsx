@@ -32,51 +32,37 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
 
   useEffect(() => {
     setLikes(post.likes || []);
-    setLikesCount(post.likes_count || 0);
+    setLikesCount(post.likes_count ?? (post.likes?.length || 0));
   }, [post.likes, post.likes_count]);
 
   const isLiked = useMemo(() => likes.some(l => l.user_id === session?.user.id), [likes, session]);
 
-  const CONTENT_LIMIT = 280;
-  const isLongContent = post.content.length > CONTENT_LIMIT;
-  const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
-
-  const renderContentWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.split(urlRegex).map((part, index) => {
-      if (part.match(urlRegex)) {
-        return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
-            {part}
-          </a>
-        );
-      }
-      return part;
-    });
-  };
-
   useEffect(() => {
     const fetchTopLikers = async () => {
-      if (likes.length === 0) {
+      if (likesCount === 0) {
         setLikerProfiles([]);
         return;
       }
-      const likerIds = likes.slice(0, 3).map(l => l.user_id);
-      const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
+      // On récupère les profils des derniers likes pour l'affichage du texte "X et Y ont aimé"
+      const { data } = await supabase
+        .from('likes')
+        .select('profiles(id, full_name, avatar_url)')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
       if (data) {
-        const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
-        setLikerProfiles(sorted);
+        setLikerProfiles(data.map((d: any) => d.profiles).filter(Boolean));
       }
     };
     fetchTopLikers();
-  }, [likes]);
+  }, [likesCount, post.id]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!session?.user) return;
     
-    // Optimistic UI pour une fluidité instantanée
     if (isLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -99,42 +85,46 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
     }
   };
 
-  const handleShare = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const url = `${window.location.origin}/post/${post.id}`;
-    
-    try {
-        if (navigator.share) {
-            await navigator.share({
-                title: 'ISIG Community',
-                text: `Découvrez ce post de ${post.profiles.full_name} sur ISIG Community`,
-                url: url,
-            });
-        } else {
-            await navigator.clipboard.writeText(url);
-            alert("Lien copié !");
-        }
-    } catch (err) {
-        console.error(err);
-    }
-  };
-
   const getLikeSummaryText = () => {
     const count = likesCount;
     if (count === 0) return null;
 
     if (isLiked) {
         if (count === 1) return "Vous avez aimé";
-        const other = likerProfiles.find(p => p.id !== session?.user.id);
-        const otherName = other?.full_name.split(' ')[0] || "quelqu'un";
-        if (count === 2) return `Vous et ${otherName}`;
+        const others = likerProfiles.filter(p => p.id !== session?.user.id);
+        if (others.length > 0) {
+            const otherName = others[0].full_name.split(' ')[0];
+            if (count === 2) return `Vous et ${otherName}`;
+            return `Vous, ${otherName} et ${count - 2} autres`;
+        }
         return `Vous et ${count - 1} autres`;
     } else {
-        const first = likerProfiles[0]?.full_name.split(' ')[0] || "Un étudiant";
-        if (count === 1) return `${first} a aimé`;
-        return `${first} et ${count - 1} autres`;
+        if (likerProfiles.length > 0) {
+            const first = likerProfiles[0].full_name.split(' ')[0];
+            if (count === 1) return `${first} a aimé`;
+            if (count === 2) return `${first} et 1 autre`;
+            return `${first} et ${count - 1} autres`;
+        }
+        return `${count} J'aime`;
     }
+  };
+
+  const CONTENT_LIMIT = 280;
+  const isLongContent = post.content.length > CONTENT_LIMIT;
+  const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
+
+  const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   return (
@@ -238,7 +228,15 @@ const PostCard: React.FC<PostProps> = memo(({ post, startWithModalOpen = false, 
           </button>
         </div>
 
-        <button onClick={handleShare} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all active:scale-90">
+        <button onClick={() => {
+            const url = `${window.location.origin}/post/${post.id}`;
+            if (navigator.share) {
+                navigator.share({ title: 'ISIG Community', url });
+            } else {
+                navigator.clipboard.writeText(url);
+                alert("Lien copié !");
+            }
+        }} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all active:scale-90">
             <Share2 size={22} />
         </button>
       </div>

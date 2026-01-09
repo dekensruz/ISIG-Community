@@ -60,7 +60,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handlePost = async () => {
+  const handlePost = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (!content.trim() && !file) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -150,10 +151,10 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-            <label className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer">
+            <label htmlFor="group-post-file-upload" className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer">
                 <Paperclip size={24} />
                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
-                <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+                <input id="group-post-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
             </label>
             
             <button 

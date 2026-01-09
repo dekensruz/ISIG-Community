@@ -210,7 +210,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   return (
     <div className="flex flex-col h-full bg-white relative">
         <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            <button onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50">
+            <button type="button" onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50">
                 <ArrowLeft size={22} strokeWidth={2.5} />
             </button>
             {otherParticipant && (
@@ -258,7 +258,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 <span className="font-black text-isig-blue uppercase tracking-widest text-[9px] mr-2">Réponse :</span>
                                 <span className="text-slate-500 italic font-medium">{replyingToMessage.content || 'Média'}</span>
                             </div>
-                            <button onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1"><X size={16}/></button>
+                            <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1"><X size={16}/></button>
                         </div>
                     )}
                     {editingMessage && (
@@ -266,7 +266,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                             <div className="flex items-center text-isig-orange font-black uppercase tracking-widest text-[9px]">
                                 <Pencil size={12} className="mr-2" /> Modification du message...
                             </div>
-                            <button onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1"><RotateCcw size={16}/></button>
+                            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1"><RotateCcw size={16}/></button>
                         </div>
                     )}
                     <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
@@ -296,6 +296,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 className="chat-textarea w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
                                 style={{ 
                                     minHeight: '48px',
+                                    overflow: 'hidden',
                                     scrollbarWidth: 'none',
                                     msOverflowStyle: 'none'
                                 }}
@@ -303,6 +304,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                             <style>{`
                                 .chat-textarea::-webkit-scrollbar {
                                     display: none;
+                                }
+                                .chat-textarea {
+                                    -ms-overflow-style: none;
+                                    scrollbar-width: none;
                                 }
                             `}</style>
                         </div>

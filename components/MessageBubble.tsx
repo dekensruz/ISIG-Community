@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
 import { Message } from '../types';
 import { format } from 'date-fns';
@@ -74,7 +75,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     return (
         <div className={`flex items-center gap-2 mt-1 w-full max-w-full overflow-hidden ${playerColorClass}`}>
             <audio ref={audioRef} src={src} preload="metadata"></audio>
-            <button onClick={handlePlayPause} className={`p-2 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
+            <button type="button" onClick={handlePlayPause} className={`p-2 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
                 {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
             <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
@@ -92,6 +93,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, onSetEditing, onSetReplying, setMessages, onMediaClick }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const modalRoot = document.getElementById('modal-root');
     const time = format(new Date(message.created_at), 'HH:mm', { locale: fr });
     
     const isEdited = message.updated_at && (new Date(message.updated_at).getTime() - new Date(message.created_at).getTime() > 60000);
@@ -140,7 +142,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         }
         if (message.media_type.startsWith('audio/')) return <AudioPlayer src={message.media_url} isOwnMessage={isOwnMessage} />;
         return (
-             <button onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 text-slate-800'}`}>
+             <button type="button" onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 text-slate-800'}`}>
                 <Download size={24} />
                 <div className="flex-1 min-w-0">
                     <p className="font-bold truncate text-xs">{message.media_url.split('/').pop()}</p>
@@ -149,62 +151,67 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
         );
     };
 
-    const OptionsMenu = () => {
-        const content = (
-            <div className="flex flex-col">
-                <button onClick={handleReplyAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
-                    <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
+    const OptionsMenuContent = () => (
+        <div className="flex flex-col">
+            <button type="button" onClick={handleReplyAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+                <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
+            </button>
+            {isOwnMessage && message.content && (
+                <button type="button" onClick={handleEditAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Pencil size={18} className="mr-4 md:mr-3 text-isig-orange"/>Modifier
                 </button>
-                {isOwnMessage && message.content && (
-                    <button onClick={handleEditAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
-                        <Pencil size={18} className="mr-4 md:mr-3 text-isig-orange"/>Modifier
-                    </button>
-                )}
-                <div className="border-t border-slate-100 my-1 mx-2"></div>
-                <button onClick={handleDeleteForMe} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
-                    <XCircle size={18} className="mr-4 md:mr-3"/>Supprimer (Moi)
+            )}
+            <div className="border-t border-slate-100 my-1 mx-2"></div>
+            <button type="button" onClick={handleDeleteForMe} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+                <XCircle size={18} className="mr-4 md:mr-3"/>Supprimer (Moi)
+            </button>
+            {isOwnMessage && (
+                <button type="button" onClick={handleDeleteForEveryone} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+                    <Trash2 size={18} className="mr-4 md:mr-3"/>Supprimer (Tous)
                 </button>
-                {isOwnMessage && (
-                    <button onClick={handleDeleteForEveryone} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 size={18} className="mr-4 md:mr-3"/>Supprimer (Tous)
-                    </button>
-                )}
-            </div>
-        );
+            )}
+        </div>
+    );
 
-        return (
-            <>
-                <div className="md:hidden fixed inset-0 z-[200] flex items-end animate-fade-in" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}>
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-                    <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-800 uppercase italic">Options</h3>
-                            <button onClick={() => setMenuOpen(false)} className="p-2 bg-slate-100 rounded-full"><X size={20}/></button>
-                        </div>
-                        <div className="space-y-1">
-                            {content}
-                        </div>
+    const MobileOptionsMenu = () => {
+        if (!modalRoot) return null;
+        return createPortal(
+            <div className="fixed inset-0 z-[1000] flex items-end animate-fade-in" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}>
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+                <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                    <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-black text-slate-800 uppercase italic">Options</h3>
+                        <button type="button" onClick={() => setMenuOpen(false)} className="p-2 bg-slate-100 rounded-full"><X size={20}/></button>
+                    </div>
+                    <div className="space-y-1">
+                        <OptionsMenuContent />
                     </div>
                 </div>
-
-                <div 
-                  ref={menuRef} 
-                  className={`hidden md:block absolute bottom-full mb-2 w-56 bg-white rounded-2xl shadow-premium py-2 z-[60] border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}
-                >
-                    {content}
-                </div>
-            </>
+            </div>,
+            modalRoot
         );
     };
 
     return (
         <div className={`group flex items-end gap-1 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
-                <button onClick={() => setMenuOpen(true)} className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100">
+                <button type="button" onClick={() => setMenuOpen(true)} className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100">
                     <MoreHorizontal size={18} />
                 </button>
-                {menuOpen && <OptionsMenu />}
+                {menuOpen && (
+                    <>
+                        <div className="hidden md:block">
+                            <div 
+                                ref={menuRef} 
+                                className={`absolute bottom-full mb-2 w-56 bg-white rounded-2xl shadow-premium py-2 z-[60] border border-slate-100 animate-fade-in-up ${isOwnMessage ? 'right-0' : 'left-0'}`}
+                            >
+                                <OptionsMenuContent />
+                            </div>
+                        </div>
+                        <MobileOptionsMenu />
+                    </>
+                )}
             </div>
             <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft overflow-hidden ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
                  {message.replied_to && (

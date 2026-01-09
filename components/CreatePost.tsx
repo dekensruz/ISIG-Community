@@ -73,7 +73,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handlePost = async () => {
+  const handlePost = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (!content.trim() && !file && !previewUrl) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -140,7 +141,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
               {editingPost ? 'Modification en cours' : 'Nouvelle publication'}
           </h3>
           {editingPost && (
-              <button onClick={onCancelEdit} className="flex items-center space-x-1 text-red-500 hover:text-red-600 text-[10px] font-black uppercase tracking-widest">
+              <button type="button" onClick={onCancelEdit} className="flex items-center space-x-1 text-red-500 hover:text-red-600 text-[10px] font-black uppercase tracking-widest">
                   <RotateCcw size={12}/>
                   <span>Annuler</span>
               </button>
@@ -171,6 +172,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
                 </div>
             )}
             <button
+              type="button"
               onClick={handleRemoveFile}
               className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
             >
@@ -181,12 +183,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
 
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
         <div className="flex space-x-2">
-           <label htmlFor="file-upload" className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all">
+           <label htmlFor="feed-file-upload" className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all">
             <Paperclip size={24} />
-            <input id="file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+            <input id="feed-file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
           </label>
         </div>
         <button
+          type="button"
           onClick={handlePost}
           disabled={uploading || (!content.trim() && !file && !previewUrl)}
           className={`${editingPost ? 'bg-isig-blue' : 'bg-isig-orange'} text-white font-black py-3.5 px-8 rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-[10px] flex items-center space-x-2`}

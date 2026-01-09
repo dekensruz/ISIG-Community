@@ -235,7 +235,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             className="hidden"
             accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
             onChange={handleFileChange}
-            onClick={(e) => e.stopPropagation()}
           />
 
           <button

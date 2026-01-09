@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -36,7 +37,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<Profile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // On ne met pas à true par défaut pour éviter le flash
   const [newMessage, setNewMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -70,7 +71,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior });
-    }, 100);
+    }, 50);
   };
   
   const markMessagesAsRead = useCallback(async () => {
@@ -84,7 +85,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
 
   const fetchData = useCallback(async () => {
     if (!session?.user || !conversationId) return;
-    setLoading(true);
+    
+    // N'afficher le loader que si on change radicalement de conversation ou au premier chargement
+    if (messages.length === 0) setLoading(true);
+
     try {
       const { data: participantData } = await supabase.from('conversation_participants').select('profiles:user_id(*)').eq('conversation_id', conversationId).neq('user_id', session.user.id).maybeSingle();
       if (participantData?.profiles) {
@@ -92,17 +96,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           setOtherParticipant(p);
           setIsOnlineRealtime(isUserOnline(p.last_seen_at));
       }
+      
       const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
       if (myProfile) setCurrentUserProfile(myProfile);
 
       const { data: messagesData } = await supabase.from('messages').select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))').eq('conversation_id', conversationId).order('created_at', { ascending: true });
       setMessages(messagesData as any[] || []);
+      
       if (messagesData?.some(m => !m.is_read && m.sender_id !== session.user.id)) markMessagesAsRead();
       scrollToBottom("auto");
     } catch (err) { console.error(err); } finally { setLoading(false); }
-  }, [conversationId, session?.user?.id, markMessagesAsRead]);
+  }, [conversationId, session?.user?.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    setMessages([]); // Reset messages pour éviter l'affichage de l'ancienne conv
+    fetchData(); 
+  }, [fetchData]);
 
   useEffect(() => {
     if (!conversationId || !session?.user) return;
@@ -110,7 +119,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, async (payload) => {
           const { data } = await supabase.from('messages').select('*, profiles:sender_id(*), replied_to:replying_to_message_id(*, profiles:sender_id(*))').eq('id', payload.new.id).single();
           if (data) {
-              setMessages(current => current.some(m => m.id === data.id) ? current : [...current, data as Message]);
+              setMessages(current => {
+                  if (current.some(m => m.id === data.id)) return current;
+                  return [...current, data as Message];
+              });
               if (data.sender_id !== session.user.id) markMessagesAsRead();
               scrollToBottom();
           }
@@ -119,6 +131,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
           setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+          // Utilisation de payload.old.id pour garantir le filtrage temps réel
           setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .subscribe();
@@ -166,7 +179,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         }
         setTimeout(adjustHeight, 10);
         scrollToBottom();
-    } catch (err) { alert("Erreur lors de l'envoi."); } finally { setIsUploading(false); }
+    } catch (err) { console.error(err); } finally { setIsUploading(false); }
   };
 
   const startRecording = async (e?: React.MouseEvent) => {
@@ -206,7 +219,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     }, 100);
   };
 
-  if (loading) return <div className="flex-1 flex items-center justify-center bg-white"><Spinner /></div>;
+  if (loading && messages.length === 0) return <div className="flex-1 flex items-center justify-center bg-white"><Spinner /></div>;
 
   return (
     <div className="flex flex-col h-full bg-white relative">
@@ -265,7 +278,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                     {editingMessage && (
                         <div className="flex items-center justify-between bg-isig-orange/10 p-3 rounded-2xl mb-2 border border-isig-orange/20 text-xs animate-fade-in-up">
                             <div className="flex items-center text-isig-orange font-black uppercase tracking-widest text-[9px]">
-                                <Pencil size={12} className="mr-2" /> Modification du message...
+                                <Pencil size={12} className="mr-2" /> Modification...
                             </div>
                             <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1 transition-colors"><RotateCcw size={16}/></button>
                         </div>
@@ -293,24 +306,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 ref={textareaRef}
                                 value={newMessage} 
                                 onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
-                                placeholder={editingMessage ? "Modifier le message..." : "Écrire un message..."} 
+                                placeholder={editingMessage ? "Modifier..." : "Message..."} 
                                 className="chat-textarea w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
                                 style={{ 
                                     minHeight: '48px',
-                                    overflow: 'hidden',
-                                    scrollbarWidth: 'none',
-                                    msOverflowStyle: 'none'
+                                    overflow: 'hidden'
                                 }}
                             />
-                            <style>{`
-                                .chat-textarea::-webkit-scrollbar {
-                                    display: none;
-                                }
-                                .chat-textarea {
-                                    -ms-overflow-style: none;
-                                    scrollbar-width: none;
-                                }
-                            `}</style>
                         </div>
                         <div className="flex items-center shrink-0">
                             {!newMessage.trim() && !file ? (

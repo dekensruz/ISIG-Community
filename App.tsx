@@ -68,13 +68,10 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 };
 
-// Composant de chargement intermédiaire
+// Composant de chargement intermédiaire ultra-léger
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[60vh] animate-pulse">
-    <div className="flex flex-col items-center">
-      <div className="w-12 h-12 border-4 border-isig-blue/20 border-t-isig-blue rounded-full animate-spin"></div>
-      <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Chargement fluide...</p>
-    </div>
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <div className="w-8 h-8 border-2 border-isig-blue/20 border-t-isig-blue rounded-full animate-spin"></div>
   </div>
 );
 
@@ -102,13 +99,13 @@ const AppContent: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white">
             {showNavBars && <Navbar />}
-            <main className={`transition-all duration-300 ${
+            <main className={`transition-all duration-200 ${
                 isAuthPage ? "" 
                 : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
                 : "container mx-auto px-4 pt-24 pb-24" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
-                    <Routes location={location} key={location.pathname}>
+                    <Routes location={location}>
                         <Route path="/" element={<Feed />} />
                         <Route path="/profile/:userId" element={<Profile />} />
                         <Route path="/post/:postId" element={<PostPage />} />
@@ -140,18 +137,12 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) setLoading(false);
-    }, 6000);
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      clearTimeout(timer);
     }).catch(err => {
       console.error("Auth Session Error:", err);
       setLoading(false);
-      clearTimeout(timer);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -165,10 +156,7 @@ const App: React.FC = () => {
   if (loading) {
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100">
-            <div className="flex flex-col items-center">
-                <Spinner />
-                <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Initialisation sécurisée...</p>
-            </div>
+            <Spinner />
         </div>
     );
   }

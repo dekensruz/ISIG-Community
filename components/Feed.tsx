@@ -11,6 +11,7 @@ import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
 
 // Cache global simple hors du cycle de vie du composant
 let feedCache: PostType[] = [];
+let popularCache: PostType[] = [];
 let lastFetchTime: number = 0;
 const CACHE_EXPIRATION = 1000 * 60 * 5; // 5 minutes
 
@@ -33,8 +34,8 @@ const PostSkeleton = () => (
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
-  const [posts, setPosts] = useState<PostType[]>(feedCache);
-  const [loading, setLoading] = useState(feedCache.length === 0);
+  const [posts, setPosts] = useState<PostType[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -49,17 +50,20 @@ const Feed: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = false) => {
     if (isFetchingRef.current) return;
     
-    // Si on a déjà du cache et que ce n'est pas un rafraîchissement manuel
-    if (isInitial && feedCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
+    // Utilisation du cache spécifique au mode de tri
+    const activeCache = sortBy === 'recent' ? feedCache : popularCache;
+
+    if (isInitial && activeCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
+        setPosts(activeCache);
         setLoading(false);
         return;
     }
 
     try {
       isFetchingRef.current = true;
-      if (isInitial && posts.length === 0) {
+      if (isInitial) {
         setLoading(true);
-      } else if (!isInitial) {
+      } else {
         setLoadingMore(true);
       }
 
@@ -67,17 +71,20 @@ const Feed: React.FC = () => {
       const from = currentPage * POSTS_PER_PAGE;
       const to = from + POSTS_PER_PAGE - 1;
 
-      let query = supabase
+      let queryBuilder = supabase
         .from('posts')
         .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
 
       if (sortBy === 'popular') {
-        query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+        // Correction du tri : d'abord par likes_count descendant, puis par date
+        queryBuilder = queryBuilder
+            .order('likes_count', { ascending: false })
+            .order('created_at', { ascending: false });
       } else {
-        query = query.order('created_at', { ascending: false });
+        queryBuilder = queryBuilder.order('created_at', { ascending: false });
       }
 
-      const { data, error } = await query.range(from, to);
+      const { data, error } = await queryBuilder.range(from, to);
 
       if (error) throw error;
       
@@ -85,7 +92,8 @@ const Feed: React.FC = () => {
       
       if (isInitial) {
         setPosts(newPosts);
-        feedCache = newPosts; // Mise à jour du cache
+        if (sortBy === 'recent') feedCache = newPosts;
+        else popularCache = newPosts;
         lastFetchTime = Date.now();
         setPage(0);
       } else {
@@ -94,7 +102,8 @@ const Feed: React.FC = () => {
             const unique = combined.filter((p, idx, self) => 
                 self.findIndex(t => t.id === p.id) === idx
             );
-            feedCache = unique; // Mise à jour du cache
+            if (sortBy === 'recent') feedCache = unique;
+            else popularCache = unique;
             return unique;
         });
         setPage(currentPage);
@@ -109,11 +118,11 @@ const Feed: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [page, sortBy, posts.length]);
+  }, [page, sortBy]);
 
   useEffect(() => {
     fetchPosts(true);
-  }, [sortBy]);
+  }, [sortBy, fetchPosts]);
 
   useEffect(() => {
     const channel = supabase
@@ -132,18 +141,12 @@ const Feed: React.FC = () => {
         if (data) {
           setPosts(prev => {
             if (prev.some(p => p.id === data.id)) return prev;
-            const updated = [data as any, ...prev];
-            feedCache = updated;
-            return updated;
+            return [data as any, ...prev];
           });
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
-        setPosts(prev => {
-            const updated = prev.filter(p => p.id !== payload.old.id);
-            feedCache = updated;
-            return updated;
-        });
+        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
         const { data } = await supabase
@@ -152,11 +155,7 @@ const Feed: React.FC = () => {
           .eq('id', payload.new.id)
           .single();
         if (data) {
-          setPosts(prev => {
-            const updated = prev.map(p => p.id === data.id ? data as any : p);
-            feedCache = updated;
-            return updated;
-          });
+          setPosts(prev => prev.map(p => p.id === data.id ? data as any : p));
         }
       })
       .subscribe();
@@ -185,15 +184,12 @@ const Feed: React.FC = () => {
   const handlePostCreated = (newPost?: PostType) => {
     if (newPost) {
         setPosts(prev => {
-            let updated;
             if (editingPost) {
-                updated = prev.map(p => p.id === newPost.id ? newPost : p);
+                return prev.map(p => p.id === newPost.id ? newPost : p);
             } else {
                 if (prev.some(p => p.id === newPost.id)) return prev;
-                updated = [newPost, ...prev];
+                return [newPost, ...prev];
             }
-            feedCache = updated;
-            return updated;
         });
         setEditingPost(null);
     } else {
@@ -217,14 +213,14 @@ const Feed: React.FC = () => {
   }, [posts, searchQuery]);
 
   return (
-    <div className="max-w-3xl mx-auto w-full transition-all duration-500">
+    <div className="max-w-3xl mx-auto w-full transition-all duration-300">
       <div className="space-y-6">
         <div className="md:hidden mb-4 animate-fade-in">
             <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-isig-blue transition-colors" size={18} />
                 <input 
                     type="text" 
-                    placeholder="Rechercher sur le campus..." 
+                    placeholder="Rechercher étudiant ou post..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-12 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"
@@ -274,7 +270,7 @@ const Feed: React.FC = () => {
         )}
 
         <div className="space-y-8 pb-10">
-          {loading && posts.length === 0 ? (
+          {loading ? (
              <div className="space-y-8">
                 {[1, 2, 3].map(i => <PostSkeleton key={i} />)}
              </div>

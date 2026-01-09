@@ -50,7 +50,7 @@ const Navbar: React.FC = () => {
             })
             .subscribe();
 
-        // Abonnement temps réel pour les notifications (IMPORTANT)
+        // Abonnement temps réel pour les notifications
         const notificationChannel = supabase
             .channel(`nav-notifications-${session.user.id}`)
             .on('postgres_changes', {
@@ -81,7 +81,7 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between items-center h-16 sm:h-20">
           
           <div className="flex items-center space-x-4 flex-1">
-            <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
+            <Link to="/" className="flex items-center space-x-2 flex-shrink-0 transition-transform active:scale-95">
               <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-sm" />
               <span className="hidden sm:block text-xl font-black tracking-tighter text-brand-dark uppercase">
                 ISIG<span className="text-isig-blue">.</span>
@@ -92,7 +92,7 @@ const Navbar: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 type="text" 
-                placeholder="Rechercher sur ISIG..." 
+                placeholder="Rechercher étudiant ou post..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-11 pr-4 py-2.5 bg-slate-100/70 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-isig-blue transition-all"
@@ -101,14 +101,14 @@ const Navbar: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-3">
-            <Link to="/groups" className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-2xl transition-all" title="Groupes">
+            <Link to="/groups" className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-2xl transition-all active:scale-90" title="Groupes">
               <LayoutGrid size={22} />
             </Link>
 
-            <Link to="/notifications" className="relative p-2.5 text-slate-600 hover:bg-slate-100 rounded-2xl transition-all">
+            <Link to="/notifications" className="relative p-2.5 text-slate-600 hover:bg-slate-100 rounded-2xl transition-all active:scale-90">
               <Bell size={22} />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute top-2 right-2 flex h-4 w-4">
+                <span className="absolute top-2 right-2 flex h-4 w-4 animate-pulse">
                     <span className="relative inline-flex rounded-full h-4 w-4 bg-isig-orange text-[10px] font-bold text-white items-center justify-center border-2 border-white">
                         {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                     </span>
@@ -118,21 +118,21 @@ const Navbar: React.FC = () => {
 
             {profile && (
                <div className="relative flex items-center pl-3 border-l border-slate-200 ml-2">
-                  <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 group">
+                  <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 group transition-transform active:scale-95">
                     <Avatar avatarUrl={profile.avatar_url} name={profile.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/30 transition-all" />
                     <span className="hidden sm:block text-sm font-black text-slate-800">{profile.full_name.split(' ')[0]}</span>
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-3xl shadow-premium border border-slate-100 py-2 overflow-hidden animate-fade-in">
-                        <Link to={`/profile/${profile.id}`} onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                    <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-3xl shadow-premium border border-slate-100 py-2 overflow-hidden animate-fade-in-up">
+                        <Link to={`/profile/${profile.id}`} onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                             <User size={18} className="mr-3 text-slate-400" /> Profil
                         </Link>
-                        <Link to="/settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                        <Link to="/settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                             <Settings size={18} className="mr-3 text-slate-400" /> Paramètres
                         </Link>
                         <div className="border-t border-slate-100 my-1 mx-2"></div>
-                        <button onClick={handleSignOut} className="w-full flex items-center px-4 py-3.5 text-sm font-bold text-red-500 hover:bg-red-50 text-left">
+                        <button onClick={handleSignOut} className="w-full flex items-center px-4 py-3.5 text-sm font-bold text-red-500 hover:bg-red-50 text-left transition-colors">
                             <LogOut size={18} className="mr-3" /> Déconnexion
                         </button>
                     </div>

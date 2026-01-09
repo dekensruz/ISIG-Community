@@ -70,8 +70,8 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 // Composant de chargement intermédiaire ultra-léger
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[40vh]">
-    <div className="w-8 h-8 border-2 border-isig-blue/20 border-t-isig-blue rounded-full animate-spin"></div>
+  <div className="flex items-center justify-center min-h-[60vh] animate-fade-in">
+    <div className="w-10 h-10 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
   </div>
 );
 
@@ -97,31 +97,33 @@ const AppContent: React.FC = () => {
     }, [session]);
 
     return (
-        <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white">
+        <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white transition-colors duration-300">
             {showNavBars && <Navbar />}
-            <main className={`transition-all duration-200 ${
+            <main className={`transition-all duration-300 ease-out ${
                 isAuthPage ? "" 
                 : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
-                : "container mx-auto px-4 pt-24 pb-24" 
+                : "container mx-auto px-4 pt-24 pb-28 sm:pb-32" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
-                    <Routes location={location}>
-                        <Route path="/" element={<Feed />} />
-                        <Route path="/profile/:userId" element={<Profile />} />
-                        <Route path="/post/:postId" element={<PostPage />} />
-                        <Route path="/groups" element={session ? <GroupsPage /> : <Navigate to="/auth" />} />
-                        <Route path="/group/:groupId" element={session ? <GroupPage /> : <Navigate to="/auth" />} />
-                        <Route path="/chat" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
-                        <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
-                        <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
-                        <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
-                        <Route path="/feedback" element={session ? <FeedbackPage /> : <Navigate to="/auth" />} />
-                        <Route path="/admin/feedbacks" element={session ? <AdminFeedbacksPage /> : <Navigate to="/auth" />} />
-                        <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
-                        <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
-                        <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />
-                        <Route path="*" element={<Navigate to="/" />} />
-                    </Routes>
+                    <div key={location.pathname} className="animate-fade-in">
+                        <Routes location={location}>
+                            <Route path="/" element={<Feed />} />
+                            <Route path="/profile/:userId" element={<Profile />} />
+                            <Route path="/post/:postId" element={<PostPage />} />
+                            <Route path="/groups" element={session ? <GroupsPage /> : <Navigate to="/auth" />} />
+                            <Route path="/group/:groupId" element={session ? <GroupPage /> : <Navigate to="/auth" />} />
+                            <Route path="/chat" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
+                            <Route path="/chat/:conversationId" element={session ? <ChatPage /> : <Navigate to="/auth" />} />
+                            <Route path="/users" element={session ? <UsersPage /> : <Navigate to="/auth" />} />
+                            <Route path="/settings" element={session ? <SettingsPage /> : <Navigate to="/auth" />} />
+                            <Route path="/feedback" element={session ? <FeedbackPage /> : <Navigate to="/auth" />} />
+                            <Route path="/admin/feedbacks" element={session ? <AdminFeedbacksPage /> : <Navigate to="/auth" />} />
+                            <Route path="/auth" element={!session ? <AuthPage /> : <Navigate to="/" />} />
+                            <Route path="/search" element={session ? <SearchResultsPage /> : <Navigate to="/auth" />} />
+                            <Route path="/notifications" element={session ? <NotificationsPage /> : <Navigate to="/auth" />} />
+                            <Route path="*" element={<Navigate to="/" />} />
+                        </Routes>
+                    </div>
                 </Suspense>
             </main>
             {showNavBars && <TabBar />}
@@ -155,7 +157,7 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <div className="flex items-center justify-center min-h-screen bg-slate-50">
             <Spinner />
         </div>
     );

@@ -5,7 +5,7 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import * as locales from 'date-fns/locale';
-import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ImageModal from './ImageModal';
 import PostDetailModal from './PostDetailModal';
@@ -101,7 +101,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     } catch (err) {
         try {
             await navigator.clipboard.writeText(shareText);
-            alert("Mention personnalisée et lien copiés dans votre presse-papier !");
+            alert("Lien copié dans votre presse-papier !");
         } catch (copyErr) {
             console.error("Erreur de copie", copyErr);
         }
@@ -127,8 +127,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     }
   };
 
-  const isTrending = likesCount >= 5;
-
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all hover:shadow-premium group">
       <div className="p-6 flex items-center justify-between">
@@ -141,11 +139,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                 <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors">
                     {post.profiles.full_name}
                 </Link>
-                {isTrending && (
-                    <div className="bg-isig-orange/10 text-isig-orange px-2 py-0.5 rounded-lg flex items-center text-[8px] font-black uppercase tracking-widest animate-pulse">
-                        <TrendingUp size={10} className="mr-1"/> Tendance
-                    </div>
-                )}
             </div>
             <div className="flex items-center text-[10px] text-slate-400 font-black uppercase tracking-widest">
                 <span>{post.profiles.major}</span>

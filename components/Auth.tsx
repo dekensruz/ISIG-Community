@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { useSearchParams } from 'react-router-dom';
 import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck } from 'lucide-react';
 import Spinner from './Spinner';
 
 const AuthPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -15,9 +17,15 @@ const AuthPage: React.FC = () => {
   const [major, setMajor] = useState('');
   const [promotion, setPromotion] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const initialMode = searchParams.get('mode');
+    if (initialMode === 'signup') setMode('signup');
+    else if (initialMode === 'forgot') setMode('forgot');
+    else setMode('login');
+  }, [searchParams]);
 
   const getFriendlyErrorMessage = (err: any) => {
     const msg = err.message || '';
@@ -100,7 +108,7 @@ const AuthPage: React.FC = () => {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-md space-y-8 animate-fade-in-up">
+        <div className="w-full max-md space-y-8 animate-fade-in-up">
           <div className="lg:hidden flex justify-center mb-6">
             <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 drop-shadow-xl" />
           </div>

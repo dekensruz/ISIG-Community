@@ -37,7 +37,6 @@ const Navbar: React.FC = () => {
         fetchProfile();
         fetchNotificationCount();
 
-        // Abonnement temps réel pour le profil
         const profileChannel = supabase
             .channel(`nav-profile-${session.user.id}`)
             .on('postgres_changes', { 
@@ -50,7 +49,6 @@ const Navbar: React.FC = () => {
             })
             .subscribe();
 
-        // Abonnement temps réel pour les notifications
         const notificationChannel = supabase
             .channel(`nav-notifications-${session.user.id}`)
             .on('postgres_changes', {
@@ -70,7 +68,10 @@ const Navbar: React.FC = () => {
     }
   }, [session]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropdownOpen(false);
     await supabase.auth.signOut();
     navigate('/auth');
   };
@@ -116,7 +117,7 @@ const Navbar: React.FC = () => {
               )}
             </Link>
 
-            {profile && (
+            {profile ? (
                <div className="relative flex items-center pl-3 border-l border-slate-200 ml-2">
                   <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 group transition-transform active:scale-95">
                     <Avatar avatarUrl={profile.avatar_url} name={profile.full_name} size="md" className="ring-2 ring-transparent group-hover:ring-isig-blue/30 transition-all" />
@@ -124,20 +125,27 @@ const Navbar: React.FC = () => {
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-3xl shadow-premium border border-slate-100 py-2 overflow-hidden animate-fade-in-up">
-                        <Link to={`/profile/${profile.id}`} onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                            <User size={18} className="mr-3 text-slate-400" /> Profil
-                        </Link>
-                        <Link to="/settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                            <Settings size={18} className="mr-3 text-slate-400" /> Paramètres
-                        </Link>
-                        <div className="border-t border-slate-100 my-1 mx-2"></div>
-                        <button onClick={handleSignOut} className="w-full flex items-center px-4 py-3.5 text-sm font-bold text-red-500 hover:bg-red-50 text-left transition-colors">
-                            <LogOut size={18} className="mr-3" /> Déconnexion
-                        </button>
-                    </div>
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)}></div>
+                      <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-3xl shadow-premium border border-slate-100 py-2 overflow-hidden animate-fade-in-up z-20">
+                          <Link to={`/profile/${profile.id}`} onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                              <User size={18} className="mr-3 text-slate-400" /> Profil
+                          </Link>
+                          <Link to="/settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                              <Settings size={18} className="mr-3 text-slate-400" /> Paramètres
+                          </Link>
+                          <div className="border-t border-slate-100 my-1 mx-2"></div>
+                          <button onClick={handleSignOut} className="w-full flex items-center px-4 py-3.5 text-sm font-bold text-red-500 hover:bg-red-50 text-left transition-colors">
+                              <LogOut size={18} className="mr-3" /> Déconnexion
+                          </button>
+                      </div>
+                    </>
                   )}
                </div>
+            ) : (
+                <Link to="/auth" className="ml-2 bg-isig-blue text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-isig-blue/20 hover:bg-blue-600 transition-all active:scale-95">
+                    Connexion
+                </Link>
             )}
           </div>
 

@@ -219,11 +219,15 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
 
   const CommentItem: React.FC<{ comment: GroupPostComment, isReply?: boolean }> = ({ comment, isReply }) => (
     <div className={`flex items-start space-x-3 ${isReply ? 'ml-10 mt-3' : 'mt-4 animate-fade-in'}`}>
-        <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
+        <Link to={`/profile/${comment.user_id}`} onClick={handleClose} className="shrink-0 transition-transform active:scale-90">
+          <Avatar avatarUrl={comment.profiles.avatar_url} name={comment.profiles.full_name} size="sm" />
+        </Link>
         <div className="flex-1 min-w-0">
             <div className="group/comment relative bg-slate-50 p-3 rounded-2xl border border-slate-100">
                 <div className="flex justify-between items-start">
-                    <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                    <Link to={`/profile/${comment.user_id}`} onClick={handleClose} className="hover:underline">
+                      <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles.full_name}</p>
+                    </Link>
                     {session?.user.id === comment.user_id && (
                         <div className="relative">
                             <button onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)} className="text-slate-400 hover:text-slate-600">

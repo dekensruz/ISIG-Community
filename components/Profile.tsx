@@ -163,7 +163,7 @@ const Profile: React.FC = () => {
   
   const handleFollow = async () => {
     if (!session?.user) {
-      navigate('/auth');
+      navigate('/auth?mode=signup');
       return;
     }
     if (isOwnProfile || followLoading) return;
@@ -180,7 +180,7 @@ const Profile: React.FC = () => {
 
   const handleUnfollow = async () => {
     if (!session?.user) {
-      navigate('/auth');
+      navigate('/auth?mode=signup');
       return;
     }
     if (isOwnProfile || followLoading) return;

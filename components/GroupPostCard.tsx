@@ -165,7 +165,8 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
       {post.media_url && (
         <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100">
-          {post.media_type?.startsWith('image/') ? (
+          {/* Correction ici : Utilisation de 'image' au lieu de startsWith('image/') pour uniformité */}
+          {post.media_type === 'image' || post.media_type?.startsWith('image/') ? (
             <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} />
           ) : (
             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4">

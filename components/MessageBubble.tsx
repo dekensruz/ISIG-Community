@@ -101,19 +101,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+            }
         };
-        if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        if (menuOpen) {
+            // Utiliser click au lieu de mousedown pour éviter de fermer avant le déclenchement de l'action React
+            document.addEventListener('click', handleClickOutside);
+        }
+        return () => document.removeEventListener('click', handleClickOutside);
     }, [menuOpen]);
     
     const handleDeleteForMe = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         setMessages(prev => prev.filter(m => m.id !== message.id));
     };
     
     const handleDeleteForEveryone = async (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         const { error } = await supabase.from('messages').delete().eq('id', message.id);
@@ -121,12 +128,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     };
 
     const handleReplyAction = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         onSetReplying(message);
         setMenuOpen(false);
     };
 
     const handleEditAction = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         onSetEditing(message);
         setMenuOpen(false);
@@ -157,34 +166,34 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
             <button 
                 type="button" 
                 onClick={handleReplyAction} 
-                className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
+                className="w-full text-left flex items-center px-4 py-3 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
             >
-                <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
+                <MessageSquareReply size={18} className="mr-3 text-isig-blue"/>Répondre
             </button>
             {isOwnMessage && message.content && (
                 <button 
                     type="button" 
                     onClick={handleEditAction} 
-                    className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
+                    className="w-full text-left flex items-center px-4 py-3 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                    <Pencil size={18} className="mr-4 md:mr-3 text-isig-orange"/>Modifier
+                    <Pencil size={18} className="mr-3 text-isig-orange"/>Modifier
                 </button>
             )}
             <div className="border-t border-slate-100 my-1 mx-2"></div>
             <button 
                 type="button" 
                 onClick={handleDeleteForMe} 
-                className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
+                className="w-full text-left flex items-center px-4 py-3 text-sm font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
             >
-                <XCircle size={18} className="mr-4 md:mr-3"/>Supprimer (Moi)
+                <XCircle size={18} className="mr-3"/>Supprimer (Moi)
             </button>
             {isOwnMessage && (
                 <button 
                     type="button" 
                     onClick={handleDeleteForEveryone} 
-                    className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full text-left flex items-center px-4 py-3 text-sm font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
                 >
-                    <Trash2 size={18} className="mr-4 md:mr-3"/>Supprimer (Tous)
+                    <Trash2 size={18} className="mr-3"/>Supprimer (Tous)
                 </button>
             )}
         </div>
@@ -217,7 +226,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
                 <button 
                     type="button" 
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }} 
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} 
                     className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100"
                 >
                     <MoreHorizontal size={18} />

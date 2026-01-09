@@ -9,7 +9,7 @@ import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
 import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
 
-// Cache global simple hors du cycle de vie du composant
+// Cache global simple
 let feedCache: PostType[] = [];
 let popularCache: PostType[] = [];
 let lastFetchTime: number = 0;
@@ -50,13 +50,13 @@ const Feed: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = false) => {
     if (isFetchingRef.current) return;
     
-    // Utilisation du cache spécifique au mode de tri
+    // Si on change de mode de tri en initial, on peut ignorer le cache pour forcer la fluidité/fraîcheur
     const activeCache = sortBy === 'recent' ? feedCache : popularCache;
 
     if (isInitial && activeCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
         setPosts(activeCache);
         setLoading(false);
-        return;
+        // On ne retourne pas ici si on veut forcer le rafraîchissement au changement de sortBy
     }
 
     try {
@@ -76,7 +76,7 @@ const Feed: React.FC = () => {
         .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
 
       if (sortBy === 'popular') {
-        // Correction du tri : d'abord par likes_count descendant, puis par date
+        // Tri strict par likes_count pour l'onglet populaire
         queryBuilder = queryBuilder
             .order('likes_count', { ascending: false })
             .order('created_at', { ascending: false });
@@ -120,9 +120,10 @@ const Feed: React.FC = () => {
     }
   }, [page, sortBy]);
 
+  // Déclencher le fetch au changement de sortBy
   useEffect(() => {
     fetchPosts(true);
-  }, [sortBy, fetchPosts]);
+  }, [sortBy]); // Simplifié pour ne dépendre que de sortBy ici
 
   useEffect(() => {
     const channel = supabase

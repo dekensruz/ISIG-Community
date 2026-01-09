@@ -71,7 +71,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior });
-    }, 50);
+    }, 100);
   };
   
   const markMessagesAsRead = useCallback(async () => {
@@ -233,8 +233,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   if (loading && messages.length === 0) return <div className="flex-1 flex items-center justify-center bg-white"><Spinner /></div>;
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
-        <header className="flex items-center justify-between p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
+    <div className="flex flex-col h-full bg-white relative">
+        <header className="flex items-center justify-between p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shrink-0">
             <div className="flex items-center min-w-0">
                 <button type="button" onClick={() => navigate('/chat')} className="mr-3 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50 active:bg-slate-200">
                     <ArrowLeft size={22} strokeWidth={2.5} />
@@ -260,7 +260,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar">
+        {/* Zone de messages avec min-h-0 pour permettre au flex-1 de fonctionner correctement */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar">
             {messages.map((msg) => (
                 <MessageBubble 
                   key={msg.id} 
@@ -275,6 +276,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             <div ref={messagesEndRef} className="h-4" />
         </div>
 
+        {/* Zone de saisie fixée en bas grâce au flex-col du parent */}
         <div className="p-4 border-t border-slate-100 bg-white shrink-0">
             {recordingStatus === 'recording' ? (
                 <div className="flex items-center space-x-4 h-14 bg-red-50 rounded-2xl px-4 border border-red-100 animate-pulse">
@@ -326,7 +328,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 ref={textareaRef}
                                 value={newMessage} 
                                 onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
-                                placeholder={editingMessage ? "Modifier..." : "Message..."} 
+                                placeholder={editingMessage ? "Modifier le message..." : "Écrire un message..."} 
                                 className="chat-textarea w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
                                 style={{ 
                                     minHeight: '48px',

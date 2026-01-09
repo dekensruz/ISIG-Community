@@ -8,17 +8,22 @@ import { User, LogOut, Search, Bell, LayoutGrid, Settings } from 'lucide-react';
 import Avatar from './Avatar';
 
 const Navbar: React.FC = () => {
-  const { session, loading } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const { searchQuery, setSearchQuery } = useSearchFilter();
 
   const fetchProfile = async () => {
     if (session?.user) {
+        setProfileLoading(true);
         const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         if (data) setProfile(data);
+        setProfileLoading(false);
+    } else {
+        setProfileLoading(false);
     }
   };
 
@@ -65,6 +70,7 @@ const Navbar: React.FC = () => {
         };
     } else {
       setProfile(null);
+      setProfileLoading(false);
       setUnreadNotificationsCount(0);
     }
   }, [session]);
@@ -82,6 +88,9 @@ const Navbar: React.FC = () => {
       window.location.reload(); 
     }
   };
+
+  // On considère qu'on charge si l'auth charge OU si on a une session mais que le profil n'est pas encore là
+  const isReallyLoading = authLoading || (session && profileLoading);
 
   return (
     <nav className="glass fixed top-0 w-full z-40 border-b border-slate-200/50">
@@ -124,7 +133,7 @@ const Navbar: React.FC = () => {
               )}
             </Link>
 
-            {loading ? (
+            {isReallyLoading ? (
                <div className="ml-2 w-10 h-10 bg-slate-100 rounded-full animate-pulse"></div>
             ) : profile ? (
                <div className="relative flex items-center pl-3 border-l border-slate-200 ml-2">

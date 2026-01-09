@@ -60,9 +60,9 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'inherit';
+      textarea.style.height = 'auto'; // Changé de inherit à auto
       const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 128;
+      const maxHeight = 120;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
       textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
@@ -299,7 +299,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth" style={{ scrollbarGutter: 'stable' }}>
             <div className="flex items-center space-x-4 mb-6">
                 <Link to={`/profile/${post.profiles.id}`} onClick={handleClose}>
                   <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" />
@@ -358,7 +358,7 @@ const GroupPostDetailModal: React.FC<GroupPostDetailModalProps> = ({ postInitial
                             else setNewComment(val);
                             adjustHeight();
                         }}
-                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden custom-scrollbar"
+                        className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden"
                     />
                 </div>
                 <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">

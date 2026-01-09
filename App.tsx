@@ -5,7 +5,7 @@ import { supabase } from './services/supabase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Spinner from './components/Spinner';
 
-// Lazy loading des pages
+// Lazy loading des pages pour optimiser le bundle et la fluidité
 const AuthPage = lazy(() => import('./components/Auth'));
 const Feed = lazy(() => import('./components/Feed'));
 const Profile = lazy(() => import('./components/Profile'));
@@ -20,7 +20,7 @@ const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
 const AdminFeedbacksPage = lazy(() => import('./components/AdminFeedbacksPage'));
 const FeedbackPage = lazy(() => import('./components/FeedbackPage'));
 
-// Composants de structure
+// Importation des composants de structure
 import Navbar from './components/Navbar';
 import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
@@ -39,6 +39,12 @@ export const useAuth = () => useContext(AuthContext);
 type SearchFilterContextType = {
   searchQuery: string;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  filterType: string;
+  setFilterType: React.Dispatch<React.SetStateAction<string>>;
+  sortOrder: string;
+  setSortOrder: React.Dispatch<React.SetStateAction<string>>;
+  isSearchActive: boolean;
+  setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export const SearchFilterContext = createContext<SearchFilterContextType | undefined>(undefined);
@@ -51,16 +57,21 @@ export const useSearchFilter = () => {
 
 const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterType, setFilterType] = useState('all');
+    const [sortOrder, setSortOrder] = useState('desc');
+    const [isSearchActive, setIsSearchActive] = useState(false);
+
     return (
-        <SearchFilterContext.Provider value={{ searchQuery, setSearchQuery }}>
+        <SearchFilterContext.Provider value={{ searchQuery, setSearchQuery, filterType, setFilterType, sortOrder, setSortOrder, isSearchActive, setIsSearchActive }}>
             {children}
         </SearchFilterContext.Provider>
     );
 };
 
+// Composant de chargement intermédiaire ultra-léger
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[60vh]">
-    <Spinner />
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <div className="w-8 h-8 border-2 border-isig-blue/20 border-t-isig-blue rounded-full animate-spin"></div>
   </div>
 );
 
@@ -71,6 +82,8 @@ const AppContent: React.FC = () => {
     
     const isAuthPage = location.pathname === '/auth';
     const isChatConversation = location.pathname.startsWith('/chat/') && location.pathname.split('/').length > 2;
+    
+    const showScrollButton = !isAuthPage && (location.pathname === '/' || location.pathname.startsWith('/group/'));
     const showNavBars = !isAuthPage && !isChatConversation;
 
     useEffect(() => {
@@ -84,16 +97,15 @@ const AppContent: React.FC = () => {
     }, [session]);
 
     return (
-        <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white flex flex-col">
+        <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white">
             {showNavBars && <Navbar />}
-            
-            <main className={`flex-grow transition-opacity duration-300 ${
+            <main className={`transition-all duration-200 ${
                 isAuthPage ? "" 
-                : isChatConversation ? "h-screen overflow-hidden" 
-                : "container mx-auto px-4 pt-20 pb-28 sm:pt-24" 
+                : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
+                : "container mx-auto px-4 pt-24 pb-24" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
-                    <Routes>
+                    <Routes location={location}>
                         <Route path="/" element={<Feed />} />
                         <Route path="/profile/:userId" element={<Profile />} />
                         <Route path="/post/:postId" element={<PostPage />} />
@@ -112,9 +124,8 @@ const AppContent: React.FC = () => {
                     </Routes>
                 </Suspense>
             </main>
-
             {showNavBars && <TabBar />}
-            {session && !isAuthPage && !isChatConversation && <ScrollToTopButton />}
+            {session && showScrollButton && <ScrollToTopButton />}
             <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
             {session && !isAuthPage && canShowNotifications && <NotificationsProvider />}
         </div>
@@ -129,7 +140,10 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => {
+      console.error("Auth Session Error:", err);
+      setLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -139,7 +153,13 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><Spinner /></div>;
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-100">
+            <Spinner />
+        </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{ session, loading }}>

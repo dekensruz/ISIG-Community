@@ -68,7 +68,11 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     }
   };
 
-  const handleRemoveFile = () => {
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
@@ -81,7 +85,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     fileInputRef.current?.click();
   };
 
-  const handlePost = async (e?: React.MouseEvent) => {
+  const handlePost = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!content.trim() && !file && !previewUrl) {
       setError("La publication ne peut pas être vide.");
@@ -156,67 +160,70 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
           )}
       </div>
 
-      <div className="relative">
-        <textarea
-            ref={textareaRef}
-            className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all overflow-hidden"
-            placeholder="Partagez une astuce, une question ou un projet..."
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              adjustHeight();
-            }}
-        />
-      </div>
-      
-      {previewUrl && (
-        <div className="mt-4 relative inline-block group">
-            {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
-                <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
-            ) : (
-                <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <FileText className="text-isig-blue mr-3" />
-                    <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file?.name || 'Fichier attaché'}</p>
-                </div>
-            )}
-            <button
-              type="button"
-              onClick={handleRemoveFile}
-              className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
-            >
-              <X size={16} />
-            </button>
+      <form onSubmit={handlePost} noValidate>
+        <div className="relative">
+          <textarea
+              ref={textareaRef}
+              className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all overflow-hidden"
+              placeholder="Partagez une astuce, une question ou un projet..."
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value);
+                adjustHeight();
+              }}
+          />
         </div>
-      )}
+        
+        {previewUrl && (
+          <div className="mt-4 relative inline-block group">
+              {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
+                  <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
+              ) : (
+                  <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <FileText className="text-isig-blue mr-3" />
+                      <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file?.name || 'Fichier attaché'}</p>
+                  </div>
+              )}
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+          </div>
+        )}
 
-      <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
-        <div className="flex space-x-2">
-           <button 
-            type="button" 
-            onClick={triggerFileInput}
-            className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all outline-none"
-            aria-label="Joindre un fichier"
-           >
-            <Paperclip size={24} />
-           </button>
-           <input 
-              ref={fileInputRef}
-              type="file" 
-              className="hidden" 
-              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-              onChange={handleFileChange} 
-            />
+        <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
+          <div className="flex space-x-2">
+             <button 
+              type="button" 
+              onClick={triggerFileInput}
+              className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all outline-none"
+             >
+                <Paperclip size={24} />
+             </button>
+          </div>
+          <button
+            type="submit"
+            disabled={uploading || (!content.trim() && !file && !previewUrl)}
+            className={`${editingPost ? 'bg-isig-blue' : 'bg-isig-orange'} text-white font-black py-3.5 px-8 rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-[10px] flex items-center space-x-2`}
+          >
+            {uploading ? <Spinner /> : (editingPost ? <><Send size={14}/><span>Mettre à jour</span></> : 'Publier')}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handlePost}
-          disabled={uploading || (!content.trim() && !file && !previewUrl)}
-          className={`${editingPost ? 'bg-isig-blue' : 'bg-isig-orange'} text-white font-black py-3.5 px-8 rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-[10px] flex items-center space-x-2`}
-        >
-          {uploading ? <Spinner /> : (editingPost ? <><Send size={14}/><span>Mettre à jour</span></> : 'Publier')}
-        </button>
-      </div>
-      {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
+        {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
+      </form>
+
+      {/* Input isolé */}
+      <input 
+        ref={fileInputRef}
+        type="file" 
+        className="hidden" 
+        style={{ display: 'none' }}
+        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+        onChange={handleFileChange} 
+      />
     </div>
   );
 };

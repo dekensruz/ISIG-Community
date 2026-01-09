@@ -32,13 +32,15 @@ const Profile: React.FC = () => {
   
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState<boolean | null>(null); // Initialisé à null pour le chargement
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
 
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [userListConfig, setUserListConfig] = useState<{ type: 'followers' | 'following', title: string } | null>(null);
   
   const editAreaRef = useRef<HTMLDivElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = session?.user.id === userId;
 
@@ -70,7 +72,6 @@ const Profile: React.FC = () => {
       setFollowerCount(followers || 0);
       setFollowingCount(following || 0);
 
-      // Vérification immédiate du statut d'abonnement
       if (session?.user && !isOwnProfile) {
         const { data: followData } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).maybeSingle();
         setIsFollowing(!!followData);
@@ -244,11 +245,14 @@ const Profile: React.FC = () => {
                 >
                     {isEditing && (
                         <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center rounded-b-[3.5rem] opacity-0 group-hover:opacity-100 transition-opacity">
-                            <label className="bg-white/90 text-slate-800 px-6 py-3 rounded-2xl flex items-center space-x-2 cursor-pointer hover:bg-white transition-all shadow-xl font-black text-sm uppercase tracking-widest">
+                            <button 
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); coverInputRef.current?.click(); }}
+                              className="bg-white/90 text-slate-800 px-6 py-3 rounded-2xl flex items-center space-x-2 cursor-pointer hover:bg-white transition-all shadow-xl font-black text-sm uppercase tracking-widest outline-none"
+                            >
                                 {coverUploading ? <Spinner /> : <Camera size={20} className="text-isig-blue"/>}
                                 <span>Changer la couverture</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} disabled={coverUploading}/>
-                            </label>
+                            </button>
                         </div>
                     )}
                 </div>
@@ -258,17 +262,21 @@ const Profile: React.FC = () => {
                 <div className="relative flex flex-col sm:flex-row items-center sm:items-start -mt-16 sm:-mt-20 mb-6 sm:space-x-8">
                     <div className="relative group/avatar shrink-0">
                         <button 
+                            type="button"
                             onClick={() => profile.avatar_url && setModalImage(profile.avatar_url)} 
                             disabled={!profile.avatar_url}
-                            className="relative"
+                            className="relative outline-none"
                         >
                            <Avatar avatarUrl={profile.avatar_url} name={profile.full_name} size="3xl" className="ring-[12px] ring-white shadow-premium" />
                         </button>
                         {isOwnProfile && (
-                            <label className="absolute bottom-2 right-2 bg-isig-orange text-white p-3 rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg transition-all active:scale-90 flex items-center justify-center">
+                            <button 
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); avatarInputRef.current?.click(); }}
+                                className="absolute bottom-2 right-2 bg-isig-orange text-white p-3 rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg transition-all active:scale-90 flex items-center justify-center outline-none"
+                            >
                                 {avatarUploading ? <Spinner/> : <Upload size={20} />}
-                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading}/>
-                            </label>
+                            </button>
                         )}
                     </div>
 
@@ -376,6 +384,10 @@ const Profile: React.FC = () => {
                 </div>
             </div>
         </div>
+
+        {/* Inputs isolés pour avatar et cover */}
+        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" style={{display:'none'}} onChange={handleAvatarUpload}/>
+        <input ref={coverInputRef} type="file" accept="image/*" className="hidden" style={{display:'none'}} onChange={handleCoverUpload}/>
         
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-slate-100">

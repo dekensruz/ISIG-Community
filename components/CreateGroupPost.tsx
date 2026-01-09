@@ -129,7 +129,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   
   return (
     <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 animate-fade-in-up">
-      <form onSubmit={handlePost} className="space-y-4" noValidate>
+      <form onSubmit={handlePost} className="space-y-4">
         <textarea
             ref={textareaRef}
             className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[100px] text-sm transition-all overflow-hidden"
@@ -163,14 +163,24 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-            <button 
-                type="button"
-                onClick={triggerFileInput}
-                className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 outline-none"
-            >
-                <Paperclip size={24} />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
-            </button>
+            <div className="flex items-center">
+                <button 
+                  type="button"
+                  onClick={triggerFileInput}
+                  className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer outline-none"
+                  aria-label="Joindre un fichier"
+                >
+                    <Paperclip size={24} />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
+                </button>
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  onChange={handleFileChange} 
+                />
+            </div>
             
             <button 
                 type="submit" 
@@ -188,15 +198,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             </div>
         )}
       </form>
-      {/* Input totalement isolé du reste du DOM interactif */}
-      <input 
-        ref={fileInputRef}
-        type="file" 
-        className="hidden" 
-        style={{ display: 'none' }}
-        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-        onChange={handleFileChange} 
-      />
     </div>
   );
 };

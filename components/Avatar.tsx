@@ -18,12 +18,12 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
   };
   
   const sizeClasses = {
-    sm: 'h-8 w-8 text-[10px]',
-    md: 'h-10 w-10 text-xs',
-    lg: 'h-12 w-12 text-sm',
-    xl: 'h-16 w-16 text-lg',
-    '2xl': 'h-24 w-24 text-2xl',
-    '3xl': 'h-32 w-32 text-4xl',
+    sm: 'h-8 w-8 min-w-[2rem] min-h-[2rem] text-[10px]',
+    md: 'h-10 w-10 min-w-[2.5rem] min-h-[2.5rem] text-xs',
+    lg: 'h-12 w-12 min-w-[3rem] min-h-[3rem] text-sm',
+    xl: 'h-16 w-16 min-w-[4rem] min-h-[4rem] text-lg',
+    '2xl': 'h-24 w-24 min-w-[6rem] min-h-[6rem] text-2xl',
+    '3xl': 'h-32 w-32 min-w-[8rem] min-h-[8rem] text-4xl',
   };
   
   const shapeClasses = {
@@ -42,7 +42,8 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
     return colorClasses[Math.abs(hash % colorClasses.length)];
   };
 
-  const finalClassName = `${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm`;
+  // Ajout de flex-shrink-0 pour empêcher la compression dans les listes
+  const finalClassName = `flex-shrink-0 ${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm overflow-hidden`;
 
   if (avatarUrl) {
     return (

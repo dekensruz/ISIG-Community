@@ -19,7 +19,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = () => {
@@ -60,6 +59,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
       setFile(selectedFile);
       if (selectedFile.type.startsWith('image/')) {
         setPreviewUrl(URL.createObjectURL(selectedFile));
+      } else {
+        setPreviewUrl(null);
       }
     } else {
         setFile(null);
@@ -70,11 +71,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
+    const input = document.getElementById('feed-file-upload') as HTMLInputElement;
+    if (input) input.value = '';
   };
 
   const handlePost = async (e?: React.MouseEvent) => {
@@ -187,20 +185,19 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
 
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
         <div className="flex space-x-2">
-           <button 
-            type="button" 
-            onClick={triggerFileInput} 
+           <label 
+            htmlFor="feed-file-upload" 
             className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all"
            >
             <Paperclip size={24} />
-            <input 
+           </label>
+           <input 
               id="feed-file-upload" 
               type="file" 
               className="sr-only" 
-              ref={fileInputRef} 
+              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
               onChange={handleFileChange} 
             />
-          </button>
         </div>
         <button
           type="button"

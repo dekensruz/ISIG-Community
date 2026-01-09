@@ -18,7 +18,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = () => {
@@ -61,11 +60,8 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
+    const input = document.getElementById('group-post-file-upload') as HTMLInputElement;
+    if (input) input.value = '';
   };
 
   const handlePost = async (e?: React.FormEvent) => {
@@ -161,21 +157,22 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-            <button 
-              type="button"
-              onClick={triggerFileInput}
-              className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer"
-            >
-                <Paperclip size={24} />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
+            <div className="flex items-center">
+                <label 
+                  htmlFor="group-post-file-upload"
+                  className="text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all flex items-center space-x-2 cursor-pointer"
+                >
+                    <Paperclip size={24} />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Joindre</span>
+                </label>
                 <input 
                   id="group-post-file-upload" 
                   type="file" 
                   className="sr-only" 
-                  ref={fileInputRef} 
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
                   onChange={handleFileChange} 
                 />
-            </button>
+            </div>
             
             <button 
                 type="submit" 

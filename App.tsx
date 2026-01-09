@@ -97,12 +97,14 @@ const AppContent: React.FC = () => {
     }, [session]);
 
     return (
-        <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white">
+        <div className="min-h-screen bg-slate-100 selection:bg-isig-blue selection:text-white flex flex-col">
             {showNavBars && <Navbar />}
-            <main className={`transition-all duration-200 ${
+            <main 
+                key={location.pathname} // Utilisation de la clé pour forcer la ré-animation à chaque changement de route
+                className={`flex-grow transition-all duration-300 animate-fade-in ${
                 isAuthPage ? "" 
                 : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden" 
-                : "container mx-auto px-4 pt-24 pb-24" 
+                : "container mx-auto px-4 pt-24 pb-28" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
                     <Routes location={location}>

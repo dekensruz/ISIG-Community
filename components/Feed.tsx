@@ -9,8 +9,9 @@ import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
 import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
 
-// Cache global simple hors du cycle de vie du composant
-let feedCache: PostType[] = [];
+// Cache séparé par mode de tri pour éviter les flashs de contenu mélangé
+let recentCache: PostType[] = [];
+let popularCache: PostType[] = [];
 let lastFetchTime: number = 0;
 const CACHE_EXPIRATION = 1000 * 60 * 5; // 5 minutes
 
@@ -33,13 +34,15 @@ const PostSkeleton = () => (
 
 const Feed: React.FC = () => {
   const { session } = useAuth();
-  const [posts, setPosts] = useState<PostType[]>(feedCache);
-  const [loading, setLoading] = useState(feedCache.length === 0);
+  const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
+  
+  // On initialise avec le cache correspondant
+  const [posts, setPosts] = useState<PostType[]>(sortBy === 'recent' ? recentCache : popularCache);
+  const [loading, setLoading] = useState(posts.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
-  const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
   const { searchQuery, setSearchQuery } = useSearchFilter();
   
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -49,17 +52,20 @@ const Feed: React.FC = () => {
   const fetchPosts = useCallback(async (isInitial = false) => {
     if (isFetchingRef.current) return;
     
-    // Si on a déjà du cache et que ce n'est pas un rafraîchissement manuel
-    if (isInitial && feedCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
+    const currentCache = sortBy === 'recent' ? recentCache : popularCache;
+
+    // Si on a déjà du cache valide et que c'est le chargement initial
+    if (isInitial && currentCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
+        setPosts(currentCache);
         setLoading(false);
         return;
     }
 
     try {
       isFetchingRef.current = true;
-      if (isInitial && posts.length === 0) {
+      if (isInitial) {
         setLoading(true);
-      } else if (!isInitial) {
+      } else {
         setLoadingMore(true);
       }
 
@@ -72,7 +78,10 @@ const Feed: React.FC = () => {
         .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
 
       if (sortBy === 'popular') {
-        query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+        // Tri par nombre de likes (décroissant) puis par date
+        query = query
+          .order('likes_count', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false });
       } else {
         query = query.order('created_at', { ascending: false });
       }
@@ -85,7 +94,8 @@ const Feed: React.FC = () => {
       
       if (isInitial) {
         setPosts(newPosts);
-        feedCache = newPosts; // Mise à jour du cache
+        if (sortBy === 'recent') recentCache = newPosts;
+        else popularCache = newPosts;
         lastFetchTime = Date.now();
         setPage(0);
       } else {
@@ -94,7 +104,8 @@ const Feed: React.FC = () => {
             const unique = combined.filter((p, idx, self) => 
                 self.findIndex(t => t.id === p.id) === idx
             );
-            feedCache = unique; // Mise à jour du cache
+            if (sortBy === 'recent') recentCache = unique;
+            else popularCache = unique;
             return unique;
         });
         setPage(currentPage);
@@ -109,9 +120,13 @@ const Feed: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [page, sortBy, posts.length]);
+  }, [page, sortBy]);
 
+  // Déclencher le rechargement quand le tri change
   useEffect(() => {
+    // On vide l'affichage local si pas de cache pour forcer le skeleton
+    const currentCache = sortBy === 'recent' ? recentCache : popularCache;
+    setPosts(currentCache);
     fetchPosts(true);
   }, [sortBy]);
 
@@ -133,7 +148,8 @@ const Feed: React.FC = () => {
           setPosts(prev => {
             if (prev.some(p => p.id === data.id)) return prev;
             const updated = [data as any, ...prev];
-            feedCache = updated;
+            // On ne met à jour que le cache "recent" pour les nouveaux posts
+            if (sortBy === 'recent') recentCache = updated;
             return updated;
           });
         }
@@ -141,7 +157,8 @@ const Feed: React.FC = () => {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
         setPosts(prev => {
             const updated = prev.filter(p => p.id !== payload.old.id);
-            feedCache = updated;
+            if (sortBy === 'recent') recentCache = updated;
+            else popularCache = updated;
             return updated;
         });
       })
@@ -154,7 +171,8 @@ const Feed: React.FC = () => {
         if (data) {
           setPosts(prev => {
             const updated = prev.map(p => p.id === data.id ? data as any : p);
-            feedCache = updated;
+            if (sortBy === 'recent') recentCache = updated;
+            else popularCache = updated;
             return updated;
           });
         }
@@ -164,7 +182,7 @@ const Feed: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [sortBy]);
 
   useEffect(() => {
     if (!hasMore || loading || loadingMore || searchQuery) return;
@@ -192,7 +210,7 @@ const Feed: React.FC = () => {
                 if (prev.some(p => p.id === newPost.id)) return prev;
                 updated = [newPost, ...prev];
             }
-            feedCache = updated;
+            if (sortBy === 'recent') recentCache = updated;
             return updated;
         });
         setEditingPost(null);
@@ -224,7 +242,7 @@ const Feed: React.FC = () => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-isig-blue transition-colors" size={18} />
                 <input 
                     type="text" 
-                    placeholder="Rechercher sur le campus..." 
+                    placeholder="Rechercher étudiant ou post..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-12 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-isig-blue outline-none transition-all shadow-soft"
@@ -238,7 +256,7 @@ const Feed: React.FC = () => {
         </div>
 
         {!searchQuery && (
-          <div className="flex p-1 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto animate-fade-in-up shadow-sm">
+          <div className="flex p-1 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto animate-fade-in shadow-sm">
               <button 
                   onClick={() => setSortBy('recent')}
                   className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 active:scale-95 ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}

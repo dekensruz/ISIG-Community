@@ -19,7 +19,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -49,7 +48,6 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
         setFile(null);
         setPreviewUrl(null);
     }
-    // Important: Clear the input value so the same file can be selected again
     e.target.value = '';
   };
 
@@ -61,15 +59,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
-
-  const triggerFileInput = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Action synchrone pour éviter les blocages/rafraîchissements mobiles
-    fileInputRef.current?.click();
-  }, []);
 
   const handlePost = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault();
@@ -177,15 +167,14 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
 
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
         <div className="flex space-x-2">
-           <button 
-            type="button" 
-            onClick={triggerFileInput}
+           <label 
+            htmlFor="file-input-group"
             className="cursor-pointer text-slate-400 hover:text-isig-blue p-3 rounded-2xl hover:bg-slate-50 transition-all outline-none"
            >
             <Paperclip size={24} />
-           </button>
+           </label>
            <input 
-              ref={fileInputRef}
+              id="file-input-group"
               type="file" 
               className="hidden" 
               accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"

@@ -31,7 +31,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [likerProfiles, setLikerProfiles] = useState<Profile[]>([]);
 
-  // CRITIQUE : Synchroniser l'état local quand le parent (Feed) reçoit une mise à jour Realtime
+  // Synchronisation de l'état local quand le post change (via Realtime dans Feed.tsx)
   useEffect(() => {
     setLikes(post.likes || []);
     setLikesCount(post.likes_count || 0);
@@ -59,6 +59,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
   useEffect(() => {
     const fetchTopLikers = async () => {
+      // On utilise le tableau 'likes' pour trouver les IDs des gens qui ont aimé
       if (likes.length === 0) {
         setLikerProfiles([]);
         return;
@@ -66,6 +67,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       const likerIds = likes.slice(0, 3).map(l => l.user_id);
       const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', likerIds);
       if (data) {
+        // Garder l'ordre original des IDs
         const sorted = likerIds.map(id => data.find(p => p.id === id)).filter(Boolean) as Profile[];
         setLikerProfiles(sorted);
       }
@@ -75,6 +77,8 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
   const handleLike = async () => {
     if (!session?.user) return;
+    
+    // Optimistic UI : On change localement avant la réponse serveur
     if (isLiked) {
       const like = likes.find(l => l.user_id === session.user.id);
       if (like) {
@@ -83,10 +87,18 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         await supabase.from('likes').delete().match({ post_id: post.id, user_id: session.user.id });
       }
     } else {
+      const tempId = `temp-${Date.now()}`;
+      setLikes(prev => [{ id: tempId, post_id: post.id, user_id: session.user.id! } as Like, ...prev]);
+      setLikesCount(prev => prev + 1);
+      
       const { data, error } = await supabase.from('likes').insert({ post_id: post.id, user_id: session.user.id }).select().single();
-      if (!error && data) {
-          setLikes(prev => [data, ...prev]);
-          setLikesCount(prev => prev + 1);
+      if (error) {
+          // Rollback en cas d'erreur
+          setLikes(prev => prev.filter(l => l.id !== tempId));
+          setLikesCount(prev => prev - 1);
+      } else if (data) {
+          // Mettre à jour avec l'ID réel
+          setLikes(prev => prev.map(l => l.id === tempId ? data : l));
       }
     }
   };
@@ -121,6 +133,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
 
     if (isLiked) {
         if (count === 1) return "Vous avez aimé";
+        // Trouver une autre personne que moi dans likerProfiles
         const other = likerProfiles.find(p => p.id !== session?.user.id);
         const otherName = other?.full_name.split(' ')[0] || "quelqu'un";
         

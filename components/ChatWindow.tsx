@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -170,7 +169,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     } catch (err) { alert("Erreur lors de l'envoi."); } finally { setIsUploading(false); }
   };
 
-  const startRecording = async () => {
+  const startRecording = async (e?: React.MouseEvent) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
@@ -188,7 +188,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     } catch (err) { alert("Microphone inaccessible."); }
   };
 
-  const stopRecording = () => {
+  const stopRecording = (e?: React.MouseEvent) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
       mediaRecorderRef.current?.stop();
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -210,7 +211,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   return (
     <div className="flex flex-col h-full bg-white relative">
         <header className="flex items-center p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 shadow-sm shrink-0">
-            <button type="button" onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50">
+            <button type="button" onClick={() => navigate('/chat')} className="mr-4 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50 active:bg-slate-200">
                 <ArrowLeft size={22} strokeWidth={2.5} />
             </button>
             {otherParticipant && (
@@ -248,7 +249,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                         <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
                         <span className="text-red-700 font-black tracking-tighter">{formatTime(recordingTime)}</span>
                     </div>
-                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2.5 rounded-xl shadow-lg shadow-red-200"><StopCircle size={24} /></button>
+                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2.5 rounded-xl shadow-lg shadow-red-200 transition-transform active:scale-95"><StopCircle size={24} /></button>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -258,7 +259,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 <span className="font-black text-isig-blue uppercase tracking-widest text-[9px] mr-2">Réponse :</span>
                                 <span className="text-slate-500 italic font-medium">{replyingToMessage.content || 'Média'}</span>
                             </div>
-                            <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1"><X size={16}/></button>
+                            <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1 transition-colors"><X size={16}/></button>
                         </div>
                     )}
                     {editingMessage && (
@@ -266,12 +267,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                             <div className="flex items-center text-isig-orange font-black uppercase tracking-widest text-[9px]">
                                 <Pencil size={12} className="mr-2" /> Modification du message...
                             </div>
-                            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1"><RotateCcw size={16}/></button>
+                            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1 transition-colors"><RotateCcw size={16}/></button>
                         </div>
                     )}
                     <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
                         {!editingMessage && (
-                            <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0 transition-colors">
+                            <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0 transition-colors active:bg-slate-100">
                                 <Paperclip size={24} />
                                 <input type="file" onChange={(e) => {
                                     if (e.target.files?.[0]) {
@@ -285,7 +286,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                             {filePreview && (
                                 <div className="flex items-center bg-isig-blue/10 p-2 mb-2 rounded-xl text-[10px] font-black uppercase text-isig-blue border border-isig-blue/20">
                                     <span className="truncate flex-1 ml-2">{filePreview}</span>
-                                    <button type="button" onClick={() => { setFile(null); setFilePreview(null); }} className="p-1"><X size={14}/></button>
+                                    <button type="button" onClick={() => { setFile(null); setFilePreview(null); }} className="p-1 transition-colors hover:text-red-500"><X size={14}/></button>
                                 </div>
                             )}
                             <textarea 

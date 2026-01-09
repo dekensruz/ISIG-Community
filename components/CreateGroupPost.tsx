@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -53,7 +52,11 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
     }
   };
 
-  const handleRemoveFile = () => {
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setFile(null);
     if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
@@ -61,7 +64,11 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
   };
 
   const handlePost = async (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (!content.trim() && !file) {
       setError("La publication ne peut pas être vide.");
       return;
@@ -146,7 +153,7 @@ const CreateGroupPost: React.FC<CreateGroupPostProps> = ({ groupId, onPostCreate
             <div className="flex items-center p-3 bg-slate-50 rounded-xl border border-slate-100 relative">
                 <FileText className="text-isig-blue mr-3" />
                 <p className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{file.name}</p>
-                <button type="button" onClick={handleRemoveFile} className="ml-auto text-slate-400 hover:text-red-500"><X size={16}/></button>
+                <button type="button" onClick={handleRemoveFile} className="ml-auto text-slate-400 hover:text-red-500 transition-colors p-1"><X size={16}/></button>
             </div>
         )}
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
@@ -23,6 +22,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     const [currentTime, setCurrentTime] = useState(0);
 
     const handlePlayPause = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         if (audioRef.current) {
             if (isPlaying) audioRef.current.pause();
@@ -107,12 +107,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     }, [menuOpen]);
     
     const handleDeleteForMe = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         setMessages(prev => prev.filter(m => m.id !== message.id));
     };
     
     const handleDeleteForEveryone = async (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         setMenuOpen(false);
         const { error } = await supabase.from('messages').delete().eq('id', message.id);
@@ -120,12 +122,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     };
 
     const handleReplyAction = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         onSetReplying(message);
         setMenuOpen(false);
     };
 
     const handleEditAction = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         onSetEditing(message);
         setMenuOpen(false);
@@ -153,20 +157,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
 
     const OptionsMenuContent = () => (
         <div className="flex flex-col">
-            <button type="button" onClick={handleReplyAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+            <button 
+                type="button" 
+                onClick={handleReplyAction} 
+                className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
+            >
                 <MessageSquareReply size={18} className="mr-4 md:mr-3 text-isig-blue"/>Répondre
             </button>
             {isOwnMessage && message.content && (
-                <button type="button" onClick={handleEditAction} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors">
+                <button 
+                    type="button" 
+                    onClick={handleEditAction} 
+                    className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors"
+                >
                     <Pencil size={18} className="mr-4 md:mr-3 text-isig-orange"/>Modifier
                 </button>
             )}
             <div className="border-t border-slate-100 my-1 mx-2"></div>
-            <button type="button" onClick={handleDeleteForMe} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+            <button 
+                type="button" 
+                onClick={handleDeleteForMe} 
+                className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
+            >
                 <XCircle size={18} className="mr-4 md:mr-3"/>Supprimer (Moi)
             </button>
             {isOwnMessage && (
-                <button type="button" onClick={handleDeleteForEveryone} className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+                <button 
+                    type="button" 
+                    onClick={handleDeleteForEveryone} 
+                    className="w-full text-left flex items-center px-4 py-4 md:py-2.5 text-sm md:text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
+                >
                     <Trash2 size={18} className="mr-4 md:mr-3"/>Supprimer (Tous)
                 </button>
             )}
@@ -176,13 +196,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const MobileOptionsMenu = () => {
         if (!modalRoot) return null;
         return createPortal(
-            <div className="fixed inset-0 z-[1000] flex items-end animate-fade-in" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}>
+            <div className="fixed inset-0 z-[1000] flex items-end animate-fade-in" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); }}>
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-                <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                <div className="relative w-full bg-white rounded-t-[2.5rem] p-6 shadow-2xl animate-fade-in-up" onClick={e => { e.preventDefault(); e.stopPropagation(); }}>
                     <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-black text-slate-800 uppercase italic">Options</h3>
-                        <button type="button" onClick={() => setMenuOpen(false)} className="p-2 bg-slate-100 rounded-full"><X size={20}/></button>
+                        <button type="button" onClick={() => setMenuOpen(false)} className="p-2 bg-slate-100 rounded-full transition-colors active:bg-slate-200">
+                            <X size={20}/>
+                        </button>
                     </div>
                     <div className="space-y-1">
                         <OptionsMenuContent />
@@ -196,7 +218,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     return (
         <div className={`group flex items-end gap-1 w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
              <div className={`relative self-center ${isOwnMessage ? 'order-1' : 'order-3'}`}>
-                <button type="button" onClick={() => setMenuOpen(true)} className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100">
+                <button 
+                    type="button" 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(true); }} 
+                    className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100"
+                >
                     <MoreHorizontal size={18} />
                 </button>
                 {menuOpen && (

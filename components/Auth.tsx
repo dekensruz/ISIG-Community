@@ -110,7 +110,7 @@ const AuthPage: React.FC = () => {
         <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
         <div className="relative z-10">
-          <img src="https://i.ibb.co/h1RW1grw/transparent.png" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
+          <img src="https://i.ibb.co/gLJQF0rn/isig.jpg" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
           <h1 className="text-5xl font-extrabold text-white leading-tight italic">
             L'intelligence <br/><span className="text-isig-blue text-6xl">collective</span> <br/> de l'ISIG Goma.
           </h1>
@@ -151,7 +151,7 @@ const AuthPage: React.FC = () => {
               <div className="grid grid-cols-1 gap-4">
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder="Nom complet (Ex: Dekens Ruzuba)" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                  <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

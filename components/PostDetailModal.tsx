@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageCircle, Send, Trash2, Pencil, MoreHorizontal } from 'lucide-react';
@@ -17,14 +16,26 @@ interface PostDetailModalProps {
   onInteractionUpdate?: (likes: Like[], commentCount: number) => void;
 }
 
-// Helper pour le rendu des liens
+// Helper pour le rendu des liens amélioré
 const renderLinks = (text: string, isOwnMessage: boolean) => {
     if (!text) return '';
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9.-]+\.(?:com|net|org|edu|ac|cd|io|me|fr|be)[^\s/]*[^\s.,;?!])/gi;
+    
     return text.split(urlRegex).map((part, index) => {
         if (part.match(urlRegex)) {
+            let href = part;
+            if (!href.match(/^https?:\/\//i)) {
+                href = `https://${href}`;
+            }
             return (
-                <a key={index} href={part} target="_blank" rel="noopener noreferrer" className={`underline break-all ${isOwnMessage ? 'text-white' : 'text-isig-blue'}`} onClick={e => e.stopPropagation()}>
+                <a 
+                    key={index} 
+                    href={href} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className={`underline break-all transition-colors duration-200 ${isOwnMessage ? 'text-white hover:opacity-80' : 'text-isig-blue hover:text-blue-600'}`} 
+                    onClick={e => e.stopPropagation()}
+                >
                     {part}
                 </a>
             );
@@ -62,7 +73,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUser
             <div className="flex-1 min-w-0">
                 <div className="relative group/comment bg-slate-50 p-3 rounded-2xl border border-slate-100">
                     <div className="flex justify-between items-start">
-                        <Link to={`/profile/${comment.user_id}`} onClick={onCloseModal} className="hover:underline">
+                        <Link to={`/profile/${comment.user_id}`} onClick={onCloseModal} className="hover:underline transition-colors">
                             <p className="font-black text-[10px] text-isig-blue uppercase tracking-widest mb-1">{comment.profiles?.full_name || 'Utilisateur'}</p>
                         </Link>
                         
@@ -72,16 +83,16 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUser
                                     <MoreHorizontal size={14} />
                                 </button>
                                 {menuOpen && (
-                                    <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden">
+                                    <div className="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-premium border border-slate-100 py-1 z-20 overflow-hidden animate-fade-in">
                                         <button 
                                             onClick={() => { setIsEditing(true); setMenuOpen(false); }} 
-                                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center"
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center transition-colors"
                                         >
                                             <Pencil size={12} className="mr-2 text-isig-orange" /> Modifier
                                         </button>
                                         <button 
                                             onClick={() => { onDelete(comment.id); setMenuOpen(false); }} 
-                                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center"
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center transition-colors"
                                         >
                                             <Trash2 size={12} className="mr-2" /> Supprimer
                                         </button>
@@ -96,7 +107,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, isReply, currentUser
                             <textarea 
                                 value={editContent} 
                                 onChange={(e) => setEditContent(e.target.value)} 
-                                className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue resize-none min-h-[60px]"
+                                className="w-full bg-white border border-slate-100 rounded-xl p-2 text-sm font-medium outline-none focus:ring-1 focus:ring-isig-blue resize-none min-h-[60px] transition-all"
                                 autoFocus
                             />
                             <div className="flex space-x-3 mt-2">
@@ -138,7 +149,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
   const navigate = useNavigate();
   const [likes, setLikes] = useState<Like[]>(post.likes || []);
   
-  // Utilisation de la même logique que PostCard pour l'initialisation précise
   const [likesCount, setLikesCount] = useState(() => {
     const actualArrayCount = post.likes?.length || 0;
     return Math.max(post.likes_count || 0, actualArrayCount);
@@ -161,7 +171,6 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
     setTimeout(onClose, 300);
   }, [onClose]);
 
-  // Synchronisation avec le parent à chaque changement important
   useEffect(() => {
     if (onInteractionUpdate) {
         onInteractionUpdate(likes, comments.length);
@@ -294,7 +303,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
       <div onClick={e => e.stopPropagation()} className={`bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] overflow-hidden transition-all duration-300 ${isAnimatingOut ? 'scale-95' : 'scale-100'}`}>
         <div className="flex justify-between items-center p-6 border-b border-slate-50 flex-shrink-0">
             <h2 className="font-black text-xl text-slate-800 tracking-tight italic uppercase">Publication</h2>
-            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
+            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-50 rounded-full transition-all active:scale-90"><X size={24} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 scroll-smooth">
@@ -311,7 +320,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
             </div>
             <p className="text-slate-700 whitespace-pre-wrap font-medium leading-relaxed mb-6">{renderLinks(post.content, false)}</p>
             {post.media_url && post.media_type === 'image' && (
-                <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100">
+                <div className="rounded-[2rem] overflow-hidden mb-6 bg-slate-100 border border-slate-100 transition-transform duration-500 hover:scale-[1.01]">
                     <img src={post.media_url} alt="Média" className="w-full h-auto max-h-[500px] object-contain mx-auto" />
                 </div>
             )}
@@ -334,8 +343,8 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
 
         <div className="border-t border-slate-50 bg-white flex-shrink-0 relative z-10 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
             <div className="px-6 py-4 flex items-center space-x-6 border-b border-slate-50">
-                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all ${likes.some(l => l.user_id === session?.user.id) ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
-                    <Heart size={24} fill={likes.some(l => l.user_id === session?.user.id) ? '#FF8C00' : 'none'}/>
+                <button onClick={handleLike} className={`flex items-center space-x-2 font-black transition-all active:scale-95 ${likes.some(l => l.user_id === session?.user.id) ? 'text-isig-orange' : 'text-slate-400 hover:text-slate-800'}`}>
+                    <Heart size={24} fill={likes.some(l => l.user_id === session?.user.id) ? '#FF8C00' : 'none'} className="transition-transform duration-300 group-active:scale-125"/>
                     <span className="text-sm">{likesCount}</span>
                 </button>
                 <div className="flex items-center space-x-2 font-black text-slate-400">
@@ -347,7 +356,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
                 {replyingTo && (
                     <div className="bg-slate-50 p-3 rounded-2xl mb-3 flex items-center justify-between border border-slate-100 animate-fade-in">
                         <p className="text-xs font-bold text-slate-500">Répondre à <span className="text-isig-blue">{replyingTo.profiles?.full_name || '...'}</span></p>
-                        <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
+                        <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><X size={16}/></button>
                     </div>
                 )}
                 <form onSubmit={handlePostComment} className="flex items-center space-x-3">
@@ -366,7 +375,7 @@ const PostDetailModal: React.FC<PostDetailModalProps> = ({ post, onClose, onInte
                             className="w-full bg-slate-50 p-4 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none text-sm font-medium transition-all resize-none max-h-32 overflow-y-hidden" 
                         />
                     </div>
-                    <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                    <button type="submit" disabled={isPostingComment || !(replyingTo ? replyContent : newComment).trim()} className="bg-isig-blue text-white w-12 h-12 shrink-0 flex items-center justify-center rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 hover:bg-blue-600">
                         {isPostingComment ? <Spinner /> : <Send size={20} />}
                     </button>
                 </form>

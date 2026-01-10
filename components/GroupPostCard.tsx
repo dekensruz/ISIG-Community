@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { GroupPost, Profile, GroupPostLike } from '../types';
 import { useAuth } from '../App';
@@ -129,11 +128,24 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
 
   const renderContentWithLinks = useCallback((text: string) => {
     if (!text) return '';
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    // Regex améliorée pour détecter les URLs même sans http://
+    const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9.-]+\.(?:com|net|org|edu|ac|cd|io|me|fr|be)[^\s/]*[^\s.,;?!])/gi;
+    
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
+        let href = part;
+        if (!href.match(/^https?:\/\//i)) {
+          href = `https://${href}`;
+        }
         return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+          <a 
+            key={index} 
+            href={href} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-isig-blue hover:underline break-all transition-colors duration-200" 
+            onClick={e => e.stopPropagation()}
+          >
             {part}
           </a>
         );
@@ -143,7 +155,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   }, []);
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all hover:shadow-premium group animate-fade-in-up">
+    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all duration-300 hover:shadow-premium group animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center min-w-0 flex-1">
           <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-95 shrink-0">
@@ -161,11 +173,11 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
               <MoreHorizontal size={20} />
             </button>
             {showOptions && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 animate-fade-in">
-                <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 animate-fade-in overflow-hidden">
+                <button onClick={() => { setShowEditModal(true); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
-                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('group_posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
+                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('group_posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors">
                   <Trash2 size={16} className="mr-3" /> Supprimer
                 </button>
               </div>
@@ -178,7 +190,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
         {renderContentWithLinks(displayedContent)}
         {!isExpanded && isLongContent && <span>...</span>}
         {isLongContent && (
-            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block transition-all active:scale-95">
+            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-isig-blue font-black text-[10px] uppercase tracking-widest block transition-all active:scale-95 hover:opacity-70">
                 {isExpanded ? <><ChevronUp size={14} className="inline mr-1"/>Voir moins</> : <><ChevronDown size={14} className="inline mr-1"/>Voir plus</>}
             </button>
         )}
@@ -187,9 +199,9 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       {post.media_url && (
         <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100 transition-transform active:scale-[0.98]">
           {post.media_type === 'image' || post.media_type?.startsWith('image/') ? (
-            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer" onClick={() => setShowImageModal(true)} loading="lazy" />
+            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer transition-transform duration-500 hover:scale-105" onClick={() => setShowImageModal(true)} loading="lazy" />
           ) : (
-            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4">
+            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4 hover:bg-slate-100 transition-colors">
               <FileText size={20} className="text-isig-blue mr-3" />
               <span className="text-slate-800 font-bold text-sm uppercase">Fichier joint</span>
             </a>
@@ -217,7 +229,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       
       <div className="flex justify-between items-center text-slate-500 border-t border-slate-50 pt-4">
         <div className="flex items-center space-x-2 sm:space-x-6">
-          <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
+          <button onClick={handleLike} className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
             <Heart size={20} fill={isLiked ? '#FF8C00' : 'none'} className={`transition-transform duration-300 ${isLiked ? 'scale-110' : ''}`} />
             <span className="text-sm font-bold">{likesCount}</span>
           </button>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Post as PostType, Profile, Like } from '../types';
 import { useAuth } from '../App';
@@ -130,11 +129,24 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
   const renderContentWithLinks = useCallback((text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    // Regex améliorée pour détecter les URLs même sans http://
+    const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9.-]+\.(?:com|net|org|edu|ac|cd|io|me|fr|be)[^\s/]*[^\s.,;?!])/gi;
+    
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
+        let href = part;
+        if (!href.match(/^https?:\/\//i)) {
+          href = `https://${href}`;
+        }
         return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-isig-blue hover:underline break-all" onClick={e => e.stopPropagation()}>
+          <a 
+            key={index} 
+            href={href} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-isig-blue hover:underline break-all transition-colors duration-200" 
+            onClick={e => e.stopPropagation()}
+          >
             {part}
           </a>
         );
@@ -171,11 +183,11 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden animate-fade-in">
                 <button 
                   onClick={() => { if(onEditRequested) onEditRequested(post); setShowOptions(false); }} 
-                  className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
-                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">
+                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors">
                   <Trash2 size={16} className="mr-3" /> Supprimer
                 </button>
               </div>

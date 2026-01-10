@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
@@ -96,7 +95,7 @@ const AppContent: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white transition-colors duration-300">
             {showNavBars && <Navbar />}
-            <main className={`transition-all duration-300 ease-out ${
+            <main className={`transition-all duration-500 ease-in-out ${
                 isAuthPage ? "" 
                 : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden flex flex-col" 
                 : "container mx-auto px-4 pt-24 pb-28 sm:pb-32" 
@@ -104,7 +103,7 @@ const AppContent: React.FC = () => {
                 <Suspense fallback={<PageLoader />}>
                     <div 
                         key={location.pathname} 
-                        className={`animate-fade-in ${isChatConversation ? 'flex-1 min-h-0 h-full' : ''}`}
+                        className={`page-transition ${isChatConversation ? 'flex-1 min-h-0 h-full' : ''}`}
                     >
                         <Routes location={location}>
                             <Route path="/" element={<Feed />} />

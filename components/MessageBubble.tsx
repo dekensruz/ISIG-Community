@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
@@ -90,7 +89,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
 
     if (hasError) {
         return (
-            <div className={`mt-1 p-3 rounded-xl flex items-center justify-between border ${isOwnMessage ? 'bg-white/10 border-white/20 text-white' : 'bg-red-50 border-red-100 text-red-600'}`}>
+            <div className={`mt-1 p-3 rounded-xl flex items-center justify-between border transition-all ${isOwnMessage ? 'bg-white/10 border-white/20 text-white' : 'bg-red-50 border-red-100 text-red-600'}`}>
                 <div className="flex items-center space-x-3">
                     <FileAudio size={24} className={isOwnMessage ? 'text-white' : 'text-red-500'} />
                     <div>
@@ -114,7 +113,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     return (
         <div className={`flex items-center gap-2 mt-1 w-full max-w-full overflow-hidden ${playerColorClass}`}>
             <audio ref={audioRef} src={src} preload="auto" playsInline></audio>
-            <button type="button" onClick={handlePlayPause} className={`p-2.5 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
+            <button type="button" onClick={handlePlayPause} className={`p-2.5 rounded-full transition-all shrink-0 ${buttonBgClass}`}>
                 {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
             <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
@@ -190,16 +189,21 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     };
 
     const renderContentWithLinks = (text: string) => {
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9.-]+\.(?:com|net|org|edu|ac|cd|io|me|fr|be)[^\s/]*[^\s.,;?!])/gi;
+        
         return text.split(urlRegex).map((part, index) => {
             if (part.match(urlRegex)) {
+                let href = part;
+                if (!href.match(/^https?:\/\//i)) {
+                    href = `https://${href}`;
+                }
                 return (
                     <a 
                         key={index} 
-                        href={part} 
+                        href={href} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className={`underline break-all ${isOwnMessage ? 'text-white' : 'text-isig-blue'}`} 
+                        className={`underline break-all transition-colors duration-200 ${isOwnMessage ? 'text-white hover:opacity-80' : 'text-isig-blue hover:text-blue-600'}`} 
                         onClick={e => e.stopPropagation()}
                     >
                         {part}
@@ -212,16 +216,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
 
     const renderMedia = () => {
         if (!message.media_url || !message.media_type) return null;
-        if (message.media_type.startsWith('image/')) {
+        if (message.media_type.startsWith('image/') || message.media_type === 'image') {
             return (
-                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-xl overflow-hidden cursor-pointer max-w-full bg-black/5">
+                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-xl overflow-hidden cursor-pointer max-w-full bg-black/5 transition-transform duration-300 hover:scale-[1.02] active:scale-100">
                     <img src={message.media_url} alt="Média" className="w-full max-h-64 object-contain" />
                 </div>
             );
         }
         if (message.media_type.startsWith('audio/')) return <AudioPlayer src={message.media_url} isOwnMessage={isOwnMessage} />;
         return (
-             <button type="button" onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 text-slate-800'}`}>
+             <button type="button" onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left transition-all active:scale-[0.98] ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}>
                 <Download size={24} />
                 <div className="flex-1 min-w-0">
                     <p className="font-bold truncate text-xs">{message.media_url.split('/').pop()}</p>
@@ -305,7 +309,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                 <button 
                     type="button" 
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} 
-                    className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-100"
+                    className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-200"
                 >
                     <MoreHorizontal size={18} />
                 </button>
@@ -323,9 +327,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     </>
                 )}
             </div>
-            <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft overflow-hidden ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
+            <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft overflow-hidden transition-transform duration-300 ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
                  {message.replied_to && (
-                     <div className={`p-3 mb-2 border-l-4 rounded-xl flex flex-col ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
+                     <div className={`p-3 mb-2 border-l-4 rounded-xl flex flex-col transition-colors ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
                          <p className={`font-black text-[9px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>
                              {message.replied_to.profiles?.full_name || '...'}
                          </p>
@@ -340,7 +344,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     {isOwnMessage && (
-                        <CheckCheck size={14} className={`ml-1 ${message.is_read ? 'text-isig-orange' : 'text-white/50'}`} />
+                        <CheckCheck size={14} className={`ml-1 transition-colors duration-300 ${message.is_read ? 'text-isig-orange' : 'text-white/50'}`} />
                     )}
                 </div>
             </div>

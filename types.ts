@@ -18,7 +18,6 @@ export interface Profile {
   show_birth_year?: boolean;
   last_seen_at?: string;
   role: 'user' | 'admin';
-  theme: 'light' | 'dark';
 }
 
 export interface Post {

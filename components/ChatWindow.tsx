@@ -150,7 +150,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         } else {
             let mediaUrl, mediaType;
             if (file || audioBlob) {
-                const mediaFile = file || new File([audioBlob!], "audio.webm", { type: "audio/webm" });
+                const mediaFile = file || new File([audioBlob!], `audio_${Date.now()}.${audioBlob?.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: audioBlob?.type || file?.type });
                 const fileName = `${conversationId}/${Date.now()}-${mediaFile.name}`;
                 const { data: uploadData, error: uploadError } = await supabase.storage.from('chat_media').upload(fileName, mediaFile);
                 if (uploadError) throw uploadError;
@@ -179,37 +179,37 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     } catch (err) { console.error(err); } finally { setIsUploading(false); }
   };
 
-  const handleDeleteConversation = async () => {
-      if (!window.confirm("Voulez-vous vraiment supprimer toute cette conversation ?")) return;
-      setLoading(true);
-      try {
-          const { error } = await supabase.from('conversations').delete().eq('id', conversationId);
-          if (error) throw error;
-          navigate('/chat');
-      } catch (err) {
-          console.error(err);
-          alert("Erreur lors de la suppression.");
-          setLoading(false);
-      }
-  };
-
   const startRecording = async (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
-        mediaRecorderRef.current = new MediaRecorder(stream);
+        
+        // Détection du format pour compatibilité iPhone (MP4) vs Android (WebM)
+        let mimeType = 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+            mimeType = 'audio/aac';
+        }
+
+        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
         audioChunksRef.current = [];
-        mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+        mediaRecorderRef.current.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
         mediaRecorderRef.current.onstop = async () => {
-            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            if (blob.size > 100) await handleSendMessage(undefined, blob);
+            const blob = new Blob(audioChunksRef.current, { type: mimeType });
+            if (blob.size > 500) await handleSendMessage(undefined, blob);
             setRecordingStatus('idle');
         };
         mediaRecorderRef.current.start();
         setRecordingStatus('recording');
         timerIntervalRef.current = window.setInterval(() => setRecordingTime(p => p + 1), 1000);
-    } catch (err) { alert("Microphone inaccessible."); }
+    } catch (err) { 
+        console.error(err);
+        alert("Microphone inaccessible. Vérifiez les permissions."); 
+    }
   };
 
   const stopRecording = (e?: React.MouseEvent) => {

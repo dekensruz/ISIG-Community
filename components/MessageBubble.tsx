@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { Message } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X, Copy } from 'lucide-react';
+import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X, Copy, AlertTriangle } from 'lucide-react';
 
 interface MessageBubbleProps {
     message: Message;
@@ -21,13 +21,23 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [hasError, setHasError] = useState(false);
 
-    const handlePlayPause = (e: React.MouseEvent) => {
+    const handlePlayPause = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         if (audioRef.current) {
-            if (isPlaying) audioRef.current.pause();
-            else audioRef.current.play();
+            try {
+                if (isPlaying) {
+                    audioRef.current.pause();
+                } else {
+                    setHasError(false);
+                    await audioRef.current.play();
+                }
+            } catch (err) {
+                console.error("Erreur de lecture audio:", err);
+                setHasError(true);
+            }
         }
     };
 
@@ -46,17 +56,22 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
         const setAudioTime = () => setCurrentTime(audio.currentTime);
         const onPlay = () => setIsPlaying(true);
         const onPause = () => setIsPlaying(false);
+        const onError = () => setHasError(true);
+
         audio.addEventListener('loadedmetadata', setAudioData);
         audio.addEventListener('timeupdate', setAudioTime);
         audio.addEventListener('play', onPlay);
         audio.addEventListener('pause', onPause);
         audio.addEventListener('ended', onPause);
+        audio.addEventListener('error', onError);
+
         return () => {
             audio.removeEventListener('loadedmetadata', setAudioData);
             audio.removeEventListener('timeupdate', setAudioTime);
             audio.removeEventListener('play', onPlay);
             audio.removeEventListener('pause', onPause);
             audio.removeEventListener('ended', onPause);
+            audio.removeEventListener('error', onError);
         };
     }, []);
 
@@ -75,16 +90,17 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
 
     return (
         <div className={`flex items-center gap-2 mt-1 w-full max-w-full overflow-hidden ${playerColorClass}`}>
-            <audio ref={audioRef} src={src} preload="metadata"></audio>
-            <button type="button" onClick={handlePlayPause} className={`p-2 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
-                {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
+            <audio ref={audioRef} src={src} preload="auto" playsInline></audio>
+            <button type="button" onClick={handlePlayPause} className={`p-2.5 rounded-full transition-colors shrink-0 ${buttonBgClass} ${hasError ? 'text-red-500' : ''}`}>
+                {hasError ? <AlertTriangle size={18} /> : isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
             <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
                 <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer relative ${progressBgClass}`}>
                     <div style={{ width: `${Math.min(progress, 100)}%` }} className={`h-full rounded-full transition-all duration-100 ${progressFillClass}`}></div>
                 </div>
-                 <div className="text-[10px] font-mono mt-1 self-end opacity-80">
-                    {formatTimeDisplay(currentTime)} / {formatTimeDisplay(duration)}
+                 <div className="flex justify-between items-center text-[10px] font-mono mt-1 opacity-80">
+                    <span>{hasError ? "Format non supporté" : formatTimeDisplay(currentTime)}</span>
+                    <span>{formatTimeDisplay(duration)}</span>
                 </div>
             </div>
         </div>

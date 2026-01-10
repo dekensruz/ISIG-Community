@@ -2,8 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useSearchParams } from 'react-router-dom';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react';
 import Spinner from './Spinner';
+
+const PROMOTIONS = [
+    "Licence 1",
+    "Licence 2",
+    "Licence 3",
+    "Licence 4",
+    "Master 1",
+    "Master 2"
+];
 
 const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -139,14 +148,25 @@ const AuthPage: React.FC = () => {
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input type="text" placeholder="Matricule" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                   </div>
                   <div className="relative">
-                    <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="Promotion" value={promotion} onChange={(e) => setPromotion(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                    <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                    <select 
+                        value={promotion} 
+                        onChange={(e) => setPromotion(e.target.value)} 
+                        className="w-full pl-11 pr-10 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer" 
+                        required
+                    >
+                        <option value="" disabled>Choisir Promotion</option>
+                        {PROMOTIONS.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                   </div>
                 </div>
                 <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
@@ -190,24 +210,6 @@ const AuthPage: React.FC = () => {
                   {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
                 </button>
               </p>
-              
-              <div className="pt-4 border-t border-slate-100 flex flex-wrap justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <a href="#" className="hover:text-isig-blue">Conditions d'utilisation</a>
-                  <a href="#" className="hover:text-isig-blue">Confidentialité</a>
-                  <a href="#" className="hover:text-isig-blue">Aide</a>
-              </div>
-          </div>
-
-          <div className="mt-8 text-center pt-4">
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Développé par</p>
-            <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-3 group">
-                <img 
-                    src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
-                    alt="Dekens Ruzuba" 
-                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100 group-hover:ring-isig-blue transition-all"
-                />
-                <span className="text-slate-900 font-black group-hover:text-isig-blue transition-all">Dekens Ruzuba</span>
-            </a>
           </div>
         </div>
       </div>

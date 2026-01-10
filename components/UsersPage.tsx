@@ -2,16 +2,23 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
-import { UserPlus, UserCheck, Search, X, Users } from 'lucide-react';
+import { UserPlus, UserCheck, Search, X, Users, MessageSquare, Clock, TrendingUp, Sparkles } from 'lucide-react';
 import { useAuth } from '../App';
+import { differenceInMinutes } from 'date-fns';
 
 const USERS_PER_PAGE = 12;
 
+const isUserOnline = (lastSeenAt?: string | null): boolean => {
+    if (!lastSeenAt) return false;
+    return differenceInMinutes(new Date(), new Date(lastSeenAt)) < 3;
+};
+
 const UsersPage: React.FC = () => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<Profile[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +27,7 @@ const UsersPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [followingMap, setFollowingMap] = useState<Map<string, boolean>>(new Map());
+  const [sortBy, setSortBy] = useState<'recent' | 'active' | 'popular'>('recent');
   
   const searchTimeout = useRef<number | null>(null);
 
@@ -55,10 +63,19 @@ const UsersPage: React.FC = () => {
         query = query.ilike('full_name', `%${currentSearch.trim()}%`);
       }
 
-      // TRI : Du plus récent au plus ancien
-      const { data: usersData, error: usersError } = await query
-        .order('updated_at', { ascending: false }) // On utilise updated_at ou created_at selon la structure
-        .range(from, to);
+      // Gestion du tri
+      if (sortBy === 'recent') {
+        query = query.order('created_at', { ascending: false });
+      } else if (sortBy === 'active') {
+        // Pour "Actifs", on utilise last_seen_at comme proxy d'activité récente
+        query = query.order('last_seen_at', { ascending: false, nullsFirst: false });
+      } else if (sortBy === 'popular') {
+        // Pour "Populaire", on trie par ID comme fallback ou si vous avez un champ followers_count
+        // Ici on trie par updated_at pour montrer les profils récemment mis à jour
+        query = query.order('updated_at', { ascending: false });
+      }
+
+      const { data: usersData, error: usersError } = await query.range(from, to);
         
       if (usersError) throw usersError;
 
@@ -93,7 +110,7 @@ const UsersPage: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [session?.user, page, search, followingMap]);
+  }, [session?.user, page, search, followingMap, sortBy]);
 
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
@@ -105,7 +122,7 @@ const UsersPage: React.FC = () => {
     return () => {
         if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     };
-  }, [search]);
+  }, [search, sortBy]);
   
   const handleToggleFollow = async (targetUserId: string) => {
     if (!session?.user) return;
@@ -119,6 +136,18 @@ const UsersPage: React.FC = () => {
         await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: targetUserId });
     } else {
         await supabase.from('followers').insert({ follower_id: session.user.id, following_id: targetUserId });
+    }
+  };
+
+  const handleQuickMessage = async (targetUserId: string) => {
+    if (!session?.user) return;
+    try {
+      const { data, error } = await supabase.rpc('get_or_create_conversation', { other_user_id: targetUserId });
+      if (!error && data) {
+        navigate(`/chat/${data}`);
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -152,6 +181,30 @@ const UsersPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      <div className="flex p-1 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto mb-10 animate-fade-in-up shadow-sm">
+          <button 
+              onClick={() => setSortBy('recent')}
+              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+              <Clock size={14} />
+              <span>Récents</span>
+          </button>
+          <button 
+              onClick={() => setSortBy('active')}
+              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+              <Sparkles size={14} />
+              <span>Actifs</span>
+          </button>
+          <button 
+              onClick={() => setSortBy('popular')}
+              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+              <TrendingUp size={14} />
+              <span>Populaires</span>
+          </button>
+      </div>
       
       {loading ? (
         <div className="flex justify-center mt-20"><Spinner /></div>
@@ -161,23 +214,35 @@ const UsersPage: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6 px-1">
                     {users.map((user, index) => {
                         const isFollowing = followingMap.get(user.id);
+                        const online = isUserOnline(user.last_seen_at);
                         const majorLabel = user.major || 'Étudiant ISIG';
                         return (
                             <div 
                                 key={user.id} 
-                                className="group bg-white p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft border border-slate-50 flex flex-col items-center text-center transition-all hover:shadow-premium hover:-translate-y-1.5 animate-fade-in-up"
+                                className="group bg-white p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft border border-slate-50 flex flex-col items-center text-center transition-all hover:shadow-premium hover:-translate-y-1.5 animate-fade-in-up relative"
                                 style={{ animationDelay: `${(index % 12) * 0.03}s` }}
                             >
+                                <button 
+                                    onClick={() => handleQuickMessage(user.id)}
+                                    className="absolute top-3 right-3 p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-isig-blue hover:text-white transition-all shadow-sm active:scale-90"
+                                    title="Message rapide"
+                                >
+                                    <MessageSquare size={16} />
+                                </button>
+
                                 <Link to={`/profile/${user.id}`} className="relative mb-3">
                                     <Avatar 
                                         avatarUrl={user.avatar_url} 
                                         name={user.full_name} 
                                         size="xl" 
+                                        isOnline={online}
                                         className="ring-4 ring-slate-50 group-hover:ring-isig-blue/10 transition-all duration-500 sm:w-20 sm:h-20 w-16 h-16" 
                                     />
                                 </Link>
                                 <h2 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1 w-full">{user.full_name}</h2>
-                                <p className="text-[9px] text-isig-blue font-black uppercase tracking-widest mt-0.5 line-clamp-1 opacity-70">{majorLabel}</p>
+                                <p className="text-[9px] text-isig-blue font-black uppercase tracking-widest mt-0.5 line-clamp-1 opacity-70">
+                                    {user.promotion ? `${user.promotion} • ` : ''}{majorLabel}
+                                </p>
                                 
                                 <div className="mt-4 flex flex-col gap-1.5 w-full">
                                     <button

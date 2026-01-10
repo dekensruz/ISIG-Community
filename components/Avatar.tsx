@@ -7,9 +7,10 @@ interface AvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   className?: string;
   shape?: 'circle' | 'square';
+  isOnline?: boolean;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className = '', shape = 'circle' }) => {
+const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className = '', shape = 'circle', isOnline = false }) => {
   const getInitials = (fullName: string) => {
     if (!fullName) return '?';
     const names = fullName.trim().split(' ');
@@ -42,25 +43,27 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
     return colorClasses[Math.abs(hash % colorClasses.length)];
   };
 
-  // Ajout de flex-shrink-0 pour empêcher la compression dans les listes
-  const finalClassName = `flex-shrink-0 ${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm overflow-hidden`;
-
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className={`${finalClassName} object-cover border-2 border-white`}
-      />
-    );
-  }
+  const finalClassName = `flex-shrink-0 ${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm overflow-hidden relative`;
 
   return (
-    <div
-      className={`${finalClassName} flex items-center justify-center font-extrabold text-white border-2 border-white ${getColor(name)}`}
-      title={name}
-    >
-      {getInitials(name)}
+    <div className="relative inline-block">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={name}
+          className={`${finalClassName} object-cover border-2 border-white`}
+        />
+      ) : (
+        <div
+          className={`${finalClassName} flex items-center justify-center font-extrabold text-white border-2 border-white ${getColor(name)}`}
+          title={name}
+        >
+          {getInitials(name)}
+        </div>
+      )}
+      {isOnline && (
+        <span className={`absolute bottom-0 right-0 block rounded-full bg-emerald-500 ring-2 ring-white ${size === 'sm' ? 'h-2 w-2' : size === 'md' ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'}`}></span>
+      )}
     </div>
   );
 };

@@ -156,8 +156,16 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6">
+            <div className="relative mb-8">
+                <img 
+                    src="https://i.ibb.co/gLJQF0rn/isig.jpg" 
+                    alt="ISIG Logo" 
+                    className="w-32 h-32 rounded-[2.5rem] shadow-premium animate-pulse" 
+                />
+            </div>
             <Spinner />
+            <p className="mt-6 text-slate-400 font-black text-xs uppercase tracking-widest animate-pulse">Chargement de l'espace ISIG...</p>
         </div>
     );
   }

@@ -103,7 +103,7 @@ const AuthPage: React.FC = () => {
         </div>
         <div className="relative z-10 flex items-center space-x-3 text-white/50 text-xs font-bold uppercase tracking-widest">
             <ShieldCheck size={16} />
-            <span>Données sécurisées par cryptage AES-256</span>
+            <span>Données sécurisées </span>
         </div>
       </div>
 

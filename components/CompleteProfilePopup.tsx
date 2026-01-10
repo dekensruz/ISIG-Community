@@ -29,6 +29,8 @@ const CompleteProfilePopup: React.FC = () => {
                 // Si l'un des deux champs est manquant, on affiche le popup
                 if (!data.gender || !data.promotion) {
                     setIsVisible(true);
+                    // Stocker le fait qu'on a affiché le popup de profil
+                    localStorage.setItem('profile_popup_triggered', 'true');
                 }
             }
             setLoading(false);
@@ -40,38 +42,39 @@ const CompleteProfilePopup: React.FC = () => {
     if (!isVisible || loading) return null;
 
     const handleAction = () => {
-        setIsVisible(false); // Disparaît immédiatement
-        // On ajoute ?edit=true pour que le composant Profile sache qu'il doit s'ouvrir en mode édition
+        setIsVisible(false);
+        // Marquer comme fermé avec timestamp pour le délai du mode sombre
+        localStorage.setItem('profile_popup_closed_at', Date.now().toString());
         navigate(`/profile/${session?.user.id}?edit=true`);
     };
 
     return (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-lg z-[100] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-[2.5rem] shadow-premium max-w-md w-full p-8 text-center animate-fade-in-up relative overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-premium max-w-md w-full p-8 text-center animate-fade-in-up relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-isig-blue to-isig-orange"></div>
                 
                 <div className="w-20 h-20 bg-isig-orange/10 text-isig-orange rounded-3xl flex items-center justify-center mx-auto mb-6">
                     <AlertTriangle size={40} />
                 </div>
 
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-tight uppercase italic">Profil incomplet</h2>
-                <p className="mt-4 text-slate-500 font-medium leading-relaxed">
+                <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-tight uppercase italic">Profil incomplet</h2>
+                <p className="mt-4 text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
                     Cher étudiant, ISIG Community évolue ! Pour une meilleure expérience, veuillez spécifier votre <span className="text-isig-blue font-bold">Genre</span> et votre <span className="text-isig-blue font-bold">Promotion</span>.
                 </p>
 
                 <div className="mt-8 space-y-3">
-                    <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                    <div className="flex items-center space-x-4 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-100 dark:border-slate-800 text-left">
                         <UserRound className="text-isig-blue shrink-0" size={24} />
                         <div>
-                            <p className="font-black text-[10px] uppercase tracking-widest text-slate-400">Champ requis</p>
-                            <p className="text-sm font-bold text-slate-700">Genre (M/F)</p>
+                            <p className="font-black text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500">Champ requis</p>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Genre (M/F)</p>
                         </div>
                     </div>
-                    <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                    <div className="flex items-center space-x-4 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-100 dark:border-slate-800 text-left">
                         <GraduationCap className="text-isig-blue shrink-0" size={24} />
                         <div>
-                            <p className="font-black text-[10px] uppercase tracking-widest text-slate-400">Champ requis</p>
-                            <p className="text-sm font-bold text-slate-700">Promotion académique</p>
+                            <p className="font-black text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500">Champ requis</p>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Promotion académique</p>
                         </div>
                     </div>
                 </div>

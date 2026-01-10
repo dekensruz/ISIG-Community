@@ -27,13 +27,22 @@ import UnreadMessagesProvider from './components/UnreadMessagesProvider';
 import NotificationsProvider from './components/NotificationsProvider';
 import InstallPWABanner from './components/InstallPWABanner';
 import CompleteProfilePopup from './components/CompleteProfilePopup';
+import DarkModeDiscoveryPopup from './components/DarkModeDiscoveryPopup';
 
 type AuthContextType = {
   session: Session | null;
   loading: boolean;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 };
 
-const AuthContext = createContext<AuthContextType>({ session: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ 
+    session: null, 
+    loading: true, 
+    theme: 'light', 
+    toggleTheme: () => {} 
+});
+
 export const useAuth = () => useContext(AuthContext);
 
 type SearchFilterContextType = {
@@ -75,7 +84,7 @@ const PageLoader = () => (
 );
 
 const AppContent: React.FC = () => {
-    const { session } = useAuth();
+    const { session, theme } = useAuth();
     const location = useLocation();
     
     const isAuthPage = location.pathname === '/auth';
@@ -95,7 +104,9 @@ const AppContent: React.FC = () => {
     }, [session]);
 
     return (
-        <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white transition-colors duration-300">
+        <div className={`min-h-screen transition-colors duration-300 selection:bg-isig-blue selection:text-white ${
+            theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'
+        }`}>
             {showNavBars && <Navbar />}
             <main className={`transition-all duration-500 ease-in-out ${
                 isAuthPage ? "" 
@@ -132,6 +143,7 @@ const AppContent: React.FC = () => {
             <InstallPWABanner onComplete={() => {}} />
             {session && !isAuthPage && <NotificationsProvider />}
             {session && !isAuthPage && <CompleteProfilePopup />}
+            {session && !isAuthPage && <DarkModeDiscoveryPopup />}
         </div>
     );
 };
@@ -139,10 +151,28 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
+    // Initialiser le thème
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+    if (savedTheme) {
+        setTheme(savedTheme);
+        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+          // Charger le thème depuis le profil
+          supabase.from('profiles').select('theme').eq('id', session.user.id).single()
+            .then(({ data }) => {
+                if (data?.theme) {
+                    setTheme(data.theme);
+                    document.documentElement.classList.toggle('dark', data.theme === 'dark');
+                }
+            });
+      }
       setLoading(false);
     }).catch(err => {
       console.error("Auth Session Error:", err);
@@ -157,9 +187,20 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const toggleTheme = async () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    
+    if (session?.user) {
+        await supabase.from('profiles').update({ theme: newTheme }).eq('id', session.user.id);
+    }
+  };
+
   if (loading) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-slate-950 p-6">
             <div className="relative mb-8">
                 <img 
                     src="https://i.ibb.co/gLJQF0rn/isig.jpg" 
@@ -174,7 +215,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading }}>
+    <AuthContext.Provider value={{ session, loading, theme, toggleTheme }}>
         <BrowserRouter>
             <SearchFilterProvider>
                 <UnreadMessagesProvider>

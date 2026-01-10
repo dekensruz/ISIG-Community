@@ -23,8 +23,13 @@
     <meta property="og:image" content="https://i.ibb.co/gLJQF0rn/isig.jpg" />
     <meta property="og:site_name" content="ISIG Community" />
 
+    <!-- PWA Icons & Meta -->
     <link rel="icon" type="image/jpeg" href="https://i.ibb.co/gLJQF0rn/isig.jpg" />
     <link rel="apple-touch-icon" href="https://i.ibb.co/gLJQF0rn/isig.jpg" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ISIG Comm">
+    
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -170,63 +175,10 @@
     transform: scale(0.96);
     transition: transform 0.1s;
   }
-
-  /* Splash screen initial */
-  #initial-loader {
-    position: fixed;
-    inset: 0;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    transition: opacity 0.5s ease-out, visibility 0.5s;
-  }
-  #initial-loader.fade-out {
-    opacity: 0;
-    visibility: hidden;
-  }
-  .loader-logo {
-    width: 120px;
-    height: 120px;
-    border-radius: 30px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 24px;
-    animation: pulse-logo 2s infinite ease-in-out;
-  }
-  @keyframes pulse-logo {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.8; }
-  }
-  .spinner-dot {
-    width: 8px;
-    height: 8px;
-    background: #00AEEF;
-    border-radius: 50%;
-    margin: 0 4px;
-    animation: dots 1.4s infinite ease-in-out both;
-  }
-  .spinner-dot:nth-child(2) { animation-delay: 0.2s; }
-  .spinner-dot:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes dots {
-    0%, 80%, 100% { transform: scale(0); }
-    40% { transform: scale(1); }
-  }
 </style>
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <!-- Splash screen initial affiché avant le chargement de React -->
-    <div id="initial-loader">
-      <img src="https://i.ibb.co/2BY4hqb/favicon.png" alt="ISIG Logo" class="loader-logo" />
-      <div class="flex">
-        <div class="spinner-dot"></div>
-        <div class="spinner-dot"></div>
-        <div class="spinner-dot"></div>
-      </div>
-    </div>
-
     <div id="landscape-lock">
       <div class="animate-bounce mb-6">
         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#00AEEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
@@ -237,14 +189,5 @@
     <div id="modal-root"></div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <script>
-      // Cacher le loader quand React a fini de monter (approximativement)
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          const loader = document.getElementById('initial-loader');
-          if (loader) loader.classList.add('fade-out');
-        }, 800);
-      });
-    </script>
   </body>
 </html>

@@ -31,12 +31,11 @@ const UsersPage: React.FC = () => {
   
   const searchTimeout = useRef<number | null>(null);
 
-  const fetchUsers = useCallback(async (isInitial = false, currentSearch = search) => {
+  const fetchUsers = useCallback(async (isInitial = false) => {
     if (!session?.user) return;
     
     if (isInitial) {
       setLoading(true);
-      setPage(0);
     } else {
       setLoadingMore(true);
     }
@@ -46,14 +45,14 @@ const UsersPage: React.FC = () => {
     const to = from + USERS_PER_PAGE - 1;
 
     try {
-      // 1. Déterminer le décompte total pour l'affichage informatif
+      // 1. Décompte total
       let countQuery = supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .neq('id', session.user.id);
 
-      if (currentSearch.trim()) {
-        countQuery = countQuery.ilike('full_name', `%${currentSearch.trim()}%`);
+      if (search.trim()) {
+        countQuery = countQuery.ilike('full_name', `%${search.trim()}%`);
       }
       
       if (sortBy === 'online') {
@@ -64,30 +63,27 @@ const UsersPage: React.FC = () => {
       const { count: total } = await countQuery;
       setTotalCount(total);
 
-      // 2. Récupérer les membres avec le tri approprié
+      // 2. Requête des données
       let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', session.user.id);
 
-      if (currentSearch.trim()) {
-        query = query.ilike('full_name', `%${currentSearch.trim()}%`);
+      if (search.trim()) {
+        query = query.ilike('full_name', `%${search.trim()}%`);
       }
 
       // Gestion du tri
       if (sortBy === 'all') {
-        // "Tous" triés par date d'inscription
         query = query.order('created_at', { ascending: false });
       } else if (sortBy === 'online') {
         const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
         query = query.gt('last_seen_at', threeMinsAgo).order('last_seen_at', { ascending: false });
       } else if (sortBy === 'active') {
-        // "Actifs" : Triés par nombre de publications (nécessite le script SQL)
-        // @ts-ignore : On suppose que la colonne posts_count existe maintenant
+        // @ts-ignore
         query = query.order('posts_count', { ascending: false, nullsFirst: false });
       } else if (sortBy === 'popular') {
-        // "Populaires" : Triés par nombre d'abonnés (nécessite le script SQL)
-        // @ts-ignore : On suppose que la colonne followers_count existe maintenant
+        // @ts-ignore
         query = query.order('followers_count', { ascending: false, nullsFirst: false });
       }
 
@@ -96,7 +92,7 @@ const UsersPage: React.FC = () => {
 
       const newUsers = usersData || [];
       
-      // Récupérer les statuts de suivi pour les nouveaux utilisateurs
+      // Suivi
       const newUserIds = newUsers.map(u => u.id);
       if (newUserIds.length > 0) {
         const { data: followingData } = await supabase
@@ -114,6 +110,7 @@ const UsersPage: React.FC = () => {
 
       if (isInitial) {
         setUsers(newUsers);
+        setPage(0);
       } else {
         setUsers(prev => [...prev, ...newUsers]);
         setPage(currentPage);
@@ -131,26 +128,22 @@ const UsersPage: React.FC = () => {
 
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
-    
     searchTimeout.current = window.setTimeout(() => {
-        fetchUsers(true, search);
+        fetchUsers(true);
     }, 400);
-
     return () => {
         if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     };
-  }, [search, sortBy]); // Ne dépend plus de fetchUsers pour éviter les loops
+  }, [search, sortBy]);
   
   const handleToggleFollow = async (targetUserId: string) => {
     if (!session?.user) return;
-
     const isCurrentlyFollowing = followingMap.get(targetUserId);
     setFollowingMap(prev => {
         const next = new Map(prev);
         next.set(targetUserId, !isCurrentlyFollowing);
         return next;
     });
-
     if (isCurrentlyFollowing) {
         await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: targetUserId });
     } else {
@@ -162,12 +155,8 @@ const UsersPage: React.FC = () => {
     if (!session?.user) return;
     try {
       const { data, error } = await supabase.rpc('get_or_create_conversation', { other_user_id: targetUserId });
-      if (!error && data) {
-        navigate(`/chat/${data}`);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (!error && data) navigate(`/chat/${data}`);
+    } catch (err) { console.error(err); }
   };
 
   return (
@@ -201,32 +190,33 @@ const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex overflow-x-auto no-scrollbar pb-2 mb-10 -mx-2 px-2 animate-fade-in-up">
-          <div className="flex p-1 bg-slate-200/50 rounded-2xl w-fit whitespace-nowrap shadow-sm">
+      <div className="flex justify-center mb-10 animate-fade-in-up">
+          <div className="grid grid-cols-3 sm:flex gap-1 p-1 bg-slate-200/50 rounded-[1.5rem] w-full sm:w-fit shadow-sm">
             <button 
                 onClick={() => setSortBy('all')}
-                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'all' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'all' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <LayoutGrid size={14} />
                 <span>Tous</span>
             </button>
             <button 
                 onClick={() => setSortBy('online')}
-                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'online' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'online' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <Circle size={10} fill={sortBy === 'online' ? '#10b981' : 'none'} className={sortBy === 'online' ? 'animate-pulse' : ''} />
                 <span>En ligne</span>
             </button>
             <button 
                 onClick={() => setSortBy('active')}
-                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <Sparkles size={14} />
                 <span>Actifs</span>
             </button>
+            {/* Sur mobile, on force ce bouton sur la ligne suivante en le centrant */}
             <button 
                 onClick={() => setSortBy('popular')}
-                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`col-start-2 sm:col-start-auto flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <TrendingUp size={14} />
                 <span>Populaires</span>
@@ -257,7 +247,6 @@ const UsersPage: React.FC = () => {
                                 >
                                     <MessageSquare size={16} />
                                 </button>
-
                                 <Link to={`/profile/${user.id}`} className="relative mb-3">
                                     <Avatar 
                                         avatarUrl={user.avatar_url} 
@@ -271,7 +260,6 @@ const UsersPage: React.FC = () => {
                                 <p className="text-[9px] text-isig-blue font-black uppercase tracking-widest mt-0.5 line-clamp-1 opacity-70">
                                     {user.promotion ? `${user.promotion} • ` : ''}{majorLabel}
                                 </p>
-                                
                                 <div className="mt-4 flex flex-col gap-1.5 w-full">
                                     <button
                                         onClick={() => handleToggleFollow(user.id)}

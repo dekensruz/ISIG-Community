@@ -38,11 +38,8 @@ const AuthPage: React.FC = () => {
 
   const getFriendlyErrorMessage = (err: any) => {
     const msg = err.message || '';
-    if (msg.includes('Invalid login credentials')) return "Email ou mot de passe incorrect. Veuillez vérifier vos accès.";
-    if (msg.includes('User not found')) return "Aucun compte n'est associé à cet email.";
-    if (msg.includes('Email not confirmed')) return "Veuillez confirmer votre adresse email avant de vous connecter.";
+    if (msg.includes('Invalid login credentials')) return "Email ou mot de passe incorrect.";
     if (msg.includes('already registered')) return "Cet email est déjà utilisé par un autre étudiant.";
-    if (msg.includes('Password should be')) return "Le mot de passe doit contenir au moins 6 caractères.";
     return msg || "Une erreur est survenue. Veuillez réessayer.";
   };
 
@@ -81,13 +78,11 @@ const AuthPage: React.FC = () => {
                 avatar_url: avatarUrl,
             }).eq('id', data.user.id);
         }
-        setMessage('Un email de confirmation a été envoyé. Vérifiez votre boîte de réception.');
+        setMessage('Vérifiez votre boîte mail pour confirmer votre inscription.');
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/settings`,
-        });
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
         if (error) throw error;
-        setMessage('Lien de récupération envoyé ! Vérifiez votre boîte mail.');
+        setMessage('Lien de récupération envoyé !');
       }
     } catch (err: any) {
       setError(getFriendlyErrorMessage(err));
@@ -117,7 +112,7 @@ const AuthPage: React.FC = () => {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-md space-y-8 animate-fade-in-up">
+        <div className="w-full max-w-md space-y-8 animate-fade-in-up">
           <div className="lg:hidden flex justify-center mb-6">
             <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 drop-shadow-xl" />
           </div>
@@ -187,30 +182,21 @@ const AuthPage: React.FC = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
-                {isLogin && (
-                    <div className="text-right">
-                        <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors uppercase tracking-widest">
-                            Mot de passe oublié ?
-                        </button>
-                    </div>
-                )}
               </div>
             )}
 
             <button type="submit" disabled={loading} className="w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm">
-              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer l\'accès' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
+              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
               {!loading && <ArrowRight size={20} />}
             </button>
           </form>
 
-          <div className="text-center space-y-4">
-              <p className="text-slate-500 font-bold">
-                {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
-                <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
-                  {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
-                </button>
-              </p>
-          </div>
+          <p className="text-center text-slate-500 font-bold">
+            {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
+            <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
+                {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
+            </button>
+          </p>
         </div>
       </div>
     </div>

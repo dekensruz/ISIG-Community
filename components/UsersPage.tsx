@@ -5,7 +5,7 @@ import { Profile } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import Spinner from './Spinner';
 import Avatar from './Avatar';
-import { UserPlus, UserCheck, Search, X, Users, MessageSquare, Clock, TrendingUp, Sparkles } from 'lucide-react';
+import { UserPlus, UserCheck, Search, X, Users, MessageSquare, LayoutGrid, TrendingUp, Sparkles, Circle } from 'lucide-react';
 import { useAuth } from '../App';
 import { differenceInMinutes } from 'date-fns';
 
@@ -27,7 +27,7 @@ const UsersPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [followingMap, setFollowingMap] = useState<Map<string, boolean>>(new Map());
-  const [sortBy, setSortBy] = useState<'recent' | 'active' | 'popular'>('recent');
+  const [sortBy, setSortBy] = useState<'all' | 'online' | 'active' | 'popular'>('all');
   
   const searchTimeout = useRef<number | null>(null);
 
@@ -42,6 +42,7 @@ const UsersPage: React.FC = () => {
     const to = from + USERS_PER_PAGE - 1;
 
     try {
+      // 1. Déterminer le décompte total
       let countQuery = supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -51,9 +52,15 @@ const UsersPage: React.FC = () => {
         countQuery = countQuery.ilike('full_name', `%${currentSearch.trim()}%`);
       }
       
+      if (sortBy === 'online') {
+          const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+          countQuery = countQuery.gt('last_seen_at', threeMinsAgo);
+      }
+
       const { count: total } = await countQuery;
       setTotalCount(total);
 
+      // 2. Récupérer les membres
       let query = supabase
         .from('profiles')
         .select('*')
@@ -63,24 +70,26 @@ const UsersPage: React.FC = () => {
         query = query.ilike('full_name', `%${currentSearch.trim()}%`);
       }
 
-      // Gestion du tri
-      if (sortBy === 'recent') {
+      // Gestion du tri et filtres
+      if (sortBy === 'all') {
         query = query.order('created_at', { ascending: false });
+      } else if (sortBy === 'online') {
+        const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+        query = query.gt('last_seen_at', threeMinsAgo).order('last_seen_at', { ascending: false });
       } else if (sortBy === 'active') {
-        // Pour "Actifs", on utilise last_seen_at comme proxy d'activité récente
+        // "Actifs" : On trie par dernière présence comme indicateur d'activité
         query = query.order('last_seen_at', { ascending: false, nullsFirst: false });
       } else if (sortBy === 'popular') {
-        // Pour "Populaire", on trie par ID comme fallback ou si vous avez un champ followers_count
-        // Ici on trie par updated_at pour montrer les profils récemment mis à jour
+        // "Populaires" : On trie par date de mise à jour (profils les plus récents/complets)
         query = query.order('updated_at', { ascending: false });
       }
 
       const { data: usersData, error: usersError } = await query.range(from, to);
-        
       if (usersError) throw usersError;
 
       const newUsers = usersData || [];
       
+      // Récupérer les statuts de suivi pour les nouveaux utilisateurs
       const newUserIds = newUsers.map(u => u.id);
       if (newUserIds.length > 0) {
         const { data: followingData } = await supabase
@@ -89,9 +98,11 @@ const UsersPage: React.FC = () => {
           .eq('follower_id', session.user.id)
           .in('following_id', newUserIds);
         
-        const newFollowingMap = isInitial ? new Map() : new Map(followingMap);
-        followingData?.forEach(item => newFollowingMap.set(item.following_id, true));
-        setFollowingMap(newFollowingMap);
+        setFollowingMap(prev => {
+            const next = new Map(prev);
+            followingData?.forEach(item => next.set(item.following_id, true));
+            return next;
+        });
       }
 
       if (isInitial) {
@@ -110,7 +121,7 @@ const UsersPage: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [session?.user, page, search, followingMap, sortBy]);
+  }, [session?.user?.id, page, sortBy]); // search n'est pas une dépendance directe ici pour éviter les loops, on l'injecte via fetchUsers(true, search)
 
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
@@ -122,15 +133,17 @@ const UsersPage: React.FC = () => {
     return () => {
         if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     };
-  }, [search, sortBy]);
+  }, [search, sortBy, fetchUsers]);
   
   const handleToggleFollow = async (targetUserId: string) => {
     if (!session?.user) return;
 
     const isCurrentlyFollowing = followingMap.get(targetUserId);
-    const newMap = new Map(followingMap);
-    newMap.set(targetUserId, !isCurrentlyFollowing);
-    setFollowingMap(newMap);
+    setFollowingMap(prev => {
+        const next = new Map(prev);
+        next.set(targetUserId, !isCurrentlyFollowing);
+        return next;
+    });
 
     if (isCurrentlyFollowing) {
         await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: targetUserId });
@@ -158,7 +171,7 @@ const UsersPage: React.FC = () => {
           <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight italic uppercase">Membres</h1>
           <p className="text-slate-500 font-medium text-xs sm:text-sm mt-1 flex items-center">
             {totalCount !== null ? (
-                <>Découvrez la communauté (<span className="text-isig-blue font-black px-1">{totalCount}</span> étudiants)</>
+                <>{sortBy === 'online' ? 'Étudiants actuellement' : 'Découvrez la communauté'} (<span className="text-isig-blue font-black px-1">{totalCount}</span> {sortBy === 'online' ? 'en ligne' : 'étudiants'})</>
             ) : (
                 <>Chargement des membres...</>
             )}
@@ -182,28 +195,37 @@ const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex p-1 bg-slate-200/50 rounded-2xl w-full sm:w-fit mx-auto mb-10 animate-fade-in-up shadow-sm">
-          <button 
-              onClick={() => setSortBy('recent')}
-              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'recent' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-              <Clock size={14} />
-              <span>Récents</span>
-          </button>
-          <button 
-              onClick={() => setSortBy('active')}
-              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-              <Sparkles size={14} />
-              <span>Actifs</span>
-          </button>
-          <button 
-              onClick={() => setSortBy('popular')}
-              className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-              <TrendingUp size={14} />
-              <span>Populaires</span>
-          </button>
+      <div className="flex overflow-x-auto no-scrollbar pb-2 mb-10 -mx-2 px-2 animate-fade-in-up">
+          <div className="flex p-1 bg-slate-200/50 rounded-2xl w-fit whitespace-nowrap shadow-sm">
+            <button 
+                onClick={() => setSortBy('all')}
+                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'all' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                <LayoutGrid size={14} />
+                <span>Tous</span>
+            </button>
+            <button 
+                onClick={() => setSortBy('online')}
+                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'online' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                <Circle size={10} fill={sortBy === 'online' ? '#10b981' : 'none'} className={sortBy === 'online' ? 'animate-pulse' : ''} />
+                <span>En ligne</span>
+            </button>
+            <button 
+                onClick={() => setSortBy('active')}
+                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                <Sparkles size={14} />
+                <span>Actifs</span>
+            </button>
+            <button 
+                onClick={() => setSortBy('popular')}
+                className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                <TrendingUp size={14} />
+                <span>Populaires</span>
+            </button>
+          </div>
       </div>
       
       {loading ? (
@@ -253,7 +275,7 @@ const UsersPage: React.FC = () => {
                                         <span>{isFollowing ? 'Abonné' : 'Suivre'}</span>
                                     </button>
                                     <Link to={`/profile/${user.id}`} className="w-full py-2 px-2 bg-slate-50/50 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-all text-center">
-                                        Voir profil
+                                        Profil
                                     </Link>
                                 </div>
                             </div>
@@ -265,12 +287,12 @@ const UsersPage: React.FC = () => {
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Users size={24} className="text-slate-300" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-700">Aucun membre trouvé</h3>
-                    <p className="text-slate-400 mt-1 text-sm font-medium">Affinez votre recherche.</p>
+                    <h3 className="text-xl font-black text-slate-700">{sortBy === 'online' ? 'Personne en ligne' : 'Aucun membre trouvé'}</h3>
+                    <p className="text-slate-400 mt-1 text-sm font-medium">Revenez un peu plus tard.</p>
                 </div>
             )}
 
-            {hasMore && (
+            {hasMore && users.length > 0 && (
                 <div className="mt-10 flex justify-center pb-12">
                     <button
                         onClick={() => fetchUsers(false)}

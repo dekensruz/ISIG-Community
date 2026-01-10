@@ -166,10 +166,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         } else {
             let mediaUrl, mediaType;
             if (file || audioBlob) {
-                const mediaFile = file || new File([audioBlob!], `audio_${Date.now()}.${audioBlob?.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: audioBlob?.type || file?.type });
+                // Ensure a valid extension for audio files based on mime type to avoid playback issues on iOS
+                let extension = 'bin';
+                if (audioBlob) {
+                    if (audioBlob.type.includes('mp4') || audioBlob.type.includes('m4a')) extension = 'm4a';
+                    else if (audioBlob.type.includes('webm')) extension = 'webm';
+                    else if (audioBlob.type.includes('ogg')) extension = 'ogg';
+                    else if (audioBlob.type.includes('wav')) extension = 'wav';
+                    else if (audioBlob.type.includes('aac')) extension = 'aac';
+                } else if (file) {
+                    extension = file.name.split('.').pop() || 'bin';
+                }
+
+                const mediaFile = file || new File([audioBlob!], `audio_${Date.now()}.${extension}`, { type: audioBlob?.type || file?.type });
                 const fileName = `${conversationId}/${Date.now()}-${mediaFile.name}`;
+                
+                // Upload to Supabase Storage
                 const { data: uploadData, error: uploadError } = await supabase.storage.from('chat_media').upload(fileName, mediaFile);
                 if (uploadError) throw uploadError;
+                
                 const { data: urlData } = supabase.storage.from('chat_media').getPublicUrl(uploadData.path);
                 mediaUrl = urlData.publicUrl;
                 mediaType = mediaFile.type;
@@ -192,7 +207,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         }
         setTimeout(adjustHeight, 10);
         scrollToBottom();
-    } catch (err) { console.error(err); } finally { setIsUploading(false); }
+    } catch (err) { 
+        console.error(err); 
+        alert("Erreur lors de l'envoi du message.");
+    } finally { 
+        setIsUploading(false); 
+    }
   };
 
   const startRecording = async (e?: React.MouseEvent) => {
@@ -201,21 +221,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         
-        let mimeType = 'audio/webm';
-        if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-            mimeType = 'audio/aac';
+        // iOS/Safari compatibility: Prioritize 'audio/mp4' (AAC) over 'audio/webm'
+        const possibleMimeTypes = [
+            'audio/mp4',
+            'audio/aac',
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus'
+        ];
+
+        let mimeType = '';
+        for (const type of possibleMimeTypes) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                mimeType = type;
+                break;
+            }
         }
 
-        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+        if (!mimeType) {
+            // Fallback to default browser behavior
+            mediaRecorderRef.current = new MediaRecorder(stream);
+        } else {
+            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+        }
+        
         audioChunksRef.current = [];
         mediaRecorderRef.current.ondataavailable = (e) => {
             if (e.data.size > 0) audioChunksRef.current.push(e.data);
         };
         mediaRecorderRef.current.onstop = async () => {
-            const blob = new Blob(audioChunksRef.current, { type: mimeType });
-            if (blob.size > 500) await handleSendMessage(undefined, blob);
+            const finalMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+            const blob = new Blob(audioChunksRef.current, { type: finalMimeType });
+            // Only send if recording has some data (at least 500 bytes to avoid empty files)
+            if (blob.size > 500) {
+                await handleSendMessage(undefined, blob);
+            }
             setRecordingStatus('idle');
         };
         mediaRecorderRef.current.start();
@@ -223,7 +263,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         timerIntervalRef.current = window.setInterval(() => setRecordingTime(p => p + 1), 1000);
     } catch (err) { 
         console.error(err);
-        alert("Microphone inaccessible. Vérifiez les permissions."); 
+        alert("Microphone inaccessible. Veuillez vérifier les permissions dans les réglages de votre appareil."); 
     }
   };
 

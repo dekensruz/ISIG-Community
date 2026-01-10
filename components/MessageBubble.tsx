@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { Message } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X, Copy, AlertTriangle } from 'lucide-react';
+import { CheckCheck, MoreHorizontal, MessageSquareReply, Pencil, Trash2, XCircle, Download, Play, Pause, X, Copy, AlertTriangle, FileAudio } from 'lucide-react';
 
 interface MessageBubbleProps {
     message: Message;
@@ -88,18 +88,41 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     const progressFillClass = isOwnMessage ? 'bg-white' : 'bg-isig-blue';
     const buttonBgClass = isOwnMessage ? 'bg-white/20 hover:bg-white/40' : 'bg-slate-200 hover:bg-slate-300';
 
+    if (hasError) {
+        return (
+            <div className={`mt-1 p-3 rounded-xl flex items-center justify-between border ${isOwnMessage ? 'bg-white/10 border-white/20 text-white' : 'bg-red-50 border-red-100 text-red-600'}`}>
+                <div className="flex items-center space-x-3">
+                    <FileAudio size={24} className={isOwnMessage ? 'text-white' : 'text-red-500'} />
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest">Note vocale</p>
+                        <p className="text-[9px] font-medium opacity-80">Format incompatible sur cet iPhone</p>
+                    </div>
+                </div>
+                <a 
+                    href={src} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className={`p-2 rounded-lg transition-all active:scale-95 ${isOwnMessage ? 'bg-white/20 hover:bg-white/40 text-white' : 'bg-white text-red-500 shadow-sm border border-red-100'}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Download size={18} />
+                </a>
+            </div>
+        );
+    }
+
     return (
         <div className={`flex items-center gap-2 mt-1 w-full max-w-full overflow-hidden ${playerColorClass}`}>
             <audio ref={audioRef} src={src} preload="auto" playsInline></audio>
-            <button type="button" onClick={handlePlayPause} className={`p-2.5 rounded-full transition-colors shrink-0 ${buttonBgClass} ${hasError ? 'text-red-500' : ''}`}>
-                {hasError ? <AlertTriangle size={18} /> : isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
+            <button type="button" onClick={handlePlayPause} className={`p-2.5 rounded-full transition-colors shrink-0 ${buttonBgClass}`}>
+                {isPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current" />}
             </button>
             <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
                 <div onClick={handleProgressClick} className={`h-1.5 w-full rounded-full cursor-pointer relative ${progressBgClass}`}>
                     <div style={{ width: `${Math.min(progress, 100)}%` }} className={`h-full rounded-full transition-all duration-100 ${progressFillClass}`}></div>
                 </div>
                  <div className="flex justify-between items-center text-[10px] font-mono mt-1 opacity-80">
-                    <span>{hasError ? "Format non supporté" : formatTimeDisplay(currentTime)}</span>
+                    <span>{formatTimeDisplay(currentTime)}</span>
                     <span>{formatTimeDisplay(duration)}</span>
                 </div>
             </div>

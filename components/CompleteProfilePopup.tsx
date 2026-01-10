@@ -39,6 +39,11 @@ const CompleteProfilePopup: React.FC = () => {
 
     if (!isVisible || loading) return null;
 
+    const handleAction = () => {
+        setIsVisible(false);
+        navigate(`/profile/${session?.user.id}`);
+    };
+
     return (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-lg z-[100] flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white rounded-[2.5rem] shadow-premium max-w-md w-full p-8 text-center animate-fade-in-up relative overflow-hidden">
@@ -50,7 +55,7 @@ const CompleteProfilePopup: React.FC = () => {
 
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-tight uppercase italic">Profil incomplet</h2>
                 <p className="mt-4 text-slate-500 font-medium leading-relaxed">
-                    Cher étudiant, ISIG Community évolue ! Pour une meilleure expérience de mise en relation, veuillez spécifier votre <span className="text-isig-blue font-bold">Genre</span> et votre <span className="text-isig-blue font-bold">Promotion</span>.
+                    Cher étudiant, ISIG Community évolue ! Pour une meilleure expérience, veuillez spécifier votre <span className="text-isig-blue font-bold">Genre</span> et votre <span className="text-isig-blue font-bold">Promotion</span>.
                 </p>
 
                 <div className="mt-8 space-y-3">
@@ -58,7 +63,7 @@ const CompleteProfilePopup: React.FC = () => {
                         <UserRound className="text-isig-blue shrink-0" size={24} />
                         <div>
                             <p className="font-black text-[10px] uppercase tracking-widest text-slate-400">Champ requis</p>
-                            <p className="text-sm font-bold text-slate-700">Genre (Homme/Femme)</p>
+                            <p className="text-sm font-bold text-slate-700">Genre (M/F)</p>
                         </div>
                     </div>
                     <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
@@ -71,11 +76,11 @@ const CompleteProfilePopup: React.FC = () => {
                 </div>
 
                 <button 
-                    onClick={() => navigate(`/profile/${session?.user.id}`)}
-                    className="mt-10 w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-3 transition-all active:scale-95 uppercase tracking-widest text-sm group"
+                    onClick={handleAction}
+                    className="mt-10 w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 uppercase tracking-widest text-[11px] group"
                 >
-                    <span>Mettre à jour mon profil</span>
-                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                    <span>Compléter mon profil</span>
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
             </div>
         </div>

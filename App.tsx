@@ -5,7 +5,7 @@ import { supabase } from './services/supabase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Spinner from './components/Spinner';
 
-// Lazy loading des pages pour optimiser le bundle et la fluidité
+// Lazy loading des pages
 const AuthPage = lazy(() => import('./components/Auth'));
 const Feed = lazy(() => import('./components/Feed'));
 const Profile = lazy(() => import('./components/Profile'));
@@ -20,7 +20,6 @@ const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
 const AdminFeedbacksPage = lazy(() => import('./components/AdminFeedbacksPage'));
 const FeedbackPage = lazy(() => import('./components/FeedbackPage'));
 
-// Importation des composants de structure
 import Navbar from './components/Navbar';
 import TabBar from './components/TabBar';
 import ScrollToTopButton from './components/ScrollToTopButton';
@@ -68,7 +67,6 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 };
 
-// Composant de chargement intermédiaire ultra-léger
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh] animate-fade-in">
     <div className="w-10 h-10 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
@@ -78,7 +76,6 @@ const PageLoader = () => (
 const AppContent: React.FC = () => {
     const { session } = useAuth();
     const location = useLocation();
-    const [canShowNotifications, setCanShowNotifications] = useState(false);
     
     const isAuthPage = location.pathname === '/auth';
     const isChatConversation = location.pathname.startsWith('/chat/') && location.pathname.split('/').length > 2;
@@ -131,8 +128,8 @@ const AppContent: React.FC = () => {
             </main>
             {showNavBars && <TabBar />}
             {session && showScrollButton && <ScrollToTopButton />}
-            <InstallPWABanner onComplete={() => setCanShowNotifications(true)} />
-            {session && !isAuthPage && canShowNotifications && <NotificationsProvider />}
+            <InstallPWABanner onComplete={() => {}} />
+            {session && !isAuthPage && <NotificationsProvider />}
         </div>
     );
 };

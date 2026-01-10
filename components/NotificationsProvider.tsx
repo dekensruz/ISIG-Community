@@ -4,7 +4,7 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 
-const VAPID_PUBLIC_KEY = 'BCx1XVKpiYEDX_pOptcyi7ikv0hVQo9iVNsww-GxbKyife7Vdln3gTOz2p0eN06twP5MBiZLVEsDMxeLSb4YOuc';
+const VAPID_PUBLIC_KEY = 'BH0SUDCMUyultes5PbKRTcCnyjDnDUgfUtvkIWBBdVl1pPfmvecGekEjeNKvUhvk2hMGTkROBHrLpf3PWqmuDeQ';
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -31,34 +31,43 @@ const NotificationsProvider: React.FC = () => {
 
     const subscribeUserToPush = async () => {
         try {
+            console.log("Tentative d'abonnement Push...");
             const serviceWorker = await navigator.serviceWorker.ready;
-            const existingSubscription = await serviceWorker.pushManager.getSubscription();
-
-            if (existingSubscription) {
-                await saveSubscription(existingSubscription);
-                return;
-            }
-
-            const subscription = await serviceWorker.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
             
+            let subscription = await serviceWorker.pushManager.getSubscription();
+
+            if (!subscription) {
+                console.log("Création d'un nouvel abonnement...");
+                subscription = await serviceWorker.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+            }
+            
+            console.log("Abonnement obtenu, enregistrement dans Supabase...");
             await saveSubscription(subscription);
 
         } catch (error) {
-            console.error('Failed to subscribe the user: ', error);
+            console.error('Erreur lors de l abonnement Push:', error);
         }
     };
     
     const saveSubscription = async (subscription: PushSubscription) => {
         if (!session?.user) return;
-        await supabase
+        
+        const { error } = await supabase
             .from('push_subscriptions')
             .upsert({ 
                 user_id: session.user.id,
                 subscription: subscription.toJSON()
             }, { onConflict: 'user_id' });
+
+        if (error) {
+            console.error("ERREUR lors de la sauvegarde en base de données:", error.message);
+            alert("Erreur base de données: " + error.message);
+        } else {
+            console.log("✅ Abonnement Push enregistré avec succès dans la table push_subscriptions");
+        }
     };
     
     useEffect(() => {
@@ -70,11 +79,16 @@ const NotificationsProvider: React.FC = () => {
     }, [session, notificationPermission]);
 
     const handleRequestPermission = async () => {
-        if (!('Notification' in window)) return;
+        if (!('Notification' in window)) {
+            alert("Ce navigateur ne supporte pas les notifications.");
+            return;
+        }
         const permission = await Notification.requestPermission();
         setNotificationPermission(permission);
         if (permission === 'granted') {
             await subscribeUserToPush();
+        } else {
+            alert("Vous avez refusé les notifications. Vous devez les autoriser dans les paramètres du site.");
         }
     };
 

@@ -1,147 +1,95 @@
-// supabase/functions/send-message-notification/index.ts
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// Use esm.sh version of web-push which is more compatible with Deno Deploy/Edge Functions
-import webpush from "https://esm.sh/web-push@3.6.7";
-
-// Fix: Add Deno type declaration for Supabase edge function environment.
-declare const Deno: any;
-
-// Manually define the PushSubscription type as it's a standard interface
-// This avoids type import issues from the web-push module in Deno.
-interface PushSubscription {
-    endpoint: string;
-    keys: {
-        p256dh: string;
-        auth: string;
-    };
-}
-
-interface WebhookPayload {
-  type: "INSERT";
-  table: string;
-  record: {
-    id: string;
-    conversation_id: string;
-    sender_id: string;
-    content: string;
-    media_url?: string;
-    media_type?: string;
-  };
-}
-
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
-const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
+import webpush from "https://esm.sh/web-push@3.6.7?target=deno";
 
 serve(async (req) => {
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
+  console.log("--- NOUVELLE REQUÊTE WEBHOOK ---");
+  
   try {
-    const payload: WebhookPayload = await req.json();
+    const payload = await req.json();
     const message = payload.record;
+    
+    if (!message) {
+      console.error("Payload vide ou invalide");
+      return new Response("Invalid payload", { status: 400 });
+    }
 
-    // Create a Supabase client with the service_role key
+    console.log("Message reçu ID:", message.id);
+    console.log("Conversation ID:", message.conversation_id);
+    console.log("Expéditeur ID:", message.sender_id);
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // 1. Find the recipient
-    const { data: recipientData, error: recipientError } = await supabaseAdmin
+    // 1. Chercher le destinataire (celui qui n'est pas l'expéditeur)
+    const { data: recipientData, error: recError } = await supabaseAdmin
       .from("conversation_participants")
       .select("user_id")
       .eq("conversation_id", message.conversation_id)
       .neq("user_id", message.sender_id)
       .single();
 
-    if (recipientError || !recipientData) {
-      console.error("Error finding recipient:", recipientError?.message || "Recipient not found");
-      return new Response(JSON.stringify({ error: "Recipient not found" }), { status: 404 });
+    if (recError || !recipientData) {
+      console.error("Destinataire non trouvé dans la conversation:", recError?.message);
+      return new Response("No recipient found", { status: 200 });
     }
-    const recipientId = recipientData.user_id;
+    console.log("Destinataire identifié:", recipientData.user_id);
 
-    // 2. Get recipient's push subscription
-    const { data: subscriptionData, error: subscriptionError } = await supabaseAdmin
+    // 2. Chercher l'abonnement push du destinataire
+    const { data: subData, error: subError } = await supabaseAdmin
       .from("push_subscriptions")
       .select("subscription")
-      .eq("user_id", recipientId);
-      
-    if (subscriptionError) throw subscriptionError;
-    if (!subscriptionData || subscriptionData.length === 0) {
-      console.log(`No push subscription found for user ${recipientId}.`);
-      return new Response(JSON.stringify({ message: "No subscription to send to." }), { status: 200 });
-    }
-
-    // 3. Get sender's profile
-    const { data: senderProfile, error: senderError } = await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", message.sender_id)
+      .eq("user_id", recipientData.user_id)
       .single();
-      
-    if (senderError) throw senderError;
-    const senderName = senderProfile?.full_name || "Quelqu'un";
-    
-    // 4. Prepare and send notifications
-    let body = message.content;
-    if (!body) {
-        if (message.media_type?.startsWith('image/')) {
-            body = '📷 Image';
-        } else if (message.media_url) {
-            body = '📎 Fichier joint';
-        } else {
-            body = 'Nouveau message';
-        }
+
+    if (subError || !subData) {
+      console.error("AUCUN ABONNEMENT trouvé en base pour l'utilisateur:", recipientData.user_id);
+      return new Response("No push subscription in DB", { status: 200 });
+    }
+    console.log("Abonnement push récupéré avec succès.");
+
+    // 3. Configuration VAPID
+    const pubKey = Deno.env.get("VAPID_PUBLIC_KEY");
+    const privKey = Deno.env.get("VAPID_PRIVATE_KEY");
+
+    if (!pubKey || !privKey) {
+      console.error("CLÉS VAPID MANQUANTES DANS LES SECRETS SUPABASE");
+      return new Response("Missing VAPID keys", { status: 500 });
     }
 
-    const notificationPayload = JSON.stringify({
-      title: `Nouveau message de ${senderName}`,
-      body: body,
-      url: `/chat/${message.conversation_id}`,
-    });
+    webpush.setVapidDetails(
+      'mailto:ruzubadekens@gmail.com',
+      pubKey,
+      privKey
+    );
 
-    const vapidKeys = {
-      publicKey: VAPID_PUBLIC_KEY!,
-      privateKey: VAPID_PRIVATE_KEY!,
-    };
-
-    for (const sub of subscriptionData) {
-      try {
-        await webpush.sendNotification(sub.subscription as PushSubscription, notificationPayload, {
-           vapidDetails: {
-              subject: 'mailto:ruzubadekens@gmail.com', // Replace with your contact email
-              ...vapidKeys,
-           },
-           ttl: 60 * 60 * 24 // 1 day
-        });
-      } catch (pushError) {
-        console.error(`Error sending push notification for user ${recipientId}:`, pushError);
-        // If subscription is expired or invalid (e.g., 410 Gone), delete it
-        if (pushError.statusCode === 410) {
-            console.log(`Subscription for user ${recipientId} is expired. Deleting.`);
-            await supabaseAdmin
-                .from('push_subscriptions')
-                .delete()
-                .eq('user_id', recipientId)
-                .match({ subscription: sub.subscription });
-        }
+    // 4. Envoi de la notification
+    console.log("Tentative d'envoi vers les serveurs Push...");
+    try {
+      await webpush.sendNotification(
+        subData.subscription,
+        JSON.stringify({
+          title: "Nouveau message",
+          body: message.content || "Fichier joint",
+          url: `/chat/${message.conversation_id}`
+        })
+      );
+      console.log("✅ NOTIFICATION ENVOYÉE AVEC SUCCÈS");
+    } catch (pushErr) {
+      console.error("Erreur lors de l'envoi push (Serveur distant):", pushErr.message);
+      if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+        console.log("Abonnement expiré, suppression de la base...");
+        await supabaseAdmin.from("push_subscriptions").delete().eq("user_id", recipientData.user_id);
       }
     }
+    
+    return new Response("Process completed", { status: 200 });
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
   } catch (error) {
-    console.error("Function error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("❌ ERREUR CRITIQUE DANS LA FONCTION:", error.message);
+    return new Response(error.message, { status: 500 });
   }
 });

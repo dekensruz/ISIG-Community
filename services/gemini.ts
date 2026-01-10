@@ -1,19 +1,37 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Profile } from '../types';
 
-// Recommended models for different task types based on guidelines
-const TEXT_MODEL = 'gemini-3-flash-preview';
-const REASONING_MODEL = 'gemini-3-pro-preview';
+// Helper robuste pour récupérer la clé API (Compatible Vite/Vercel)
+const getApiKey = () => {
+  // 1. Vérifie les variables d'environnement Vite (Recommandé pour Vercel)
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+  }
+  
+  // 2. Vérifie process.env standard
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.API_KEY) return process.env.API_KEY;
+    if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+  }
+
+  return '';
+};
+
+const MODEL_NAME = "gemini-2.5-flash";
 
 export const summarizeText = async (text: string): Promise<string> => {
   try {
-    // API key must be obtained exclusively from process.env.API_KEY
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("Clé API manquante (VITE_API_KEY).");
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-        model: TEXT_MODEL,
+        model: MODEL_NAME,
         contents: `Tu es un assistant académique pour les étudiants de l'ISIG Goma. Résume le texte suivant de manière structurée avec des puces. Sois concis et professionnel :\n\n---\n\n${text}`,
     });
-    // Access response.text property directly (not a method)
     return response.text || "Résumé indisponible.";
   } catch (error) {
     console.error("Error summarizing text:", error);
@@ -23,13 +41,14 @@ export const summarizeText = async (text: string): Promise<string> => {
 
 export const improveAcademicPost = async (text: string): Promise<string> => {
   try {
-    // API key must be obtained exclusively from process.env.API_KEY
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const apiKey = getApiKey();
+    if (!apiKey) return text;
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-        model: TEXT_MODEL,
+        model: MODEL_NAME,
         contents: `Reformule ce brouillon de publication pour un réseau social académique (ISIG Community). Rends-le plus clair, professionnel et engageant pour des étudiants, tout en gardant le même sens. Propose aussi 3 hashtags pertinents à la fin :\n\n"${text}"`,
     });
-    // Access response.text property directly
     return response.text || text;
   } catch (error) {
     console.error("Error improving post:", error);
@@ -44,8 +63,8 @@ export interface SuggestionResult {
 
 export const suggestPartners = async (query: string, currentUser: Profile, allUsers: Profile[]): Promise<SuggestionResult[]> => {
     try {
-        // API key must be obtained exclusively from process.env.API_KEY
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const apiKey = getApiKey();
+        if (!apiKey) return [];
 
         const otherUsers = allUsers.filter(u => u.id !== currentUser.id);
         const userProfilesPrompt = otherUsers.map(user => 
@@ -68,8 +87,9 @@ export const suggestPartners = async (query: string, currentUser: Profile, allUs
             Réponds UNIQUEMENT en JSON (tableau d'objets avec "userId" et "reason").
         `;
         
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-            model: REASONING_MODEL,
+            model: MODEL_NAME,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -78,25 +98,17 @@ export const suggestPartners = async (query: string, currentUser: Profile, allUs
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            userId: {
-                                type: Type.STRING,
-                                description: 'The ID of the suggested user.',
-                            },
-                            reason: {
-                                type: Type.STRING,
-                                description: 'Why this user is a good match for the query.',
-                            }
+                            userId: { type: Type.STRING },
+                            reason: { type: Type.STRING }
                         },
-                        required: ["userId", "reason"],
-                        propertyOrdering: ["userId", "reason"],
+                        required: ["userId", "reason"]
                     }
                 }
             }
         });
 
-        // Access response.text property directly
         let cleanText = (response.text || "[]").trim();
-        // Remove markdown formatting if present
+        // Nettoyage Markdown si nécessaire
         if (cleanText.startsWith('```json')) {
             cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
         } else if (cleanText.startsWith('```')) {

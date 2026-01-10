@@ -4,7 +4,8 @@ import { useAuth } from '../App';
 import { supabase } from '../services/supabase';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 
-const VAPID_PUBLIC_KEY = 'BH0SUDCMUyultes5PbKRTcCnyjDnDUgfUtvkIWBBdVl1pPfmvecGekEjeNKvUhvk2hMGTkROBHrLpf3PWqmuDeQ';
+// REMPLACEZ CETTE VALEUR par la "Public Key" générée par la commande npx web-push generate-vapid-keys
+const VAPID_PUBLIC_KEY = 'BOoFpHfa1Er-uzRd4yHysdloZes9PCkXbalOQwTN9cYyQ5eggzCTzYWt4LZmUDRsD3oPodbazHry6iKIcgRMRQQ';
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -31,18 +32,23 @@ const NotificationsProvider: React.FC = () => {
 
     const subscribeUserToPush = async () => {
         try {
-            console.log("Tentative d'abonnement Push...");
+            console.log("Tentative d'abonnement Push avec la nouvelle clé...");
             const serviceWorker = await navigator.serviceWorker.ready;
             
+            // On force la récupération d'un nouvel abonnement si les clés ont changé
             let subscription = await serviceWorker.pushManager.getSubscription();
 
-            if (!subscription) {
-                console.log("Création d'un nouvel abonnement...");
-                subscription = await serviceWorker.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-                });
+            if (subscription) {
+                // On vérifie si l'abonnement actuel correspond à la clé (si possible)
+                // Sinon, on le désabonne pour recréer proprement
+                await subscription.unsubscribe();
             }
+
+            console.log("Création d'un nouvel abonnement propre...");
+            subscription = await serviceWorker.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
             
             console.log("Abonnement obtenu, enregistrement dans Supabase...");
             await saveSubscription(subscription);
@@ -64,9 +70,8 @@ const NotificationsProvider: React.FC = () => {
 
         if (error) {
             console.error("ERREUR lors de la sauvegarde en base de données:", error.message);
-            alert("Erreur base de données: " + error.message);
         } else {
-            console.log("✅ Abonnement Push enregistré avec succès dans la table push_subscriptions");
+            console.log("✅ Nouvel abonnement Push enregistré avec succès.");
         }
     };
     
@@ -87,8 +92,6 @@ const NotificationsProvider: React.FC = () => {
         setNotificationPermission(permission);
         if (permission === 'granted') {
             await subscribeUserToPush();
-        } else {
-            alert("Vous avez refusé les notifications. Vous devez les autoriser dans les paramètres du site.");
         }
     };
 

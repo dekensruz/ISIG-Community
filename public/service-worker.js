@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'isig-community-v5';
+const CACHE_NAME = 'isig-community-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -38,7 +38,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// --- GESTION DES NOTIFICATIONS PUSH OPTIMISÉE POUR ANDROID ---
+// --- GESTION DES NOTIFICATIONS PUSH AVEC ICONES OFFICIELLES ---
 self.addEventListener('push', event => {
   let data = { title: 'ISIG Community', body: 'Nouveau message reçu.' };
   
@@ -50,19 +50,23 @@ self.addEventListener('push', event => {
     data = { title: 'Notification', body: event.data.text() };
   }
 
+  // URL du logo transparent officiel
+  const logoUrl = 'https://i.ibb.co/d0GY63vw/Logo-transparent.png';
+
   const options = {
     body: data.body,
-    // Utilisation d'icônes simplifiées pour Android
-    icon: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s',
-    badge: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEKe9pUpwKblGupj71Ds69l0lUj5jL-otikA&s',
+    // L'icône ronde/carrée à côté du message
+    icon: logoUrl,
+    // La petite icône dans la barre de statut (doit être transparente)
+    badge: logoUrl,
     vibrate: [200, 100, 200],
-    tag: 'msg-group-' + (data.url || 'default'), // Permet de grouper les notifs
-    renotify: true, // Fait vibrer même si une notif du même tag est déjà là
+    tag: 'isig-notif-' + (data.url || 'default'),
+    renotify: true,
     data: {
       url: data.url || '/'
     },
     actions: [
-      { action: 'open', title: 'Ouvrir' }
+      { action: 'open', title: 'Voir' }
     ]
   };
 

@@ -27,7 +27,7 @@ const UsersPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [followingMap, setFollowingMap] = useState<Map<string, boolean>>(new Map());
-  const [sortBy, setSortBy] = useState<'all' | 'online' | 'active' | 'popular'>('all');
+  const [sortBy, setSortBy] = useState<'online' | 'active' | 'popular'>('active');
   
   const searchTimeout = useRef<number | null>(null);
 
@@ -74,9 +74,7 @@ const UsersPage: React.FC = () => {
       }
 
       // Gestion du tri
-      if (sortBy === 'all') {
-        query = query.order('created_at', { ascending: false });
-      } else if (sortBy === 'online') {
+      if (sortBy === 'online') {
         const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
         query = query.gt('last_seen_at', threeMinsAgo).order('last_seen_at', { ascending: false });
       } else if (sortBy === 'active') {
@@ -191,13 +189,13 @@ const UsersPage: React.FC = () => {
       </div>
 
       <div className="flex justify-center mb-10 animate-fade-in-up">
-          <div className="grid grid-cols-3 sm:flex gap-1 p-1 bg-slate-200/50 rounded-[1.5rem] w-full sm:w-fit shadow-sm">
+          <div className="grid grid-cols-2 sm:flex gap-1 p-1 bg-slate-200/50 rounded-[1.5rem] w-full sm:w-fit shadow-sm">
             <button 
-                onClick={() => setSortBy('all')}
-                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'all' ? 'bg-white text-isig-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setSortBy('active')}
+                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-                <LayoutGrid size={14} />
-                <span>Tous</span>
+                <Sparkles size={14} />
+                <span>Actifs</span>
             </button>
             <button 
                 onClick={() => setSortBy('online')}
@@ -207,16 +205,8 @@ const UsersPage: React.FC = () => {
                 <span>En ligne</span>
             </button>
             <button 
-                onClick={() => setSortBy('active')}
-                className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'active' ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                <Sparkles size={14} />
-                <span>Actifs</span>
-            </button>
-            {/* Sur mobile, on force ce bouton sur la ligne suivante en le centrant */}
-            <button 
                 onClick={() => setSortBy('popular')}
-                className={`col-start-2 sm:col-start-auto flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`col-span-2 sm:col-span-1 flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === 'popular' ? 'bg-white text-isig-orange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <TrendingUp size={14} />
                 <span>Populaires</span>

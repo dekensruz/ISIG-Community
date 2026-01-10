@@ -166,7 +166,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         } else {
             let mediaUrl, mediaType;
             if (file || audioBlob) {
-                // Ensure a valid extension for audio files based on mime type to avoid playback issues on iOS
+                // Prioritize the correct extension for iOS compatibility
                 let extension = 'bin';
                 if (audioBlob) {
                     if (audioBlob.type.includes('mp4') || audioBlob.type.includes('m4a')) extension = 'm4a';
@@ -221,7 +221,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         
-        // iOS/Safari compatibility: Prioritize 'audio/mp4' (AAC) over 'audio/webm'
+        // Robust mime type selection for cross-platform compatibility (iOS needs AAC/MP4)
         const possibleMimeTypes = [
             'audio/mp4',
             'audio/aac',
@@ -239,7 +239,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         }
 
         if (!mimeType) {
-            // Fallback to default browser behavior
             mediaRecorderRef.current = new MediaRecorder(stream);
         } else {
             mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
@@ -252,7 +251,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         mediaRecorderRef.current.onstop = async () => {
             const finalMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
             const blob = new Blob(audioChunksRef.current, { type: finalMimeType });
-            // Only send if recording has some data (at least 500 bytes to avoid empty files)
             if (blob.size > 500) {
                 await handleSendMessage(undefined, blob);
             }
@@ -263,7 +261,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         timerIntervalRef.current = window.setInterval(() => setRecordingTime(p => p + 1), 1000);
     } catch (err) { 
         console.error(err);
-        alert("Microphone inaccessible. Veuillez vérifier les permissions dans les réglages de votre appareil."); 
+        alert("Microphone inaccessible. Vérifiez vos réglages."); 
     }
   };
 

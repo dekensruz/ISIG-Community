@@ -45,7 +45,7 @@ const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boo
                 </div>
                 <div className="flex justify-between items-center mt-1">
                      <p className={`text-xs truncate font-medium ${unread_count > 0 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                        {isLastMessageFromMe && <span className="mr-1">{last_message?.is_read ? <CheckCheck size={14} className="inline text-isig-orange" /> : <CheckCheck size={14} className="inline text-slate-300" />}</span>}
+                        {isLastMessageFromMe && <span className="mr-1">{last_message?.is_read ? <CheckCheck size={14} className="inline text-emerald-500" /> : <CheckCheck size={14} className="inline text-slate-300" />}</span>}
                         {last_message ? (last_message.content || 'Média') : 'Nouvelle conversation'}
                     </p>
                     {unread_count > 0 && (

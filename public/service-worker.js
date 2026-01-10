@@ -1,5 +1,4 @@
-
-const CACHE_NAME = 'isig-community-v6';
+const CACHE_NAME = 'isig-community-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -38,7 +37,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// --- GESTION DES NOTIFICATIONS PUSH AVEC ICONES OFFICIELLES ---
+// --- GESTION DES NOTIFICATIONS PUSH ---
 self.addEventListener('push', event => {
   let data = { title: 'ISIG Community', body: 'Nouveau message reçu.' };
   
@@ -50,15 +49,15 @@ self.addEventListener('push', event => {
     data = { title: 'Notification', body: event.data.text() };
   }
 
-  // URL du logo transparent officiel
-  const logoUrl = 'https://i.ibb.co/d0GY63vw/Logo-transparent.png';
+  // Logo opaque pour la grande icône (à droite de la notification)
+  const opaqueLogo = 'https://i.ibb.co/JRq1fp6C/Logo-isig.jpg';
+  // Logo transparent pour la petite icône (à gauche/badge/barre d'état)
+  const transparentLogo = 'https://i.ibb.co/d0GY63vw/Logo-transparent.png';
 
   const options = {
     body: data.body,
-    // L'icône ronde/carrée à côté du message
-    icon: logoUrl,
-    // La petite icône dans la barre de statut (doit être transparente)
-    badge: logoUrl,
+    icon: opaqueLogo,       // Image riche affichée à droite
+    badge: transparentLogo, // Silhouette affichée à gauche et dans la barre de statut
     vibrate: [200, 100, 200],
     tag: 'isig-notif-' + (data.url || 'default'),
     renotify: true,

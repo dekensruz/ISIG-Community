@@ -95,7 +95,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
                     <FileAudio size={24} className={isOwnMessage ? 'text-white' : 'text-red-500'} />
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-widest">Note vocale</p>
-                        <p className="text-[9px] font-medium opacity-80">Format incompatible sur cet iPhone</p>
+                        <p className="text-[9px] font-medium opacity-80 uppercase">format non prise en charge par cet iphone</p>
                     </div>
                 </div>
                 <a 
@@ -345,7 +345,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     {isOwnMessage && (
-                        <CheckCheck size={14} className={`ml-1 transition-colors duration-300 ${message.is_read ? 'text-emerald-300' : 'text-white/50'}`} />
+                        <CheckCheck size={14} className={`ml-1 transition-colors duration-300`} style={{ color: message.is_read ? '#fff000' : 'rgba(255,255,255,0.5)' }} />
                     )}
                 </div>
             </div>

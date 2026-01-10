@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Profile as ProfileType, Post as PostType } from '../types';
 import Spinner from './Spinner';
-import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X, Search, ChevronDown, UserRound } from 'lucide-react';
+import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X, Search, ChevronDown, UserRound, GraduationCap, School } from 'lucide-react';
 import PostCard from './Post';
 import CreatePost from './CreatePost';
 import Avatar from './Avatar';
@@ -16,6 +16,7 @@ import { PROMOTIONS } from './Auth';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileType | null>(null);
@@ -42,6 +43,16 @@ const Profile: React.FC = () => {
   const editAreaRef = useRef<HTMLDivElement>(null);
 
   const isOwnProfile = session?.user.id === userId;
+
+  // Détecter le mode édition via URL
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true' && isOwnProfile) {
+      setIsEditing(true);
+      // On nettoie l'URL pour ne pas rester en mode edit si on rafraîchit manuellement plus tard
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, isOwnProfile, setSearchParams]);
 
   const fetchProfileData = useCallback(async () => {
     if (!userId) return;
@@ -287,39 +298,51 @@ const Profile: React.FC = () => {
 
                     <div className="mt-6 sm:mt-24 flex-grow text-center sm:text-left min-w-0">
                        {isEditing ? (
-                            <input type="text" name="full_name" value={formData.full_name || ''} onChange={handleInputChange} className="text-3xl font-black text-slate-800 w-full p-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue transition-all" placeholder="Nom complet"/>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nom complet</label>
+                                <input type="text" name="full_name" value={formData.full_name || ''} onChange={handleInputChange} className="text-2xl sm:text-3xl font-black text-slate-800 w-full p-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue transition-all" placeholder="Nom complet"/>
+                            </div>
                         ) : (
                             <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight leading-tight">{profile.full_name}</h1>
                         )}
                         {isEditing ? (
-                            <div className="flex flex-col sm:flex-row gap-3 mt-3">
-                                <input type="text" name="major" value={formData.major || ''} onChange={handleInputChange} placeholder="Filière (ex: Génie Logiciel)" className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full"/>
-                                <div className="relative flex-1">
-                                    <select 
-                                        name="promotion"
-                                        value={formData.promotion || ''} 
-                                        onChange={handleInputChange} 
-                                        className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer"
-                                    >
-                                        <option value="" disabled>Choisir Promotion</option>
-                                        {PROMOTIONS.map(p => (
-                                            <option key={p} value={p}>{p}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center"><School size={12} className="mr-1"/> Filière</label>
+                                    <input type="text" name="major" value={formData.major || ''} onChange={handleInputChange} placeholder="Ex: Génie Logiciel" className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full shadow-sm"/>
                                 </div>
-                                <div className="relative flex-1">
-                                    <select 
-                                        name="gender"
-                                        value={formData.gender || ''} 
-                                        onChange={handleInputChange} 
-                                        className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer"
-                                    >
-                                        <option value="" disabled>Genre</option>
-                                        <option value="M">Homme (M)</option>
-                                        <option value="F">Femme (F)</option>
-                                    </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center"><GraduationCap size={12} className="mr-1"/> Promotion</label>
+                                    <div className="relative">
+                                        <select 
+                                            name="promotion"
+                                            value={formData.promotion || ''} 
+                                            onChange={handleInputChange} 
+                                            className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer shadow-sm pr-10"
+                                        >
+                                            <option value="" disabled>Choisir Promotion</option>
+                                            {PROMOTIONS.map(p => (
+                                                <option key={p} value={p}>{p}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center"><UserRound size={12} className="mr-1"/> Genre</label>
+                                    <div className="relative">
+                                        <select 
+                                            name="gender"
+                                            value={formData.gender || ''} 
+                                            onChange={handleInputChange} 
+                                            className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer shadow-sm pr-10"
+                                        >
+                                            <option value="" disabled>Choisir Genre</option>
+                                            <option value="M">Homme (M)</option>
+                                            <option value="F">Femme (F)</option>
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -392,7 +415,7 @@ const Profile: React.FC = () => {
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Biographie</h3>
                      <div className="text-slate-600 font-medium leading-relaxed italic">
                         {isEditing ? (
-                            <textarea name="bio" value={formData.bio || ''} onChange={handleInputChange} placeholder="Dites-nous en plus sur vous..." className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue transition-all min-h-[100px]"/>
+                            <textarea name="bio" value={formData.bio || ''} onChange={handleInputChange} placeholder="Dites-nous en plus sur vous..." className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue transition-all min-h-[100px] shadow-sm"/>
                         ) : (
                             <p className="whitespace-pre-wrap">{profile.bio || "Pas encore de biographie. L'étudiant mystère !"}</p>
                         )}
@@ -401,13 +424,13 @@ const Profile: React.FC = () => {
                     <div className="mt-6 flex flex-wrap gap-4">
                         {isEditing ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                            <div>
+                            <div className="space-y-1">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Matricule</label>
-                                <input type="text" name="student_id" value={formData.student_id || ''} onChange={handleInputChange} placeholder="Matricule" className="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold"/>
+                                <input type="text" name="student_id" value={formData.student_id || ''} onChange={handleInputChange} placeholder="Matricule" className="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold shadow-sm"/>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Date de naissance</label>
-                                <input type="date" name="birth_date" value={formData.birth_date || ''} onChange={handleInputChange} className="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold"/>
+                                <input type="date" name="birth_date" value={formData.birth_date || ''} onChange={handleInputChange} className="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold shadow-sm"/>
                             </div>
                           </div>
                         ) : (
@@ -425,7 +448,7 @@ const Profile: React.FC = () => {
             <div className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-slate-100">
                 <h3 className="text-lg font-black mb-4 flex items-center text-slate-800 uppercase tracking-tight"><Star className="text-isig-orange mr-3" size={24}/> Compétences</h3>
                 {isEditing ? (
-                    <input type="text" value={skillsStr} onChange={(e) => setSkillsStr(e.target.value)} placeholder="React, Python, UI/UX..." className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm focus:ring-2 focus:ring-isig-blue"/>
+                    <input type="text" value={skillsStr} onChange={(e) => setSkillsStr(e.target.value)} placeholder="React, Python, UI/UX..." className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm focus:ring-2 focus:ring-isig-blue shadow-sm"/>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {(profile.skills && profile.skills.length > 0) ? profile.skills.map(skill => <span key={skill} className="bg-isig-blue/10 text-isig-blue px-4 py-2 text-[10px] font-black rounded-xl uppercase tracking-widest">{skill}</span>) : <p className="text-slate-400 font-medium italic text-sm">Aucune compétence listée.</p>}
@@ -435,7 +458,7 @@ const Profile: React.FC = () => {
             <div className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-slate-100">
                 <h3 className="text-lg font-black mb-4 flex items-center text-slate-800 uppercase tracking-tight"><BookOpen className="text-isig-blue mr-3" size={24}/> Points forts</h3>
                 {isEditing ? (
-                    <input type="text" value={coursesStr} onChange={(e) => setCoursesStr(e.target.value)} placeholder="Algorithmes, Marketing..." className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm focus:ring-2 focus:ring-isig-blue"/>
+                    <input type="text" value={coursesStr} onChange={(e) => setCoursesStr(e.target.value)} placeholder="Algorithmes, Marketing..." className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm focus:ring-2 focus:ring-isig-blue shadow-sm"/>
                 ) : (
                      <div className="flex flex-wrap gap-2">
                          {(profile.courses && profile.courses.length > 0) ? profile.courses.map(course => <span key={course} className="bg-slate-100 text-slate-600 px-4 py-2 text-[10px] font-black rounded-xl uppercase tracking-widest">{course}</span>) : <p className="text-slate-400 font-medium italic text-sm">Aucun point fort listé.</p>}

@@ -40,8 +40,9 @@ const CompleteProfilePopup: React.FC = () => {
     if (!isVisible || loading) return null;
 
     const handleAction = () => {
-        setIsVisible(false);
-        navigate(`/profile/${session?.user.id}`);
+        setIsVisible(false); // Disparaît immédiatement
+        // On ajoute ?edit=true pour que le composant Profile sache qu'il doit s'ouvrir en mode édition
+        navigate(`/profile/${session?.user.id}?edit=true`);
     };
 
     return (
@@ -77,9 +78,9 @@ const CompleteProfilePopup: React.FC = () => {
 
                 <button 
                     onClick={handleAction}
-                    className="mt-10 w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 uppercase tracking-widest text-[11px] group"
+                    className="mt-10 w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 uppercase tracking-widest text-xs group px-6"
                 >
-                    <span>Compléter mon profil</span>
+                    <span className="whitespace-nowrap">Mettre à jour mon profil</span>
                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
             </div>

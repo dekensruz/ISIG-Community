@@ -19,6 +19,10 @@ const isUserOnline = (lastSeenAt?: string | null): boolean => {
 const ConversationListItem: React.FC<{ conversation: Conversation, isActive: boolean }> = ({ conversation, isActive }) => {
     const { session } = useAuth();
     const { other_participant, last_message, unread_count } = conversation;
+    
+    // Sécurité si participant non chargé
+    if (!other_participant) return null;
+
     const isLastMessageFromMe = session?.user && last_message?.sender_id === session.user.id;
     const online = isUserOnline(other_participant.last_seen_at);
     
@@ -73,29 +77,34 @@ const ChatPage: React.FC = () => {
     const fetchConversations = useCallback(async (isInitial = false) => {
         if (!session?.user) return;
         if (isInitial) setLoading(true);
-        const { data, error } = await supabase.rpc('get_user_conversations_with_unread_count');
-        if (!error && data) {
-            const formatted: Conversation[] = data.map((c: any) => ({
-                id: c.conversation_id,
-                created_at: c.created_at,
-                other_participant: {
-                    id: c.participant_id,
-                    full_name: c.participant_full_name,
-                    avatar_url: c.participant_avatar_url,
-                    last_seen_at: c.participant_last_seen_at
-                },
-                last_message: c.last_message_id ? {
-                    id: c.last_message_id,
-                    content: c.last_message_content,
-                    created_at: c.last_message_created_at,
-                    sender_id: c.last_message_sender_id,
-                    is_read: c.last_message_is_read,
-                } : null,
-                unread_count: c.unread_count,
-            }));
-            setConversations(sortConversations(formatted));
+        try {
+            const { data, error } = await supabase.rpc('get_user_conversations_with_unread_count');
+            if (!error && data) {
+                const formatted: Conversation[] = data.map((c: any) => ({
+                    id: c.conversation_id,
+                    created_at: c.created_at,
+                    other_participant: {
+                        id: c.participant_id,
+                        full_name: c.participant_full_name || 'Étudiant',
+                        avatar_url: c.participant_avatar_url,
+                        last_seen_at: c.participant_last_seen_at
+                    },
+                    last_message: c.last_message_id ? {
+                        id: c.last_message_id,
+                        content: c.last_message_content,
+                        created_at: c.last_message_created_at,
+                        sender_id: c.last_message_sender_id,
+                        is_read: c.last_message_is_read,
+                    } : null,
+                    unread_count: c.unread_count || 0,
+                }));
+                setConversations(sortConversations(formatted));
+            }
+        } catch (err) {
+            console.error("Erreur RPC conversations:", err);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [session?.user]);
 
     useEffect(() => {
@@ -112,7 +121,7 @@ const ChatPage: React.FC = () => {
     }, [fetchConversations]);
 
     const filteredConversations = conversations.filter(c => 
-        c.other_participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+        c.other_participant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (

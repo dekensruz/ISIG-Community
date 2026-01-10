@@ -135,6 +135,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, session?.user.id, markMessagesAsRead]);
 
+  const handleDeleteConversation = async () => {
+    if (!window.confirm("Voulez-vous vraiment supprimer cette conversation pour vous ?")) return;
+    try {
+        setLoading(true);
+        // On supprime notre participation (cela cache la conversation dans notre liste)
+        const { error } = await supabase.from('conversation_participants').delete().match({ conversation_id: conversationId, user_id: session?.user.id });
+        if (error) throw error;
+        navigate('/chat');
+    } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la suppression.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent, audioBlob?: Blob) => {
     e?.preventDefault();
     if ((!newMessage.trim() && !file && !audioBlob) || !session?.user || !currentUserProfile) return;
@@ -185,7 +201,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         
-        // Détection du format pour compatibilité iPhone (MP4) vs Android (WebM)
         let mimeType = 'audio/webm';
         if (MediaRecorder.isTypeSupported('audio/mp4')) {
             mimeType = 'audio/mp4';

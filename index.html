@@ -121,6 +121,14 @@
     background: #00AEEF;
   }
 
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   @media screen and (min-width: 320px) and (max-width: 900px) and (orientation: landscape) {
     #landscape-lock {
       display: flex !important;

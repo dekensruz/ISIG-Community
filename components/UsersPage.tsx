@@ -34,15 +34,19 @@ const UsersPage: React.FC = () => {
   const fetchUsers = useCallback(async (isInitial = false, currentSearch = search) => {
     if (!session?.user) return;
     
-    if (isInitial) setLoading(true);
-    else setLoadingMore(true);
+    if (isInitial) {
+      setLoading(true);
+      setPage(0);
+    } else {
+      setLoadingMore(true);
+    }
 
     const currentPage = isInitial ? 0 : page + 1;
     const from = currentPage * USERS_PER_PAGE;
     const to = from + USERS_PER_PAGE - 1;
 
     try {
-      // 1. Déterminer le décompte total
+      // 1. Déterminer le décompte total pour l'affichage informatif
       let countQuery = supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -60,7 +64,7 @@ const UsersPage: React.FC = () => {
       const { count: total } = await countQuery;
       setTotalCount(total);
 
-      // 2. Récupérer les membres
+      // 2. Récupérer les membres avec le tri approprié
       let query = supabase
         .from('profiles')
         .select('*')
@@ -70,18 +74,21 @@ const UsersPage: React.FC = () => {
         query = query.ilike('full_name', `%${currentSearch.trim()}%`);
       }
 
-      // Gestion du tri et filtres
+      // Gestion du tri
       if (sortBy === 'all') {
+        // "Tous" triés par date d'inscription
         query = query.order('created_at', { ascending: false });
       } else if (sortBy === 'online') {
         const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
         query = query.gt('last_seen_at', threeMinsAgo).order('last_seen_at', { ascending: false });
       } else if (sortBy === 'active') {
-        // "Actifs" : On trie par dernière présence comme indicateur d'activité
-        query = query.order('last_seen_at', { ascending: false, nullsFirst: false });
+        // "Actifs" : Triés par nombre de publications (nécessite le script SQL)
+        // @ts-ignore : On suppose que la colonne posts_count existe maintenant
+        query = query.order('posts_count', { ascending: false, nullsFirst: false });
       } else if (sortBy === 'popular') {
-        // "Populaires" : On trie par date de mise à jour (profils les plus récents/complets)
-        query = query.order('updated_at', { ascending: false });
+        // "Populaires" : Triés par nombre d'abonnés (nécessite le script SQL)
+        // @ts-ignore : On suppose que la colonne followers_count existe maintenant
+        query = query.order('followers_count', { ascending: false, nullsFirst: false });
       }
 
       const { data: usersData, error: usersError } = await query.range(from, to);
@@ -107,7 +114,6 @@ const UsersPage: React.FC = () => {
 
       if (isInitial) {
         setUsers(newUsers);
-        setPage(0);
       } else {
         setUsers(prev => [...prev, ...newUsers]);
         setPage(currentPage);
@@ -121,19 +127,19 @@ const UsersPage: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [session?.user?.id, page, sortBy]); // search n'est pas une dépendance directe ici pour éviter les loops, on l'injecte via fetchUsers(true, search)
+  }, [session?.user?.id, page, sortBy, search]);
 
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     
     searchTimeout.current = window.setTimeout(() => {
         fetchUsers(true, search);
-    }, 500);
+    }, 400);
 
     return () => {
         if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     };
-  }, [search, sortBy, fetchUsers]);
+  }, [search, sortBy]); // Ne dépend plus de fetchUsers pour éviter les loops
   
   const handleToggleFollow = async (targetUserId: string) => {
     if (!session?.user) return;

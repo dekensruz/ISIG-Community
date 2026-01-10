@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
@@ -345,7 +344,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     {isOwnMessage && (
-                        <CheckCheck size={16} className={`ml-1 transition-colors duration-300`} style={{ color: message.is_read ? '#fff000' : 'rgba(255,255,255,0.5)' }} />
+                        <CheckCheck size={20} className={`ml-1 transition-colors duration-300`} style={{ color: message.is_read ? '#FFD700' : 'rgba(255,255,255,0.5)' }} />
                     )}
                 </div>
             </div>

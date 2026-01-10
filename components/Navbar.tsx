@@ -99,7 +99,7 @@ const Navbar: React.FC = () => {
           
           <div className="flex items-center space-x-4 flex-1">
             <Link to="/" className="flex items-center space-x-2 flex-shrink-0 transition-transform active:scale-95">
-              <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-sm" />
+              <img src="https://i.ibb.co/h1RW1grw/transparent.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-sm" />
               <span className="hidden sm:block text-xl font-black tracking-tighter text-brand-dark uppercase">
                 ISIG<span className="text-isig-blue">.</span>
               </span>

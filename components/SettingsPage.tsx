@@ -157,7 +157,7 @@ const SettingsPage: React.FC = () => {
         <div className="divide-y divide-slate-50">
             <div className="p-8">
                 <div className="flex items-center space-x-4 mb-6">
-                    <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-16 h-16 drop-shadow-lg" />
+                    <img src="https://i.ibb.co/h1RW1grw/transparent.png" alt="ISIG Logo" className="w-16 h-16 drop-shadow-lg" />
                     <div>
                         <h3 className="text-xl font-black text-slate-800 uppercase italic">ISIG Community</h3>
                     </div>

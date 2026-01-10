@@ -55,6 +55,12 @@ const AuthPage: React.FC = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else if (mode === 'signup') {
+        // Validation du nom complet (au moins deux mots)
+        const nameParts = fullName.trim().split(/\s+/);
+        if (nameParts.length < 2) {
+          throw new Error("Veuillez entrer votre nom complet (Prénom et Nom). Exemple : Dekens Ruzuba");
+        }
+
         if (!gender) throw new Error("Veuillez sélectionner votre genre.");
 
         const { data, error } = await supabase.auth.signUp({
@@ -129,7 +135,7 @@ const AuthPage: React.FC = () => {
 
           <form onSubmit={handleAuth} className="mt-8 space-y-4">
             {error && (
-              <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100 flex items-start animate-pulse">
+              <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100 flex items-start animate-fade-in">
                 <AlertCircle size={18} className="mr-2 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -145,7 +151,7 @@ const AuthPage: React.FC = () => {
               <div className="grid grid-cols-1 gap-4">
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                  <input type="text" placeholder="Nom complet (Ex: Dekens Ruzuba)" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

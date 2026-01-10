@@ -5,13 +5,14 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Profile as ProfileType, Post as PostType } from '../types';
 import Spinner from './Spinner';
-import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X, Search } from 'lucide-react';
+import { Edit, Save, BookOpen, Star, Upload, Camera, Calendar, MessageCircle, UserPlus, UserCheck, X, Search, ChevronDown, UserRound } from 'lucide-react';
 import PostCard from './Post';
 import CreatePost from './CreatePost';
 import Avatar from './Avatar';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import UserListModal from './UserListModal';
+import { PROMOTIONS } from './Auth';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -56,6 +57,7 @@ const Profile: React.FC = () => {
             student_id: profileData.student_id,
             major: profileData.major,
             promotion: profileData.promotion,
+            gender: profileData.gender,
             bio: profileData.bio,
             cover_url: profileData.cover_url,
             birth_date: profileData.birth_date,
@@ -157,7 +159,7 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
   
@@ -292,12 +294,43 @@ const Profile: React.FC = () => {
                         {isEditing ? (
                             <div className="flex flex-col sm:flex-row gap-3 mt-3">
                                 <input type="text" name="major" value={formData.major || ''} onChange={handleInputChange} placeholder="Filière (ex: Génie Logiciel)" className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full"/>
-                                <input type="text" name="promotion" value={formData.promotion || ''} onChange={handleInputChange} placeholder="Promotion (ex: L2)" className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full"/>
+                                <div className="relative flex-1">
+                                    <select 
+                                        name="promotion"
+                                        value={formData.promotion || ''} 
+                                        onChange={handleInputChange} 
+                                        className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer"
+                                    >
+                                        <option value="" disabled>Choisir Promotion</option>
+                                        {PROMOTIONS.map(p => (
+                                            <option key={p} value={p}>{p}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                </div>
+                                <div className="relative flex-1">
+                                    <select 
+                                        name="gender"
+                                        value={formData.gender || ''} 
+                                        onChange={handleInputChange} 
+                                        className="text-sm font-bold p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-isig-blue w-full appearance-none cursor-pointer"
+                                    >
+                                        <option value="" disabled>Genre</option>
+                                        <option value="M">Homme (M)</option>
+                                        <option value="F">Femme (F)</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                </div>
                             </div>
                         ) : (
-                            <div className="flex items-center justify-center sm:justify-start mt-1 space-x-2">
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start mt-1 gap-2">
                                 <span className="text-lg text-isig-blue font-black uppercase tracking-widest text-xs sm:text-sm">{profile.major || 'Étudiant ISIG'}</span>
                                 {profile.promotion && <span className="bg-slate-100 text-slate-500 text-xs font-black px-2 py-1 rounded-lg">{profile.promotion}</span>}
+                                {profile.gender && (
+                                    <span className={`text-xs font-black px-2 py-1 rounded-lg ${profile.gender === 'M' ? 'bg-blue-50 text-blue-500' : 'bg-pink-50 text-pink-500'}`}>
+                                        {profile.gender === 'M' ? 'Homme' : 'Femme'}
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>

@@ -7,6 +7,7 @@ export interface Profile {
   student_id?: string;
   major?: string;
   promotion?: string;
+  gender?: 'M' | 'F';
   skills?: string[];
   courses?: string[];
   bio?: string;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
@@ -25,6 +26,7 @@ import ScrollToTopButton from './components/ScrollToTopButton';
 import UnreadMessagesProvider from './components/UnreadMessagesProvider';
 import NotificationsProvider from './components/NotificationsProvider';
 import InstallPWABanner from './components/InstallPWABanner';
+import CompleteProfilePopup from './components/CompleteProfilePopup';
 
 type AuthContextType = {
   session: Session | null;
@@ -129,6 +131,7 @@ const AppContent: React.FC = () => {
             {session && showScrollButton && <ScrollToTopButton />}
             <InstallPWABanner onComplete={() => {}} />
             {session && !isAuthPage && <NotificationsProvider />}
+            {session && !isAuthPage && <CompleteProfilePopup />}
         </div>
     );
 };

@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useSearchParams } from 'react-router-dom';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown, UserRound } from 'lucide-react';
 import Spinner from './Spinner';
 
-const PROMOTIONS = [
+export const PROMOTIONS = [
     "Licence 1",
     "Licence 2",
     "Licence 3",
@@ -25,6 +25,7 @@ const AuthPage: React.FC = () => {
   const [studentId, setStudentId] = useState('');
   const [major, setMajor] = useState('');
   const [promotion, setPromotion] = useState('');
+  const [gender, setGender] = useState<'M' | 'F' | ''>('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -54,6 +55,8 @@ const AuthPage: React.FC = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else if (mode === 'signup') {
+        if (!gender) throw new Error("Veuillez sélectionner votre genre.");
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -75,6 +78,7 @@ const AuthPage: React.FC = () => {
                 full_name: fullName,
                 major: major,
                 promotion: promotion,
+                gender: gender,
                 avatar_url: avatarUrl,
             }).eq('id', data.user.id);
         }
@@ -100,7 +104,7 @@ const AuthPage: React.FC = () => {
         <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
         <div className="relative z-10">
-          <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
+          <img src="https://i.ibb.co/h1RW1grw/transparent.png" alt="ISIG Logo" className="w-20 h-20 mb-6 drop-shadow-xl" />
           <h1 className="text-5xl font-extrabold text-white leading-tight italic">
             L'intelligence <br/><span className="text-isig-blue text-6xl">collective</span> <br/> de l'ISIG Goma.
           </h1>
@@ -143,6 +147,7 @@ const AuthPage: React.FC = () => {
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
                 </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -156,7 +161,7 @@ const AuthPage: React.FC = () => {
                         className="w-full pl-11 pr-10 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer" 
                         required
                     >
-                        <option value="" disabled>Choisir Promotion</option>
+                        <option value="" disabled>Promotion</option>
                         {PROMOTIONS.map(p => (
                             <option key={p} value={p}>{p}</option>
                         ))}
@@ -164,7 +169,24 @@ const AuthPage: React.FC = () => {
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                   </div>
                 </div>
-                <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                   <div className="relative">
+                      <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                      <select 
+                          value={gender} 
+                          onChange={(e) => setGender(e.target.value as any)} 
+                          className="w-full pl-11 pr-10 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer" 
+                          required
+                      >
+                          <option value="" disabled>Genre</option>
+                          <option value="M">Homme (M)</option>
+                          <option value="F">Femme (F)</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                   </div>
+                </div>
               </div>
             )}
 

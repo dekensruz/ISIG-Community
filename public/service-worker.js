@@ -1,4 +1,4 @@
-const CACHE_NAME = 'isig-community-v7';
+const CACHE_NAME = 'isig-community-v9';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -49,15 +49,15 @@ self.addEventListener('push', event => {
     data = { title: 'Notification', body: event.data.text() };
   }
 
-  // Logo opaque pour la grande icône (à droite de la notification)
-  const opaqueLogo = 'https://i.ibb.co/JRq1fp6C/Logo-isig.jpg';
-  // Logo transparent pour la petite icône (à gauche/badge/barre d'état)
-  const transparentLogo = 'https://i.ibb.co/d0GY63vw/Logo-transparent.png';
+  // Le logo officiel (JPEG) s'affichera en COULEURS sur la droite
+  const officialLogo = 'https://i.ibb.co/JRq1fp6C/Logo-isig.jpg';
+  // Le logo transparent (PNG) servira de silhouette pour le petit cercle à gauche
+  const transparentMask = 'https://i.ibb.co/d0GY63vw/Logo-transparent.png';
 
   const options = {
     body: data.body,
-    icon: opaqueLogo,       // Image riche affichée à droite
-    badge: transparentLogo, // Silhouette affichée à gauche et dans la barre de statut
+    icon: officialLogo,      // S'affiche en couleur à droite
+    badge: transparentMask,  // Silhouette pour la barre d'état et le petit cercle
     vibrate: [200, 100, 200],
     tag: 'isig-notif-' + (data.url || 'default'),
     renotify: true,

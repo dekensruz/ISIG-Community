@@ -211,8 +211,17 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       {post.media_url && (
         <div className="px-6 pb-6">
            {post.media_type === 'image' ? (
-             <div onClick={() => setShowImageModal(true)} className="rounded-[2rem] overflow-hidden cursor-pointer bg-slate-100 aspect-video relative ring-1 ring-slate-100 group/img transition-transform duration-300 active:scale-[0.98]">
-               <img src={post.media_url} alt="Post" className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105" loading="lazy" />
+             <div 
+               onClick={() => setShowImageModal(true)} 
+               className="social-image-container cursor-pointer transition-transform duration-300 active:scale-[0.985] group/img"
+             >
+               <img 
+                 src={post.media_url} 
+                 alt="Post content" 
+                 className="shadow-md"
+                 loading="lazy" 
+               />
+               <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/5 transition-colors duration-300"></div>
              </div>
            ) : (
              <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all active:scale-[0.98]">

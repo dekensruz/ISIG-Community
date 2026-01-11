@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
@@ -69,8 +68,9 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[60vh] animate-fade-in">
-    <div className="w-10 h-10 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
+  <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
+    <div className="w-12 h-12 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
+    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-300">Synchronisation...</p>
   </div>
 );
 
@@ -94,13 +94,20 @@ const AppContent: React.FC = () => {
         return () => clearInterval(interval);
     }, [session]);
 
+    // Force le scroll en haut lors du changement de page (sauf pour le chat)
+    useEffect(() => {
+      if (!isChatConversation) {
+        window.scrollTo(0, 0);
+      }
+    }, [location.pathname, isChatConversation]);
+
     return (
         <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white transition-colors duration-300">
             {showNavBars && <Navbar />}
             <main className={`transition-all duration-500 ease-in-out ${
                 isAuthPage ? "" 
                 : isChatConversation ? "h-screen pt-0 pb-0 overflow-hidden flex flex-col" 
-                : "container mx-auto px-4 pt-24 pb-28 sm:pb-32" 
+                : "container mx-auto px-4 pt-20 sm:pt-24 pb-28 sm:pb-32" 
             }`}>
                 <Suspense fallback={<PageLoader />}>
                     <div 

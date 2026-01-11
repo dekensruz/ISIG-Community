@@ -155,7 +155,7 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
   }, []);
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-soft border border-slate-100 transition-all duration-300 hover:shadow-premium group animate-fade-in-up">
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-slate-100 transition-all duration-300 hover:shadow-premium group animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center min-w-0 flex-1">
           <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-95 shrink-0">
@@ -197,11 +197,17 @@ const GroupPostCard: React.FC<GroupPostCardProps> = ({ post, startWithModalOpen 
       </div>
 
       {post.media_url && (
-        <div className="mb-4 rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100 transition-transform active:scale-[0.98]">
+        <div className="mb-4 social-image-container transition-transform active:scale-[0.985] group/img">
           {post.media_type === 'image' || post.media_type?.startsWith('image/') ? (
-            <img src={post.media_url} alt="Média" className="w-full max-h-[500px] object-cover cursor-pointer transition-transform duration-500 hover:scale-105" onClick={() => setShowImageModal(true)} loading="lazy" />
+            <img 
+              src={post.media_url} 
+              alt="Média" 
+              className="w-full shadow-sm cursor-pointer" 
+              onClick={() => setShowImageModal(true)} 
+              loading="lazy" 
+            />
           ) : (
-            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4 hover:bg-slate-100 transition-colors">
+            <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4 hover:bg-slate-100 transition-colors bg-slate-50 border border-slate-100 rounded-[1.5rem]">
               <FileText size={20} className="text-isig-blue mr-3" />
               <span className="text-slate-800 font-bold text-sm uppercase">Fichier joint</span>
             </a>

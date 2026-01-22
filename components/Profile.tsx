@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -13,16 +12,15 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import UserListModal from './UserListModal';
 import { PROMOTIONS } from './Auth';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<ProfileType | null>(null);
-  const [posts, setPosts] = useState<PostType[]>([]);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(true);
+  const queryClient = useQueryClient();
+  
   const [isEditing, setIsEditing] = useState(false);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
   const [profileSearch, setProfileSearch] = useState('');
@@ -32,107 +30,103 @@ const Profile: React.FC = () => {
   const [skillsStr, setSkillsStr] = useState('');
   const [coursesStr, setCoursesStr] = useState('');
   
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
-  const [followLoading, setFollowLoading] = useState(false);
-
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [userListConfig, setUserListConfig] = useState<{ type: 'followers' | 'following', title: string } | null>(null);
   
   const editAreaRef = useRef<HTMLDivElement>(null);
-
   const isOwnProfile = session?.user.id === userId;
 
   // Détecter le mode édition via URL
   useEffect(() => {
     if (searchParams.get('edit') === 'true' && isOwnProfile) {
       setIsEditing(true);
-      // On nettoie l'URL pour ne pas rester en mode edit si on rafraîchit manuellement plus tard
       searchParams.delete('edit');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, isOwnProfile, setSearchParams]);
 
-  const fetchProfileData = useCallback(async () => {
-    if (!userId) return;
-    try {
-      setLoadingProfile(true);
-      const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (profileError) throw profileError;
+  // Fetch Profile Data
+  const { data: profile, isLoading: loadingProfile } = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: async () => {
+      if (!userId) throw new Error("No user ID");
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      return data as ProfileType;
+    },
+    staleTime: 1000 * 60 * 5, // 5 mins cache
+  });
 
-      if (profileData) {
-        setProfile(profileData);
-        setFormData({
-            full_name: profileData.full_name,
-            student_id: profileData.student_id,
-            major: profileData.major,
-            promotion: profileData.promotion,
-            gender: profileData.gender,
-            bio: profileData.bio,
-            cover_url: profileData.cover_url,
-            birth_date: profileData.birth_date,
-            show_birth_year: profileData.show_birth_year,
-        });
-        setSkillsStr((profileData.skills || []).join(', '));
-        setCoursesStr((profileData.courses || []).join(', '));
-      }
-      
+  // Fetch Posts
+  const { data: posts, isLoading: loadingPosts } = useQuery({
+    queryKey: ['profile-posts', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('posts').select(`*, profiles(*), comments(*, profiles(*)), likes(*)`).eq('user_id', userId).order('created_at', { ascending: false });
+      return (data as PostType[]) || [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // Fetch Follow Counts
+  const { data: followStats } = useQuery({
+    queryKey: ['follow-stats', userId],
+    queryFn: async () => {
       const { count: followers } = await supabase.from('followers').select('*', { count: 'exact' }).eq('following_id', userId);
       const { count: following } = await supabase.from('followers').select('*', { count: 'exact' }).eq('follower_id', userId);
-      setFollowerCount(followers || 0);
-      setFollowingCount(following || 0);
-
+      
+      let isFollowing = false;
       if (session?.user && !isOwnProfile) {
-        const { data: followData } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).maybeSingle();
-        setIsFollowing(!!followData);
-      } else {
-        setIsFollowing(false);
+        const { data } = await supabase.from('followers').select('*').eq('follower_id', session.user.id).eq('following_id', userId).maybeSingle();
+        isFollowing = !!data;
       }
-      
-      setLoadingProfile(false);
-      
-      setLoadingPosts(true);
-      const { data: postsData } = await supabase.from('posts').select(`*, profiles(*), comments(*, profiles(*)), likes(*)`).eq('user_id', userId).order('created_at', { ascending: false });
-      if (postsData) setPosts(postsData as any);
-      setLoadingPosts(false);
+      return { followers: followers || 0, following: following || 0, isFollowing };
+    },
+    enabled: !!userId,
+  });
 
-    } catch (error: any) {
-      console.error('Erreur profil:', error.message);
-      setLoadingProfile(false);
-      setLoadingPosts(false);
-    }
-  }, [userId, session?.user, isOwnProfile]);
-
+  // Update Form Data on Profile Load
   useEffect(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-  
-  const handleUpdateProfile = async () => {
-    if (!isOwnProfile || !session?.user) return;
-    try {
-        setLoadingProfile(true);
-        const updates = {
-            ...formData,
-            skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-            courses: coursesStr.split(',').map(s => s.trim()).filter(Boolean),
-            birth_date: formData.birth_date === '' ? null : formData.birth_date,
-            id: userId,
-            updated_at: new Date(),
-        };
-        const { error } = await supabase.from('profiles').upsert(updates);
-        if (error) throw error;
-        setIsEditing(false);
-        fetchProfileData();
-    } catch (error: any) {
-        alert(error.message);
-    } finally {
-        setLoadingProfile(false);
+    if (profile) {
+      setFormData({
+        full_name: profile.full_name,
+        student_id: profile.student_id,
+        major: profile.major,
+        promotion: profile.promotion,
+        gender: profile.gender,
+        bio: profile.bio,
+        cover_url: profile.cover_url,
+        birth_date: profile.birth_date,
+        show_birth_year: profile.show_birth_year,
+      });
+      setSkillsStr((profile.skills || []).join(', '));
+      setCoursesStr((profile.courses || []).join(', '));
     }
-  }
+  }, [profile]);
+
+  // Update Mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (updates: Partial<ProfileType>) => {
+       const { error } = await supabase.from('profiles').upsert({ ...updates, id: userId, updated_at: new Date() });
+       if (error) throw error;
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+        setIsEditing(false);
+    }
+  });
+
+  const handleUpdateProfile = () => {
+    if (!isOwnProfile || !session?.user) return;
+    updateProfileMutation.mutate({
+        ...formData,
+        skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
+        courses: coursesStr.split(',').map(s => s.trim()).filter(Boolean),
+        birth_date: formData.birth_date === '' ? null : formData.birth_date,
+    });
+  };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile || !session?.user) return;
+    if (!event.target.files?.length || !isOwnProfile || !session?.user) return;
     const file = event.target.files[0];
     const fileName = `avatars/${userId}-${Date.now()}`;
 
@@ -143,16 +137,12 @@ const Profile: React.FC = () => {
         
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
         await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', userId);
-        fetchProfileData();
-    } catch (error: any) {
-        alert(error.message);
-    } finally {
-        setAvatarUploading(false);
-    }
+        queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+    } catch (error: any) { alert(error.message); } finally { setAvatarUploading(false); }
   }
 
   const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !isOwnProfile || !session?.user) return;
+    if (!event.target.files?.length || !isOwnProfile || !session?.user) return;
     const file = event.target.files[0];
     const fileName = `covers/${userId}-${Date.now()}`;
 
@@ -162,85 +152,42 @@ const Profile: React.FC = () => {
       if (error) throw error;
       const { data: urlData } = supabase.storage.from('covers').getPublicUrl(data.path);
       await supabase.from('profiles').update({ cover_url: urlData.publicUrl }).eq('id', userId);
-      fetchProfileData();
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setCoverUploading(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+    } catch (error: any) { alert(error.message); } finally { setCoverUploading(false); }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
   
-  const handleFollow = async () => {
-    if (!session?.user) {
-      navigate('/auth?mode=signup');
-      return;
-    }
-    if (isOwnProfile || followLoading) return;
-    setFollowLoading(true);
-    setIsFollowing(true);
-    setFollowerCount(c => c + 1);
-    const { error } = await supabase.from('followers').insert({ follower_id: session.user.id, following_id: userId });
-    if (error) {
-        setIsFollowing(false);
-        setFollowerCount(c => c - 1);
-    }
-    setFollowLoading(false);
-  };
+  const handleFollowAction = async (action: 'follow' | 'unfollow') => {
+    if (!session?.user) { navigate('/auth?mode=signup'); return; }
+    if (isOwnProfile) return;
 
-  const handleUnfollow = async () => {
-    if (!session?.user) {
-      navigate('/auth?mode=signup');
-      return;
+    // Optimistic update
+    queryClient.setQueryData(['follow-stats', userId], (old: any) => ({
+        ...old,
+        isFollowing: action === 'follow',
+        followers: action === 'follow' ? old.followers + 1 : old.followers - 1
+    }));
+
+    if (action === 'follow') {
+        await supabase.from('followers').insert({ follower_id: session.user.id, following_id: userId });
+    } else {
+        await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: userId });
     }
-    if (isOwnProfile || followLoading) return;
-    setFollowLoading(true);
-    setIsFollowing(false);
-    setFollowerCount(c => c - 1);
-    const { error } = await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: userId });
-     if (error) {
-        setIsFollowing(true);
-        setFollowerCount(c => c + 1);
-    }
-    setFollowLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['follow-stats', userId] });
   };
 
   const handleSendMessage = async () => {
-    if (!session?.user) {
-      navigate('/auth');
-      return;
-    }
+    if (!session?.user) { navigate('/auth'); return; }
     if (!userId || isOwnProfile) return;
-    try {
-      const { data, error } = await supabase.rpc('get_or_create_conversation', { other_user_id: userId });
-      if (error) throw error;
-      if (data) navigate(`/chat/${data}`);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleEditRequested = (post: PostType) => {
-    setEditingPost(post);
-    setTimeout(() => {
-        if (editAreaRef.current) {
-            const textarea = editAreaRef.current.querySelector('textarea');
-            if (textarea) {
-              textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              textarea.focus();
-            } else {
-              const yOffset = -100;
-              const y = editAreaRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
-              window.scrollTo({ top: y, behavior: 'smooth' });
-            }
-        }
-    }, 150);
+    const { data, error } = await supabase.rpc('get_or_create_conversation', { other_user_id: userId });
+    if (!error && data) navigate(`/chat/${data}`);
   };
 
   const filteredPosts = useMemo(() => {
+    if (!posts) return [];
     if (!profileSearch.trim()) return posts;
     return posts.filter(p => p.content.toLowerCase().includes(profileSearch.toLowerCase()));
   }, [posts, profileSearch]);
@@ -364,7 +311,7 @@ const Profile: React.FC = () => {
                                 onClick={() => isEditing ? handleUpdateProfile() : setIsEditing(true)} 
                                 className={`flex-1 sm:flex-none py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all active:scale-95 border ${isEditing ? 'bg-isig-orange text-white border-transparent shadow-lg shadow-isig-orange/20 hover:bg-orange-600' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-100'}`}
                              >
-                                {isEditing ? <><Save size={20} /><span>Sauver</span></> : <><Edit size={20} /><span>Éditer</span></>}
+                                {updateProfileMutation.isPending ? <Spinner /> : isEditing ? <><Save size={20} /><span>Sauver</span></> : <><Edit size={20} /><span>Éditer</span></>}
                             </button>
                         ) : (
                             <div className="flex-1 sm:flex-none flex items-center space-x-3">
@@ -372,15 +319,13 @@ const Profile: React.FC = () => {
                                     <MessageCircle size={20} className="text-isig-blue"/>
                                     <span>Chat</span>
                                 </button>
-                                {isFollowing === null ? (
-                                    <div className="w-24 h-12 bg-slate-50 rounded-2xl animate-pulse"></div>
-                                ) : isFollowing ? (
-                                    <button onClick={handleUnfollow} disabled={followLoading} className="flex-1 py-3 px-6 bg-isig-blue text-white rounded-2xl flex items-center justify-center space-x-2 hover:bg-blue-600 font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg shadow-isig-blue/20">
+                                {followStats?.isFollowing ? (
+                                    <button onClick={() => handleFollowAction('unfollow')} className="flex-1 py-3 px-6 bg-isig-blue text-white rounded-2xl flex items-center justify-center space-x-2 hover:bg-blue-600 font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg shadow-isig-blue/20">
                                         <UserCheck size={20} />
                                         <span>Abonné</span>
                                     </button>
                                 ) : (
-                                    <button onClick={handleFollow} disabled={followLoading} className="flex-1 py-3 px-6 bg-isig-orange text-white rounded-2xl flex items-center justify-center space-x-2 hover:bg-orange-600 font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg shadow-isig-orange/20">
+                                    <button onClick={() => handleFollowAction('follow')} className="flex-1 py-3 px-6 bg-isig-orange text-white rounded-2xl flex items-center justify-center space-x-2 hover:bg-orange-600 font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg shadow-isig-orange/20">
                                         <UserPlus size={20} />
                                         <span>Suivre</span>
                                     </button>
@@ -395,18 +340,18 @@ const Profile: React.FC = () => {
                         onClick={() => setUserListConfig({ type: 'followers', title: 'Abonnés' })}
                         className="text-center sm:text-left group/stat"
                     >
-                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followerCount}</span>
+                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followStats?.followers || 0}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/stat:text-isig-blue/70">Abonnés</span>
                     </button>
                     <button 
                         onClick={() => setUserListConfig({ type: 'following', title: 'Abonnements' })}
                         className="text-center sm:text-left group/stat"
                     >
-                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followingCount}</span>
+                        <span className="block text-xl font-black text-slate-800 group-hover/stat:text-isig-blue transition-colors">{followStats?.following || 0}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/stat:text-isig-blue/70">Abonnements</span>
                     </button>
                     <div className="text-center sm:text-left">
-                        <span className="block text-xl font-black text-slate-800">{posts.length}</span>
+                        <span className="block text-xl font-black text-slate-800">{posts?.length || 0}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Posts</span>
                     </div>
                 </div>
@@ -485,7 +430,10 @@ const Profile: React.FC = () => {
             {isOwnProfile && session?.user && editingPost && (
                 <div className="mb-8">
                   <CreatePost 
-                    onPostCreated={() => { fetchProfileData(); setEditingPost(null); }} 
+                    onPostCreated={() => { 
+                        queryClient.invalidateQueries({ queryKey: ['profile-posts', userId] }); 
+                        setEditingPost(null); 
+                    }} 
                     editingPost={editingPost}
                     onCancelEdit={() => setEditingPost(null)}
                   />
@@ -496,7 +444,7 @@ const Profile: React.FC = () => {
                 <div className="flex justify-center py-10"><Spinner /></div>
             ) : filteredPosts.length > 0 ? (
                 <div className="space-y-8">
-                    {filteredPosts.map(post => <PostCard key={post.id} post={post} onEditRequested={handleEditRequested} />)}
+                    {filteredPosts.map(post => <PostCard key={post.id} post={post} onEditRequested={setEditingPost} />)}
                 </div>
             ) : (
                 <div className="text-center bg-white p-16 rounded-[3rem] shadow-soft border border-slate-100">

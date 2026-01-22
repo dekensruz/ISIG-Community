@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { Post as PostType } from '../types';
 import CreatePost from './CreatePost';
@@ -8,12 +7,8 @@ import Spinner from './Spinner';
 import { useAuth, useSearchFilter } from '../App';
 import { Link } from 'react-router-dom';
 import { Search, X, TrendingUp, Clock, Ghost } from 'lucide-react';
-
-// Cache global simple
-let feedCache: PostType[] = [];
-let popularCache: PostType[] = [];
-let lastFetchTime: number = 0;
-const CACHE_EXPIRATION = 1000 * 60 * 5; // 5 minutes
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInView } from 'react-intersection-observer';
 
 const PostSkeleton = () => (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 animate-pulse shadow-soft mb-8">
@@ -32,169 +27,80 @@ const PostSkeleton = () => (
     </div>
 );
 
+const POSTS_PER_PAGE = 10;
+
 const Feed: React.FC = () => {
   const { session } = useAuth();
-  const [posts, setPosts] = useState<PostType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [editingPost, setEditingPost] = useState<PostType | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
   const { searchQuery, setSearchQuery } = useSearchFilter();
-  
-  const loaderRef = useRef<HTMLDivElement>(null);
-  const isFetchingRef = useRef(false);
-  const POSTS_PER_PAGE = 10;
+  const queryClient = useQueryClient();
+  const { ref, inView } = useInView();
 
-  const fetchPosts = useCallback(async (isInitial = false) => {
-    if (isFetchingRef.current) return;
-    
-    // Si on change de mode de tri en initial, on peut ignorer le cache pour forcer la fluidité/fraîcheur
-    const activeCache = sortBy === 'recent' ? feedCache : popularCache;
+  const fetchPosts = async ({ pageParam = 0 }) => {
+    const from = pageParam * POSTS_PER_PAGE;
+    const to = from + POSTS_PER_PAGE - 1;
 
-    if (isInitial && activeCache.length > 0 && (Date.now() - lastFetchTime < CACHE_EXPIRATION)) {
-        setPosts(activeCache);
-        setLoading(false);
-        // On ne retourne pas ici si on veut forcer le rafraîchissement au changement de sortBy
+    let queryBuilder = supabase
+      .from('posts')
+      .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
+
+    if (sortBy === 'popular') {
+      queryBuilder = queryBuilder
+          .order('likes_count', { ascending: false })
+          .order('created_at', { ascending: false });
+    } else {
+      queryBuilder = queryBuilder.order('created_at', { ascending: false });
     }
 
-    try {
-      isFetchingRef.current = true;
-      if (isInitial) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+    const { data, error } = await queryBuilder.range(from, to);
+    if (error) throw error;
+    return data as PostType[];
+  };
 
-      const currentPage = isInitial ? 0 : page + 1;
-      const from = currentPage * POSTS_PER_PAGE;
-      const to = from + POSTS_PER_PAGE - 1;
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    status,
+  } = useInfiniteQuery({
+    queryKey: ['posts', sortBy],
+    queryFn: fetchPosts,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+        return lastPage.length === POSTS_PER_PAGE ? allPages.length : undefined;
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes avant de revalider
+  });
 
-      let queryBuilder = supabase
-        .from('posts')
-        .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`);
-
-      if (sortBy === 'popular') {
-        // Tri strict par likes_count pour l'onglet populaire
-        queryBuilder = queryBuilder
-            .order('likes_count', { ascending: false })
-            .order('created_at', { ascending: false });
-      } else {
-        queryBuilder = queryBuilder.order('created_at', { ascending: false });
-      }
-
-      const { data, error } = await queryBuilder.range(from, to);
-
-      if (error) throw error;
-      
-      const newPosts = data as any || [];
-      
-      if (isInitial) {
-        setPosts(newPosts);
-        if (sortBy === 'recent') feedCache = newPosts;
-        else popularCache = newPosts;
-        lastFetchTime = Date.now();
-        setPage(0);
-      } else {
-        setPosts(prev => {
-            const combined = [...prev, ...newPosts];
-            const unique = combined.filter((p, idx, self) => 
-                self.findIndex(t => t.id === p.id) === idx
-            );
-            if (sortBy === 'recent') feedCache = unique;
-            else popularCache = unique;
-            return unique;
-        });
-        setPage(currentPage);
-      }
-
-      setHasMore(newPosts.length === POSTS_PER_PAGE);
-
-    } catch (error: any) {
-      console.error('Feed loading error:', error.message);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      isFetchingRef.current = false;
-    }
-  }, [page, sortBy]);
-
-  // Déclencher le fetch au changement de sortBy
+  // Infinite scroll trigger
   useEffect(() => {
-    fetchPosts(true);
-  }, [sortBy]); // Simplifié pour ne dépendre que de sortBy ici
+    if (inView && hasNextPage) {
+        fetchNextPage();
+    }
+  }, [inView, hasNextPage, fetchNextPage]);
 
+  // Realtime subscription setup
   useEffect(() => {
     const channel = supabase
       .channel('feed-realtime-global')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'posts' 
-      }, async (payload) => {
-        const { data } = await supabase
-          .from('posts')
-          .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
-          .eq('id', payload.new.id)
-          .single();
-        
-        if (data) {
-          setPosts(prev => {
-            if (prev.some(p => p.id === data.id)) return prev;
-            return [data as any, ...prev];
-          });
-        }
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
-        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
-        const { data } = await supabase
-          .from('posts')
-          .select(`*, profiles(*), comments(*, profiles(*)), likes(*)`)
-          .eq('id', payload.new.id)
-          .single();
-        if (data) {
-          setPosts(prev => prev.map(p => p.id === data.id ? data as any : p));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        // Invalidate query to trigger refetch in background
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hasMore || loading || loadingMore || searchQuery) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !isFetchingRef.current) {
-        fetchPosts(false);
-      }
-    }, { threshold: 0.1 });
-
-    if (loaderRef.current) {
-      observer.observe(loaderRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, searchQuery, fetchPosts]);
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const handlePostCreated = (newPost?: PostType) => {
     if (newPost) {
-        setPosts(prev => {
-            if (editingPost) {
-                return prev.map(p => p.id === newPost.id ? newPost : p);
-            } else {
-                if (prev.some(p => p.id === newPost.id)) return prev;
-                return [newPost, ...prev];
-            }
-        });
+        // Optimistic update if needed, or simple invalidation
         setEditingPost(null);
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
     } else {
-        fetchPosts(true);
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
         setEditingPost(null);
     }
   };
@@ -204,14 +110,19 @@ const Feed: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Flatten pages for rendering
+  const allPosts = useMemo(() => {
+      return data?.pages.flat() || [];
+  }, [data]);
+
   const filteredPosts = useMemo(() => {
-    if (!searchQuery.trim()) return posts;
+    if (!searchQuery.trim()) return allPosts;
     const q = searchQuery.toLowerCase();
-    return posts.filter(post => 
+    return allPosts.filter(post => 
       post.content.toLowerCase().includes(q) || 
       post.profiles.full_name.toLowerCase().includes(q)
     );
-  }, [posts, searchQuery]);
+  }, [allPosts, searchQuery]);
 
   return (
     <div className="max-w-3xl mx-auto w-full transition-all duration-300">
@@ -271,10 +182,12 @@ const Feed: React.FC = () => {
         )}
 
         <div className="space-y-8 pb-10">
-          {loading ? (
+          {status === 'pending' ? (
              <div className="space-y-8">
                 {[1, 2, 3].map(i => <PostSkeleton key={i} />)}
              </div>
+          ) : status === 'error' ? (
+              <div className="text-center p-8 text-red-500 font-bold bg-white rounded-3xl">Erreur de chargement.</div>
           ) : filteredPosts.length > 0 ? (
             <>
               {filteredPosts.map((post, index) => (
@@ -286,10 +199,12 @@ const Feed: React.FC = () => {
                   <PostCard post={post} onEditRequested={handleEditRequested} />
                 </div>
               ))}
-              {hasMore && !searchQuery && (
-                <div ref={loaderRef} className="h-24 flex items-center justify-center">
-                    {loadingMore ? <Spinner /> : <div className="w-1.5 h-1.5 bg-slate-200 rounded-full animate-bounce"></div>}
-                </div>
+              
+              {/* Infinite scroll loader */}
+              {!searchQuery && (
+                  <div ref={ref} className="h-24 flex items-center justify-center">
+                    {isFetchingNextPage ? <Spinner /> : hasNextPage ? <div className="w-1.5 h-1.5 bg-slate-200 rounded-full animate-bounce"></div> : null}
+                  </div>
               )}
             </>
           ) : (

@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle, MessageSquareText, Lock, LayoutDashboard, ChevronDown, ChevronUp, Scale } from 'lucide-react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
 
 const SettingsPage: React.FC = () => {
   const { session } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   
   const [profile, setProfile] = useState<any>(null);
   const [isPassExpanded, setIsPassExpanded] = useState(false);
@@ -28,6 +28,16 @@ const SettingsPage: React.FC = () => {
             .then(({ data }) => setProfile(data));
     }
   }, [session]);
+
+  // Ouverture automatique si redirection depuis "Mot de passe oublié"
+  useEffect(() => {
+    if (searchParams.get('view') === 'password') {
+        setIsPassExpanded(true);
+        // Optionnel : Scroll vers la section
+        const element = document.getElementById('password-section');
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [searchParams]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -97,7 +107,7 @@ const SettingsPage: React.FC = () => {
         <div className="divide-y divide-slate-50">
             <SettingItem icon={<User size={20}/>} title="Éditer le profil" subtitle="Changer nom, bio et photos" to={`/profile/${session?.user.id}`} />
             
-            <div className="bg-white border-b border-slate-50">
+            <div className="bg-white border-b border-slate-50" id="password-section">
                 <button 
                     onClick={() => setIsPassExpanded(!isPassExpanded)}
                     className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"

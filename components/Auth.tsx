@@ -38,10 +38,12 @@ const AuthPage: React.FC = () => {
   }, [searchParams]);
 
   const getFriendlyErrorMessage = (err: any) => {
-    const msg = err.message || '';
-    if (msg.includes('Invalid login credentials')) return "Email ou mot de passe incorrect.";
+    const msg = (err.message || '').toLowerCase();
+    if (msg.includes('invalid login credentials')) return "Email ou mot de passe incorrect.";
     if (msg.includes('already registered')) return "Cet email est déjà utilisé par un autre étudiant.";
-    return msg || "Une erreur est survenue. Veuillez réessayer.";
+    // Gestion spécifique pour l'email introuvable lors de la récupération
+    if (msg.includes('user not found') || msg.includes('invalid email')) return "Email introuvable.";
+    return err.message || "Une erreur est survenue. Veuillez réessayer.";
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -90,9 +92,16 @@ const AuthPage: React.FC = () => {
         }
         setMessage('Vérifiez votre boîte mail pour confirmer votre inscription.');
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        // Mode Récupération de mot de passe
+        // On vérifie d'abord si l'email semble valide (optionnel, Supabase le fait aussi)
+        if (!email) throw new Error("Veuillez entrer votre adresse email.");
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/settings?view=password`,
+        });
+        
         if (error) throw error;
-        setMessage('Lien de récupération envoyé !');
+        setMessage('Lien de récupération envoyé sur votre boîte mail.');
       }
     } catch (err: any) {
       setError(getFriendlyErrorMessage(err));

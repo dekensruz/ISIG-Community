@@ -210,6 +210,17 @@ const AuthPage: React.FC = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                {isLogin && (
+                    <div className="flex justify-end">
+                        <button 
+                            type="button" 
+                            onClick={() => setMode('forgot')} 
+                            className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors"
+                        >
+                            Mot de passe oublié ?
+                        </button>
+                    </div>
+                )}
               </div>
             )}
 

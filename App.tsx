@@ -2,6 +2,7 @@ import React, { useState, useEffect, createContext, useContext, lazy, Suspense }
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Spinner from './components/Spinner';
 
 // Lazy loading des pages
@@ -26,6 +27,19 @@ import UnreadMessagesProvider from './components/UnreadMessagesProvider';
 import NotificationsProvider from './components/NotificationsProvider';
 import InstallPWABanner from './components/InstallPWABanner';
 import CompleteProfilePopup from './components/CompleteProfilePopup';
+
+// Configuration du cache : Les données restent "fraîches" pendant 5 minutes.
+// Cela empêche le rechargement lors de la navigation rapide.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes de conservation en mémoire
+      refetchOnWindowFocus: false, // Évite de recharger si on change d'onglet
+      retry: 1,
+    },
+  },
+});
 
 type AuthContextType = {
   session: Session | null;
@@ -70,7 +84,7 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 const PageLoader = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
     <div className="w-12 h-12 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
-    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-300">Synchronisation...</p>
+    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-300">Chargement...</p>
   </div>
 );
 
@@ -94,7 +108,7 @@ const AppContent: React.FC = () => {
         return () => clearInterval(interval);
     }, [session]);
 
-    // Force le scroll en haut lors du changement de page (sauf pour le chat)
+    // Scroll en haut lors du changement de page (sauf chat et retour arrière intelligent)
     useEffect(() => {
       if (!isChatConversation) {
         window.scrollTo(0, 0);
@@ -181,15 +195,17 @@ const App: React.FC = () => {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading }}>
-        <BrowserRouter>
-            <SearchFilterProvider>
-                <UnreadMessagesProvider>
-                    <AppContent />
-                </UnreadMessagesProvider>
-            </SearchFilterProvider>
-        </BrowserRouter>
-    </AuthContext.Provider>
+    <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider value={{ session, loading }}>
+            <BrowserRouter>
+                <SearchFilterProvider>
+                    <UnreadMessagesProvider>
+                        <AppContent />
+                    </UnreadMessagesProvider>
+                </SearchFilterProvider>
+            </BrowserRouter>
+        </AuthContext.Provider>
+    </QueryClientProvider>
   );
 };
 

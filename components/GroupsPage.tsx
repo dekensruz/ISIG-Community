@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { Group } from '../types';
 import { Link } from 'react-router-dom';
@@ -7,50 +6,32 @@ import Spinner from './Spinner';
 import { Plus, Users, Lock, Search } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import Avatar from './Avatar';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const GroupsPage: React.FC = () => {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [search, setSearch] = useState('');
+  const queryClient = useQueryClient();
 
-  const fetchGroups = useCallback(async () => {
-    try {
+  const { data: groups, isLoading } = useQuery({
+    queryKey: ['groups'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('groups')
         .select(`*, profiles:created_by(*), group_members(*)`)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      if (data) setGroups(data as any);
+      return data as Group[];
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+  });
 
-    } catch (error: any) {
-      console.error("Error fetching groups:", error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const filteredGroups = groups?.filter(g => g.name.toLowerCase().includes(search.toLowerCase())) || [];
 
-  useEffect(() => {
-    fetchGroups();
-    
-    // On écoute les changements sur les groupes ET sur les membres
-    const channel = supabase
-      .channel('groups_list_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
-        fetchGroups();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
-        fetchGroups();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchGroups]);
-
-  const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()));
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['groups'] });
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -81,7 +62,7 @@ const GroupsPage: React.FC = () => {
         </div>
       </div>
       
-      {loading && groups.length === 0 ? (
+      {isLoading ? (
         <div className="flex justify-center mt-20"><Spinner /></div>
       ) : (
         filteredGroups.length > 0 ? (
@@ -117,7 +98,7 @@ const GroupsPage: React.FC = () => {
         )
       )}
       
-      {showCreateModal && <CreateGroupModal onClose={() => { setShowCreateModal(false); fetchGroups(); }} />}
+      {showCreateModal && <CreateGroupModal onClose={() => { setShowCreateModal(false); handleRefresh(); }} />}
     </div>
   );
 };

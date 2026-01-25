@@ -255,7 +255,7 @@ const AuthPage: React.FC = () => {
               className="flex items-center justify-center p-4 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md hover:border-isig-blue/30 transition-all group"
             >
                 <img 
-                    src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
+                    src="https://i.ibb.co/YKf7kvx/527452060-602830646229470-3538579722418400104-n.jpg" 
                     alt="Dekens Ruzuba" 
                     className="w-10 h-10 rounded-2xl object-cover shadow-sm ring-2 ring-slate-50 group-hover:scale-105 transition-transform" 
                 />

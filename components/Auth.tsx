@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useSearchParams } from 'react-router-dom';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown, UserRound } from 'lucide-react';
+import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown, UserRound, ExternalLink } from 'lucide-react';
 import Spinner from './Spinner';
 
 export const PROMOTIONS = [
@@ -130,8 +130,8 @@ const AuthPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-md space-y-8 animate-fade-in-up">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto">
+        <div className="w-full max-w-md space-y-8 animate-fade-in-up py-8">
           <div className="lg:hidden flex justify-center mb-6">
             <img src="https://i.ibb.co/d0GY63vw/Logo-transparent.png" alt="ISIG Logo" className="w-20 h-20 drop-shadow-xl" />
           </div>
@@ -245,6 +245,27 @@ const AuthPage: React.FC = () => {
                 {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
             </button>
           </p>
+
+          <div className="mt-12 pt-8 border-t border-slate-100/50">
+            <p className="text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Créé par</p>
+            <a 
+              href="http://portfoliodek.netlify.app/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center justify-center p-4 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md hover:border-isig-blue/30 transition-all group"
+            >
+                <img 
+                    src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" 
+                    alt="Dekens Ruzuba" 
+                    className="w-10 h-10 rounded-2xl object-cover shadow-sm ring-2 ring-slate-50 group-hover:scale-105 transition-transform" 
+                />
+                <div className="ml-4 text-left">
+                    <p className="font-black text-slate-800 text-xs">Dekens Ruzuba</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide group-hover:text-isig-blue transition-colors">Software Engineer</p>
+                </div>
+                <ExternalLink size={16} className="ml-auto text-slate-300 group-hover:text-isig-blue transition-colors" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

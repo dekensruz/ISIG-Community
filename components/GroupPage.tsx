@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -39,6 +40,7 @@ const GroupPage: React.FC = () => {
   const isOwner = session?.user.id === group?.created_by;
   const isAdmin = members.find(m => m.user_id === session?.user.id)?.role === 'admin';
   const canManageGroup = isOwner || isAdmin;
+  const modalRoot = document.getElementById('modal-root');
 
   const fetchGroupData = useCallback(async () => {
     if (!groupId || !session?.user) return;
@@ -218,20 +220,21 @@ const GroupPage: React.FC = () => {
       {showEditModal && <EditGroupModal group={group} onClose={() => setShowEditModal(false)} onGroupUpdated={fetchGroupData} onGroupDeleted={() => navigate('/groups')} />}
       {showMembersModal && <GroupMembersModal group={group} initialMembers={members} initialRequests={joinRequests} isAdmin={canManageGroup} onClose={() => setShowMembersModal(false)} onMembersUpdate={fetchGroupData} />}
       
-      {showAvatarModal && (
+      {showAvatarModal && modalRoot && createPortal(
         <div 
-            className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center backdrop-blur-md overflow-hidden" 
+            className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center backdrop-blur-md" 
             onClick={() => setShowAvatarModal(false)}
         >
             <img 
                 src={group.avatar_url || ''} 
-                className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in-up" 
+                className="max-w-full max-h-full object-contain animate-fade-in" 
                 alt="Avatar"
             />
             <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors bg-white/10 p-3 rounded-full">
                 <X size={32} />
             </button>
-        </div>
+        </div>,
+        modalRoot
       )}
     </div>
   );

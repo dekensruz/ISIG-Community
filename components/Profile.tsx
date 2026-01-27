@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
@@ -36,6 +37,7 @@ const Profile: React.FC = () => {
   
   const editAreaRef = useRef<HTMLDivElement>(null);
   const isOwnProfile = session?.user.id === userId;
+  const modalRoot = document.getElementById('modal-root');
 
   // Détecter le mode édition via URL
   useEffect(() => {
@@ -455,20 +457,21 @@ const Profile: React.FC = () => {
         </div>
     </div>
 
-    {modalImage && (
+    {modalImage && modalRoot && createPortal(
         <div 
-            className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center backdrop-blur-md overflow-hidden" 
+            className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center backdrop-blur-md" 
             onClick={() => setModalImage(null)}
         >
             <img 
                 src={modalImage} 
                 alt="Vue agrandie" 
-                className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in-up"
+                className="max-w-full max-h-full object-contain animate-fade-in"
             />
             <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors bg-white/10 p-3 rounded-full">
                 <X size={32} />
             </button>
-        </div>
+        </div>,
+        modalRoot
     )}
 
     {userListConfig && (

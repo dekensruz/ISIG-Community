@@ -4,8 +4,9 @@ import { supabase } from '../services/supabase';
 import { useAuth, useSearchFilter } from '../App';
 import { Link, useNavigate } from 'react-router-dom';
 import { Profile } from '../types';
-import { User, LogOut, Search, Bell, LayoutGrid, Settings } from 'lucide-react';
+import { User, LogOut, Search, Bell, LayoutGrid, Settings, Wand2 } from 'lucide-react';
 import Avatar from './Avatar';
+import SuggestionModal from './SuggestionModal';
 
 const Navbar: React.FC = () => {
   const { session, loading: authLoading } = useAuth();
@@ -13,6 +14,7 @@ const Navbar: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const { searchQuery, setSearchQuery } = useSearchFilter();
 
@@ -93,6 +95,7 @@ const Navbar: React.FC = () => {
   const isReallyLoading = authLoading || (session && profileLoading);
 
   return (
+    <>
     <nav className="glass fixed top-0 w-full z-40 border-b border-slate-200/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 sm:h-20">
@@ -118,6 +121,17 @@ const Navbar: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-3">
+            {/* Bouton IA */}
+            {profile && (
+                <button 
+                    onClick={() => setSuggestionModalOpen(true)}
+                    className="p-2.5 text-isig-orange hover:bg-isig-orange/10 rounded-2xl transition-all active:scale-90 flex items-center justify-center"
+                    title="Assistant IA"
+                >
+                    <Wand2 size={22} />
+                </button>
+            )}
+
             <Link to="/groups" className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-2xl transition-all active:scale-90" title="Groupes">
               <LayoutGrid size={22} />
             </Link>
@@ -170,6 +184,14 @@ const Navbar: React.FC = () => {
         </div>
       </div>
     </nav>
+    
+    {suggestionModalOpen && profile && (
+        <SuggestionModal 
+            currentUser={profile} 
+            onClose={() => setSuggestionModalOpen(false)} 
+        />
+    )}
+    </>
   );
 };
 

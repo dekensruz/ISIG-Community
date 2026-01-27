@@ -217,9 +217,20 @@ const GroupPage: React.FC = () => {
 
       {showEditModal && <EditGroupModal group={group} onClose={() => setShowEditModal(false)} onGroupUpdated={fetchGroupData} onGroupDeleted={() => navigate('/groups')} />}
       {showMembersModal && <GroupMembersModal group={group} initialMembers={members} initialRequests={joinRequests} isAdmin={canManageGroup} onClose={() => setShowMembersModal(false)} onMembersUpdate={fetchGroupData} />}
+      
       {showAvatarModal && (
-        <div className="fixed inset-0 bg-brand-dark/95 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setShowAvatarModal(false)}>
-            <img src={group.avatar_url || ''} className="max-w-full max-h-[80vh] rounded-3xl shadow-2xl animate-fade-in-up" alt="Avatar"/>
+        <div 
+            className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center backdrop-blur-md overflow-hidden" 
+            onClick={() => setShowAvatarModal(false)}
+        >
+            <img 
+                src={group.avatar_url || ''} 
+                className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in-up" 
+                alt="Avatar"
+            />
+            <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors bg-white/10 p-3 rounded-full">
+                <X size={32} />
+            </button>
         </div>
       )}
     </div>

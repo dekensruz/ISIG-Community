@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -455,8 +456,15 @@ const Profile: React.FC = () => {
     </div>
 
     {modalImage && (
-        <div className="fixed inset-0 bg-brand-dark/95 z-[100] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setModalImage(null)}>
-            <img src={modalImage} alt="Vue agrandie" className="max-w-full max-h-full object-contain rounded-3xl shadow-2xl animate-fade-in-up"/>
+        <div 
+            className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center backdrop-blur-md overflow-hidden" 
+            onClick={() => setModalImage(null)}
+        >
+            <img 
+                src={modalImage} 
+                alt="Vue agrandie" 
+                className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in-up"
+            />
             <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors bg-white/10 p-3 rounded-full">
                 <X size={32} />
             </button>

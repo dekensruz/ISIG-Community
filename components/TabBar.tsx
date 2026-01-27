@@ -1,12 +1,9 @@
 
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, MessageSquare, Wand2, PlusSquare } from 'lucide-react';
+import { Home, Users, MessageSquare, PlusSquare, Search } from 'lucide-react';
 import { useAuth } from '../App';
-import SuggestionModal from './SuggestionModal';
 import CreatePostModal from './CreatePostModal';
-import { supabase } from '../services/supabase';
-import { Profile } from '../types';
 import { useUnreadMessages } from './UnreadMessagesProvider';
 
 const TabBar: React.FC = () => {
@@ -14,21 +11,7 @@ const TabBar: React.FC = () => {
     const navigate = useNavigate();
     const { unreadCount: unreadMessagesCount } = useUnreadMessages();
     
-    const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     const [createModalOpen, setCreateModalOpen] = useState(false);
-    const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
-
-    const openSuggestionModal = async () => {
-        if (!session?.user) {
-            navigate('/auth');
-            return;
-        }
-        if (!currentUserProfile) {
-            const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-            if (data) setCurrentUserProfile(data);
-        }
-        setSuggestionModalOpen(true);
-    };
 
     const openCreateModal = () => {
         if (!session?.user) {
@@ -40,7 +23,7 @@ const TabBar: React.FC = () => {
 
     const navLinkClasses = "relative flex flex-col items-center justify-center text-slate-400 hover:text-isig-blue transition-all duration-200 active:scale-90 group py-1";
     const activeNavLinkClasses = "text-isig-blue";
-    const iconSize = 20; // Réduction de la taille des icônes
+    const iconSize = 20;
 
     return (
         <>
@@ -55,15 +38,15 @@ const TabBar: React.FC = () => {
                         <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">Accueil</span>
                     </NavLink>
 
-                    {/* 2. Groupes */}
-                    <NavLink to={session ? "/groups" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-                        <div className={`p-1.5 rounded-xl transition-colors ${location.pathname.startsWith('/group') ? 'bg-isig-blue/5' : ''}`}>
+                    {/* 2. Membres (Réintégré) */}
+                    <NavLink to={session ? "/users" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                        <div className={`p-1.5 rounded-xl transition-colors ${location.pathname === '/users' ? 'bg-isig-blue/5' : ''}`}>
                             <Users size={iconSize} className="group-[.active]:fill-isig-blue/20" strokeWidth={2.5} />
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">Groupes</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">Membres</span>
                     </NavLink>
 
-                    {/* 3. Chat (Au milieu comme demandé) */}
+                    {/* 3. Chat (Au milieu) */}
                     <NavLink to={session ? "/chat" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''} -mt-6`}>
                         <div className="p-3 bg-isig-blue rounded-full text-white shadow-lg shadow-isig-blue/30 ring-4 ring-white transition-transform group-active:scale-95">
                             <MessageSquare size={22} fill="white" strokeWidth={2.5} />
@@ -76,7 +59,15 @@ const TabBar: React.FC = () => {
                         <span className="text-[9px] font-black uppercase tracking-widest mt-1 text-slate-500 group-[.active]:text-isig-blue">Chat</span>
                     </NavLink>
 
-                    {/* 4. Créer (Nouveau bouton) */}
+                    {/* 4. Groupes */}
+                    <NavLink to={session ? "/groups" : "/auth"} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                        <div className={`p-1.5 rounded-xl transition-colors ${location.pathname.startsWith('/group') ? 'bg-isig-blue/5' : ''}`}>
+                            <Users size={iconSize} className="group-[.active]:fill-isig-blue/20" strokeWidth={2.5} />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">Groupes</span>
+                    </NavLink>
+
+                    {/* 5. Créer (Bouton d'action) */}
                     <button onClick={openCreateModal} className={navLinkClasses}>
                         <div className="p-1.5 rounded-xl transition-colors hover:bg-slate-50">
                             <PlusSquare size={iconSize} strokeWidth={2.5} />
@@ -84,25 +75,10 @@ const TabBar: React.FC = () => {
                         <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">Créer</span>
                     </button>
 
-                    {/* 5. IA */}
-                    <button onClick={openSuggestionModal} className={navLinkClasses}>
-                        <div className="p-1.5 rounded-xl transition-colors hover:bg-slate-50">
-                            <Wand2 size={iconSize} strokeWidth={2.5} />
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">IA</span>
-                    </button>
-
                 </div>
             </div>
 
             {/* Modals */}
-             {suggestionModalOpen && currentUserProfile && (
-                <SuggestionModal 
-                    currentUser={currentUserProfile} 
-                    onClose={() => setSuggestionModalOpen(false)} 
-                />
-            )}
-            
             {createModalOpen && (
                 <CreatePostModal onClose={() => setCreateModalOpen(false)} />
             )}

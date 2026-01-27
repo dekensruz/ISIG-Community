@@ -25,7 +25,16 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      const scrollHeight = textarea.scrollHeight;
+      // Limite la hauteur automatique pour forcer le scroll si trop long
+      // 50vh permet de garder le bouton visible sur mobile
+      if (scrollHeight > window.innerHeight * 0.4) {
+        textarea.style.height = '40vh';
+        textarea.style.overflowY = 'auto';
+      } else {
+        textarea.style.height = `${scrollHeight}px`;
+        textarea.style.overflowY = 'hidden';
+      }
     }
   };
 
@@ -42,7 +51,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
         setContent('');
         setPreviewUrl(null);
         setFile(null);
-        if (textareaRef.current) textareaRef.current.style.height = '120px';
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '120px';
+            textareaRef.current.style.overflowY = 'hidden';
+        }
     }
   }, [editingPost]);
 
@@ -144,9 +156,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
   return (
     <form 
       onSubmit={(e) => e.preventDefault()}
-      className={`bg-white p-6 rounded-[2rem] shadow-soft border transition-all duration-500 animate-fade-in-up ${editingPost ? 'ring-2 ring-isig-blue border-transparent' : 'border-slate-100'}`}
+      className={`bg-white p-6 rounded-[2rem] shadow-soft border transition-all duration-500 animate-fade-in-up flex flex-col max-h-[85vh] ${editingPost ? 'ring-2 ring-isig-blue border-transparent' : 'border-slate-100'}`}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 shrink-0">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
               {editingPost ? 'Modification en cours' : 'Nouvelle publication'}
           </h3>
@@ -158,10 +170,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
           )}
       </div>
 
-      <div className="relative">
+      <div className="relative flex-1 min-h-0 flex flex-col">
         <textarea
             ref={textareaRef}
-            className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all overflow-hidden"
+            className="w-full p-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none resize-none font-medium text-slate-700 min-h-[120px] transition-all"
             placeholder="Partagez une astuce, une question ou un projet..."
             value={content}
             onChange={(e) => {
@@ -169,29 +181,29 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
               adjustHeight();
             }}
         />
+        
+        {previewUrl && (
+            <div className="mt-4 relative inline-block group animate-fade-in shrink-0">
+                {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
+                    <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md object-contain" />
+                ) : (
+                    <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <FileText className="text-isig-blue mr-3" />
+                        <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file?.name || 'Fichier attaché'}</p>
+                    </div>
+                )}
+                <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
+                >
+                <X size={16} />
+                </button>
+            </div>
+        )}
       </div>
-      
-      {previewUrl && (
-        <div className="mt-4 relative inline-block group animate-fade-in">
-            {(editingPost?.media_type === 'image' || (file && file.type.startsWith('image/')) || previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.includes('storage')) ? (
-                <img src={previewUrl} alt="Aperçu" className="rounded-2xl max-h-48 w-auto shadow-md" />
-            ) : (
-                <div className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <FileText className="text-isig-blue mr-3" />
-                    <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{file?.name || 'Fichier attaché'}</p>
-                </div>
-            )}
-            <button
-              type="button"
-              onClick={handleRemoveFile}
-              className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
-            >
-              <X size={16} />
-            </button>
-        </div>
-      )}
 
-      <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
+      <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50 shrink-0">
         <div className="flex space-x-2">
            <label 
             htmlFor="file-input-feed"
@@ -217,7 +229,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, editingPost, onC
           {uploading ? <Spinner /> : (editingPost ? <><Send size={14}/><span>Mettre à jour</span></> : 'Publier')}
         </button>
       </div>
-      {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2">{error}</p>}
+      {error && <p className="text-red-500 text-[10px] font-bold mt-3 ml-2 shrink-0">{error}</p>}
     </form>
   );
 };

@@ -40,3 +40,21 @@ export const supabase = createClient(
     }
   }
 );
+
+// Fonction utilitaire pour optimiser les images via Supabase Image Transformation
+// Cela permet de ne pas charger des images 4K pour des avatars de 50px
+export const getOptimizedImageUrl = (url: string | undefined | null, width: number = 500, quality: number = 80): string | undefined => {
+  if (!url) return undefined;
+  
+  // Si l'URL ne vient pas du stockage Supabase de ce projet, on la retourne telle quelle
+  if (!url.includes(supabaseUrl)) return url;
+  
+  // Si c'est déjà une URL transformée, on évite la duplication (check basique)
+  if (url.includes('?')) return url;
+
+  // On ajoute les paramètres de transformation
+  // resize=cover permet de garder le ratio en remplissant la box
+  // format=origin permet à Supabase de servir du WebP si le navigateur le supporte (automatique souvent) 
+  // ou on force format=webp pour la perf.
+  return `${url}?width=${width}&quality=${quality}&resize=cover&format=webp`;
+};

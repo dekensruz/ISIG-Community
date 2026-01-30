@@ -166,28 +166,6 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
-  @media screen and (min-width: 320px) and (max-width: 900px) and (orientation: landscape) {
-    #landscape-lock {
-      display: flex !important;
-    }
-    #root {
-      display: none !important;
-    }
-  }
-  #landscape-lock {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: #0F172A;
-    color: white;
-    z-index: 9999;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-  }
   
   /* Amélioration des transitions de page */
   .page-transition {
@@ -210,9 +188,16 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    border-radius: 2rem;
+    border-radius: 1.5rem; /* Ajusté pour mobile */
     background-color: #f1f5f9;
   }
+  
+  @media (min-width: 640px) {
+    .social-image-container {
+      border-radius: 2rem;
+    }
+  }
+
   html.dark .social-image-container {
     background-color: #1e293b;
   }
@@ -233,13 +218,6 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <div id="landscape-lock">
-      <div class="animate-bounce mb-6">
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#00AEEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
-      </div>
-      <h2 class="text-xl font-black italic uppercase">ISIG Community</h2>
-      <p class="mt-4 text-slate-400 font-medium leading-relaxed">Veuillez utiliser votre appareil en mode <br/> <strong>portrait</strong> pour une meilleure expérience.</p>
-    </div>
     <div id="modal-root"></div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

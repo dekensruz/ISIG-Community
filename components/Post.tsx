@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Post as PostType, Profile, Like } from '../types';
 import { useAuth } from '../App';
-import { supabase } from '../services/supabase';
+import { supabase, getOptimizedImageUrl } from '../services/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import * as locales from 'date-fns/locale';
 import { Heart, MessageCircle, Share2, FileText, MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
@@ -129,7 +130,6 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
   const displayedContent = isExpanded ? post.content : post.content.substring(0, CONTENT_LIMIT);
 
   const renderContentWithLinks = useCallback((text: string) => {
-    // Regex améliorée pour détecter les URLs même sans http://
     const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9.-]+\.(?:com|net|org|edu|ac|cd|io|me|fr|be)[^\s/]*[^\s.,;?!])/gi;
     
     return text.split(urlRegex).map((part, index) => {
@@ -155,19 +155,22 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
     });
   }, []);
 
+  // Optimization: width 800 roughly covers mobile and desktop feed width
+  const optimizedMediaUrl = getOptimizedImageUrl(post.media_url, 800);
+
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card animate-fade-in-up">
-      <div className="p-6 flex items-center justify-between">
-        <div className="flex items-center space-x-4 min-w-0 flex-1">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl sm:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-premium group/card animate-fade-in-up">
+      <div className="p-4 sm:p-6 flex items-center justify-between">
+        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
           <Link to={`/profile/${post.profiles.id}`} className="transition-transform active:scale-90 duration-200 shrink-0">
-            <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="lg" className="ring-4 ring-slate-50" />
+            <Avatar avatarUrl={post.profiles.avatar_url} name={post.profiles.full_name} size="md" className="sm:w-12 sm:h-12 ring-2 sm:ring-4 ring-slate-50 dark:ring-slate-800" />
           </Link>
           <div className="min-w-0 flex-1">
-            <Link to={`/profile/${post.profiles.id}`} className="block text-base font-extrabold text-slate-800 hover:text-isig-blue transition-colors truncate">
+            <Link to={`/profile/${post.profiles.id}`} className="block text-sm sm:text-base font-extrabold text-slate-800 dark:text-white hover:text-isig-blue transition-colors truncate">
                 {post.profiles.full_name}
             </Link>
-            <div className="flex flex-wrap items-center text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
-                <span className="truncate max-w-[120px] sm:max-w-none">{post.profiles.major}</span>
+            <div className="flex flex-wrap items-center text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
+                <span className="truncate max-w-[100px] sm:max-w-none">{post.profiles.major}</span>
                 <span className="mx-1.5 text-slate-300 shrink-0">•</span>
                 <span className="shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: locales.fr })}</span>
             </div>
@@ -175,19 +178,19 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         </div>
 
         {session?.user.id === post.user_id && (
-          <div className="relative shrink-0 ml-2">
-            <button onClick={() => setShowOptions(!showOptions)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors active:scale-95">
+          <div className="relative shrink-0 ml-1">
+            <button onClick={() => setShowOptions(!showOptions)} className="p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-colors active:scale-95">
               <MoreHorizontal size={20} />
             </button>
             {showOptions && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-premium border border-slate-100 py-2 z-20 overflow-hidden animate-fade-in">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-premium border border-slate-100 dark:border-slate-800 py-2 z-20 overflow-hidden animate-fade-in">
                 <button 
                   onClick={() => { if(onEditRequested) onEditRequested(post); setShowOptions(false); }} 
-                  className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full flex items-center px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Pencil size={16} className="mr-3 text-isig-blue" /> Modifier
                 </button>
-                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors">
+                <button onClick={async () => { if(window.confirm("Supprimer ?")) await supabase.from('posts').delete().eq('id', post.id); setShowOptions(false); }} className="w-full flex items-center px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                   <Trash2 size={16} className="mr-3" /> Supprimer
                 </button>
               </div>
@@ -196,8 +199,8 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
         )}
       </div>
 
-      <div className="px-7 pb-4">
-        <div className="text-[16px] text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
+      <div className="px-4 sm:px-7 pb-4">
+        <div className="text-sm sm:text-[16px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium whitespace-pre-wrap">
           {renderContentWithLinks(displayedContent)}
           {!isExpanded && isLongContent && <span>...</span>}
         </div>
@@ -209,31 +212,30 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
       </div>
 
       {post.media_url && (
-        <div className="px-6 pb-6">
+        <div className="px-3 sm:px-6 pb-4 sm:pb-6">
            {post.media_type === 'image' ? (
              <div 
                onClick={() => setShowImageModal(true)} 
                className="social-image-container cursor-pointer transition-transform duration-300 active:scale-[0.985] group/img"
              >
                <img 
-                 src={post.media_url} 
+                 src={optimizedMediaUrl} 
                  alt="Post content" 
-                 className="shadow-md"
-                 loading="lazy" 
+                 loading="lazy"
                />
                <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/5 transition-colors duration-300"></div>
              </div>
            ) : (
-             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] hover:bg-slate-100 transition-all active:scale-[0.98]">
+             <a href={post.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-[1.5rem] hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98]">
                 <FileText size={24} className="text-isig-blue mr-4" />
-                <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Consulter le document</span>
+                <span className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">Consulter le document</span>
              </a>
            )}
         </div>
       )}
 
       {likesCount > 0 && (
-          <div className="px-7 pb-4">
+          <div className="px-4 sm:px-7 pb-4">
               <button 
                 onClick={() => setShowLikersModal(true)}
                 className="flex items-center space-x-3 text-[11px] font-black text-slate-400 uppercase tracking-wider hover:text-isig-blue transition-all active:scale-95"
@@ -241,10 +243,10 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                   <div className="flex -space-x-2">
                       {likerProfiles.length > 0 ? (
                           likerProfiles.slice(0, 3).map(p => (
-                            <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white" />
+                            <Avatar key={p.id} avatarUrl={p.avatar_url} name={p.full_name} size="sm" className="ring-2 ring-white dark:ring-slate-900" />
                           ))
                       ) : (
-                          <div className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white"></div>
+                          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900"></div>
                       )}
                   </div>
                   <span className="italic">{getLikeSummaryText()}</span>
@@ -252,15 +254,15 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
           </div>
       )}
 
-      <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <button onClick={handleLike} className={`flex items-center space-x-2 px-5 py-3 rounded-2xl transition-all duration-300 active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Heart size={22} fill={isLiked ? '#FF8C00' : 'none'} className={`transition-transform duration-300 ${isLiked ? 'scale-110' : ''}`} />
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-50 dark:border-slate-800 flex items-center justify-between">
+        <div className="flex items-center space-x-1 sm:space-x-2">
+          <button onClick={handleLike} className={`flex items-center space-x-2 px-3 sm:px-5 py-2 sm:py-3 rounded-2xl transition-all duration-300 active:scale-90 ${isLiked ? 'text-isig-orange bg-isig-orange/5' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+            <Heart size={20} sm:size={22} fill={isLiked ? '#FF8C00' : 'none'} className={`transition-transform duration-300 ${isLiked ? 'scale-110' : ''}`} />
             <span className="text-sm font-black">{likesCount}</span>
           </button>
           
-          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-5 py-3 text-slate-600 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
-            <MessageCircle size={22} />
+          <button onClick={() => setShowPostDetailModal(true)} className="flex items-center space-x-2 px-3 sm:px-5 py-2 sm:py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-all active:scale-90">
+            <MessageCircle size={20} sm:size={22} />
             <span className="text-sm font-black">{commentCount}</span>
           </button>
         </div>
@@ -274,7 +276,7 @@ const PostCard: React.FC<PostProps> = ({ post, startWithModalOpen = false, onEdi
                 alert("Lien copié !");
             }
         }} className="p-3 text-slate-400 hover:text-isig-blue hover:bg-isig-blue/5 rounded-2xl transition-all active:scale-90">
-            <Share2 size={22} />
+            <Share2 size={20} sm:size={22} />
         </button>
       </div>
 

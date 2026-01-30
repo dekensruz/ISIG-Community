@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { getOptimizedImageUrl } from '../services/supabase';
 
 interface AvatarProps {
   avatarUrl?: string | null;
@@ -27,6 +28,16 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
     '3xl': 'h-32 w-32 min-w-[8rem] min-h-[8rem] text-4xl',
   };
   
+  // Mapping pour la taille de l'image optimisée
+  const sizePixels = {
+    sm: 60,
+    md: 80,
+    lg: 100,
+    xl: 150,
+    '2xl': 250,
+    '3xl': 400,
+  };
+  
   const shapeClasses = {
     circle: 'rounded-full',
     square: 'rounded-2xl',
@@ -44,13 +55,15 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, name, size = 'md', className
   };
 
   const finalClassName = `flex-shrink-0 ${sizeClasses[size]} ${shapeClasses[shape]} ${className} shadow-sm overflow-hidden relative`;
+  const optimizedSrc = getOptimizedImageUrl(avatarUrl, sizePixels[size]);
 
   return (
     <div className="relative inline-block">
       {avatarUrl ? (
         <img
-          src={avatarUrl}
+          src={optimizedSrc}
           alt={name}
+          loading="lazy"
           className={`${finalClassName} object-cover border-2 border-white`}
         />
       ) : (

@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '../services/supabase';
+import { supabase, getOptimizedImageUrl } from '../services/supabase';
 import { Message } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -82,10 +83,10 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
     };
     
     const progress = duration ? (currentTime / duration) * 100 : 0;
-    const playerColorClass = isOwnMessage ? 'text-white' : 'text-slate-600';
-    const progressBgClass = isOwnMessage ? 'bg-white/30' : 'bg-slate-200';
+    const playerColorClass = isOwnMessage ? 'text-white' : 'text-slate-600 dark:text-slate-200';
+    const progressBgClass = isOwnMessage ? 'bg-white/30' : 'bg-slate-200 dark:bg-slate-600';
     const progressFillClass = isOwnMessage ? 'bg-white' : 'bg-isig-blue';
-    const buttonBgClass = isOwnMessage ? 'bg-white/20 hover:bg-white/40' : 'bg-slate-200 hover:bg-slate-300';
+    const buttonBgClass = isOwnMessage ? 'bg-white/20 hover:bg-white/40' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600';
 
     if (hasError) {
         return (
@@ -94,7 +95,7 @@ const AudioPlayer: React.FC<{ src: string; isOwnMessage: boolean }> = ({ src, is
                     <FileAudio size={24} className={isOwnMessage ? 'text-white' : 'text-red-500'} />
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-widest">Note vocale</p>
-                        <p className="text-[9px] font-medium opacity-80 uppercase">format non prise en charge par cet iphone</p>
+                        <p className="text-[9px] font-medium opacity-80 uppercase">format non pris en charge</p>
                     </div>
                 </div>
                 <a 
@@ -217,15 +218,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     const renderMedia = () => {
         if (!message.media_url || !message.media_type) return null;
         if (message.media_type.startsWith('image/') || message.media_type === 'image') {
+            const optimizedUrl = getOptimizedImageUrl(message.media_url, 400);
             return (
-                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-xl overflow-hidden cursor-pointer max-w-full bg-black/5 transition-transform duration-300 hover:scale-[1.02] active:scale-100">
-                    <img src={message.media_url} alt="Média" className="w-full max-h-64 object-contain" />
+                <div onClick={() => onMediaClick(message.media_url!, message.media_type!, "image.jpg")} className="mt-1 mb-1 rounded-lg overflow-hidden cursor-pointer max-w-full bg-black/5 transition-transform duration-300 hover:scale-[1.02] active:scale-100">
+                    <img src={optimizedUrl} alt="Média" loading="lazy" className="w-full max-h-64 object-contain" />
                 </div>
             );
         }
         if (message.media_type.startsWith('audio/')) return <AudioPlayer src={message.media_url} isOwnMessage={isOwnMessage} />;
         return (
-             <button type="button" onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left transition-all active:scale-[0.98] ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}>
+             <button type="button" onClick={() => onMediaClick(message.media_url!, message.media_type!, "fichier")} className={`flex items-center w-full space-x-3 p-3 mt-1 rounded-xl text-left transition-all active:scale-[0.98] ${isOwnMessage ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
                 <Download size={24} />
                 <div className="flex-1 min-w-0">
                     <p className="font-bold truncate text-xs">{message.media_url.split('/').pop()}</p>
@@ -309,9 +311,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                 <button 
                     type="button" 
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} 
-                    className="p-2 rounded-full text-slate-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-200"
+                    className="p-1.5 sm:p-2 rounded-full text-slate-400 opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-slate-100 active:bg-slate-200"
                 >
-                    <MoreHorizontal size={18} />
+                    <MoreHorizontal size={16} />
                 </button>
                 {menuOpen && (
                     <>
@@ -327,24 +329,25 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                     </>
                 )}
             </div>
-            <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-[1.25rem] order-2 shadow-soft overflow-hidden transition-transform duration-300 ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'}`}>
+            {/* Reduced radius and padding for better density */}
+            <div className={`relative max-w-[85%] sm:max-w-md lg:max-w-lg px-3 py-2 sm:px-4 sm:py-3 rounded-2xl sm:rounded-[1.25rem] order-2 shadow-sm sm:shadow-soft overflow-hidden transition-transform duration-300 ${isOwnMessage ? 'bg-isig-blue text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
                  {message.replied_to && (
-                     <div className={`p-3 mb-2 border-l-4 rounded-xl flex flex-col transition-colors ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50'}`}>
+                     <div className={`p-2 mb-1.5 border-l-4 rounded-lg flex flex-col transition-colors ${isOwnMessage ? 'border-white/40 bg-black/10' : 'border-isig-blue/30 bg-slate-50 dark:bg-slate-700'}`}>
                          <p className={`font-black text-[9px] uppercase tracking-widest mb-0.5 ${isOwnMessage ? 'text-white/80' : 'text-isig-blue'}`}>
                              {message.replied_to.profiles?.full_name || '...'}
                          </p>
-                         <p className={`text-xs italic line-clamp-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-500'}`}>
+                         <p className={`text-xs italic line-clamp-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-500 dark:text-slate-400'}`}>
                              {message.replied_to.content || "Média"}
                          </p>
                      </div>
                  )}
                 {renderMedia()}
-                {message.content && <div className="text-sm font-medium break-words whitespace-pre-wrap leading-relaxed">{renderContentWithLinks(message.content)}</div>}
-                <div className="text-right text-[9px] mt-1.5 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
+                {message.content && <div className="text-[13px] sm:text-sm font-medium break-words whitespace-pre-wrap leading-snug">{renderContentWithLinks(message.content)}</div>}
+                <div className="text-right text-[9px] mt-1 flex justify-end items-center font-black uppercase tracking-widest opacity-60">
                     {isEdited && <span className="mr-1">modifié</span>}
                     {time}
                     {isOwnMessage && (
-                        <CheckCheck size={20} className={`ml-1 transition-colors duration-300`} style={{ color: message.is_read ? '#FFD700' : 'rgba(255,255,255,0.5)' }} />
+                        <CheckCheck size={14} className={`ml-1 transition-colors duration-300`} style={{ color: message.is_read ? '#FFD700' : 'rgba(255,255,255,0.5)' }} />
                     )}
                 </div>
             </div>

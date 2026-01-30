@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../App';
 import { Message, Profile } from '../types';
-import Spinner from './Spinner';
+import { ChatSkeleton } from './Skeleton';
 import Avatar from './Avatar';
 import { Send, ArrowLeft, Paperclip, X, Mic, StopCircle, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -62,7 +62,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = '48px';
+      textarea.style.height = '44px'; // Slightly smaller base height
       const nextHeight = Math.min(textarea.scrollHeight, 160);
       textarea.style.height = `${nextHeight}px`;
     }
@@ -139,7 +139,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     if (!window.confirm("Voulez-vous vraiment supprimer cette conversation pour vous ?")) return;
     try {
         setLoading(true);
-        // On supprime notre participation (cela cache la conversation dans notre liste)
         const { error } = await supabase.from('conversation_participants').delete().match({ conversation_id: conversationId, user_id: session?.user.id });
         if (error) throw error;
         navigate('/chat');
@@ -166,7 +165,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         } else {
             let mediaUrl, mediaType;
             if (file || audioBlob) {
-                // Prioritize the correct extension for iOS compatibility
                 let extension = 'bin';
                 if (audioBlob) {
                     if (audioBlob.type.includes('mp4') || audioBlob.type.includes('m4a')) extension = 'm4a';
@@ -181,7 +179,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                 const mediaFile = file || new File([audioBlob!], `audio_${Date.now()}.${extension}`, { type: audioBlob?.type || file?.type });
                 const fileName = `${conversationId}/${Date.now()}-${mediaFile.name}`;
                 
-                // Upload to Supabase Storage
                 const { data: uploadData, error: uploadError } = await supabase.storage.from('chat_media').upload(fileName, mediaFile);
                 if (uploadError) throw uploadError;
                 
@@ -221,13 +218,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         
-        // Robust mime type selection for cross-platform compatibility (iOS needs AAC/MP4)
         const possibleMimeTypes = [
-            'audio/mp4',
-            'audio/aac',
-            'audio/webm;codecs=opus',
-            'audio/webm',
-            'audio/ogg;codecs=opus'
+            'audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'
         ];
 
         let mimeType = '';
@@ -238,11 +230,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             }
         }
 
-        if (!mimeType) {
-            mediaRecorderRef.current = new MediaRecorder(stream);
-        } else {
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-        }
+        mediaRecorderRef.current = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
         
         audioChunksRef.current = [];
         mediaRecorderRef.current.ondataavailable = (e) => {
@@ -283,20 +271,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
     }, 100);
   };
 
-  if (loading && messages.length === 0) return <div className="h-full flex items-center justify-center bg-white"><Spinner /></div>;
+  if (loading && messages.length === 0) return <div className="h-full bg-white dark:bg-slate-950"><ChatSkeleton /></div>;
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
-        <header className="flex items-center justify-between p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-20 shrink-0">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-950 relative overflow-hidden">
+        <header className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md z-20 shrink-0">
             <div className="flex items-center min-w-0">
-                <button type="button" onClick={() => navigate('/chat')} className="mr-3 p-2.5 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 bg-slate-100/50 active:bg-slate-200">
-                    <ArrowLeft size={22} strokeWidth={2.5} />
+                <button type="button" onClick={() => navigate('/chat')} className="mr-2 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 bg-slate-100/50 dark:bg-slate-800/50 active:bg-slate-200">
+                    <ArrowLeft size={20} strokeWidth={2.5} />
                 </button>
                 {otherParticipant && (
                     <Link to={`/profile/${otherParticipant.id}`} className="flex items-center space-x-3 group min-w-0">
                         <Avatar avatarUrl={otherParticipant.avatar_url} name={otherParticipant.full_name} size="md" />
                         <div className="min-w-0">
-                            <h3 className="font-black text-slate-800 tracking-tight truncate">{otherParticipant.full_name}</h3>
+                            <h3 className="font-black text-slate-800 dark:text-white tracking-tight truncate text-sm">{otherParticipant.full_name}</h3>
                             <p className={`text-[10px] font-black uppercase tracking-widest ${isOnlineRealtime ? 'text-emerald-500' : 'text-slate-400'}`}>
                                 {isOnlineRealtime ? 'En ligne' : otherParticipant.last_seen_at ? `Vu ${formatDistanceToNow(new Date(otherParticipant.last_seen_at), { locale: fr, addSuffix: true })}` : 'Hors ligne'}
                             </p> 
@@ -306,14 +294,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
             </div>
             <button 
                 onClick={handleDeleteConversation} 
-                className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all active:scale-90"
+                className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all active:scale-90"
                 title="Supprimer la conversation"
             >
-                <Trash2 size={20} />
+                <Trash2 size={18} />
             </button>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-4 space-y-2 bg-slate-50/30 dark:bg-slate-900/30 custom-scrollbar">
             {messages.map((msg) => (
                 <MessageBubble 
                   key={msg.id} 
@@ -325,41 +313,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                   onMediaClick={(url, type, name) => setMediaInView({ url, type, name })} 
                 />
             ))}
-            <div ref={messagesEndRef} className="h-4" />
+            <div ref={messagesEndRef} className="h-2" />
         </div>
 
-        <div className="p-4 border-t border-slate-100 bg-white shrink-0 z-10">
+        <div className="p-3 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0 z-10 pb-safe">
             {recordingStatus === 'recording' ? (
-                <div className="flex items-center space-x-4 h-14 bg-red-50 rounded-2xl px-4 border border-red-100 animate-pulse">
+                <div className="flex items-center space-x-4 h-12 bg-red-50 dark:bg-red-900/20 rounded-2xl px-4 border border-red-100 dark:border-red-900/30 animate-pulse">
                     <div className="flex-1 flex items-center space-x-3">
                         <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
-                        <span className="text-red-700 font-black tracking-tighter">{formatTime(recordingTime)}</span>
+                        <span className="text-red-700 dark:text-red-400 font-black tracking-tighter">{formatTime(recordingTime)}</span>
                     </div>
-                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2.5 rounded-xl shadow-lg shadow-red-200 transition-transform active:scale-95"><StopCircle size={24} /></button>
+                    <button type="button" onClick={stopRecording} className="bg-red-500 text-white p-2 rounded-xl shadow-lg shadow-red-200 transition-transform active:scale-95"><StopCircle size={20} /></button>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {replyingToMessage && (
-                        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl mb-2 border border-slate-100 text-xs animate-fade-in-up">
-                            <div className="truncate pr-4">
+                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-xl mb-2 border border-slate-100 dark:border-slate-700 text-xs animate-fade-in-up">
+                            <div className="truncate pr-4 text-slate-700 dark:text-slate-300">
                                 <span className="font-black text-isig-blue uppercase tracking-widest text-[9px] mr-2">Réponse :</span>
                                 <span className="text-slate-500 italic font-medium">{replyingToMessage.content || 'Média'}</span>
                             </div>
-                            <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1 transition-colors"><X size={16}/></button>
+                            <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-red-500 p-1 transition-colors"><X size={14}/></button>
                         </div>
                     )}
                     {editingMessage && (
-                        <div className="flex items-center justify-between bg-isig-orange/10 p-3 rounded-2xl mb-2 border border-isig-orange/20 text-xs animate-fade-in-up">
+                        <div className="flex items-center justify-between bg-isig-orange/10 p-2 rounded-xl mb-2 border border-isig-orange/20 text-xs animate-fade-in-up">
                             <div className="flex items-center text-isig-orange font-black uppercase tracking-widest text-[9px]">
                                 <Pencil size={12} className="mr-2" /> Modification...
                             </div>
-                            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1 transition-colors"><RotateCcw size={16}/></button>
+                            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="text-isig-orange hover:text-orange-600 p-1 transition-colors"><RotateCcw size={14}/></button>
                         </div>
                     )}
                     <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
                         {!editingMessage && (
-                            <label className="p-3 text-slate-400 hover:text-isig-blue cursor-pointer rounded-2xl shrink-0 transition-colors active:bg-slate-100">
-                                <Paperclip size={24} />
+                            <label className="p-2.5 text-slate-400 hover:text-isig-blue cursor-pointer rounded-xl shrink-0 transition-colors active:bg-slate-100 dark:active:bg-slate-800">
+                                <Paperclip size={22} />
                                 <input type="file" onChange={(e) => {
                                     if (e.target.files?.[0]) {
                                         setFile(e.target.files[0]);
@@ -379,20 +367,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onMessagesRead 
                                 ref={textareaRef}
                                 value={newMessage} 
                                 onChange={(e) => { setNewMessage(e.target.value); adjustHeight(); }} 
-                                placeholder={editingMessage ? "Modifier le message..." : "Écrire un message..."} 
-                                className="chat-textarea w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-40 font-medium text-slate-700" 
+                                placeholder={editingMessage ? "Modifier..." : "Message..."} 
+                                className="chat-textarea w-full bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 focus:ring-2 focus:ring-isig-blue outline-none transition-all resize-none max-h-32 font-medium text-slate-700 dark:text-slate-200 text-sm" 
                                 style={{ 
-                                    minHeight: '48px',
+                                    minHeight: '44px',
                                     overflow: 'hidden'
                                 }}
                             />
                         </div>
                         <div className="flex items-center shrink-0">
                             {!newMessage.trim() && !file ? (
-                                <button type="button" onClick={startRecording} className="bg-isig-blue text-white p-3.5 rounded-2xl shadow-lg shadow-isig-blue/20 transition-all active:scale-90 hover:bg-blue-600"><Mic size={24} /></button>
+                                <button type="button" onClick={startRecording} className="bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 p-2.5 rounded-xl transition-all active:scale-90 hover:text-isig-blue"><Mic size={22} /></button>
                             ) : (
-                                <button type="submit" disabled={isUploading} className="bg-isig-blue text-white p-3.5 rounded-2xl disabled:opacity-50 shadow-lg shadow-isig-blue/20 transition-all active:scale-90 hover:bg-blue-600">
-                                    {isUploading ? <Spinner /> : <Send size={24} />}
+                                <button type="submit" disabled={isUploading} className="bg-isig-blue text-white p-2.5 rounded-xl disabled:opacity-50 shadow-lg shadow-isig-blue/20 transition-all active:scale-90 hover:bg-blue-600">
+                                    {isUploading ? <Spinner /> : <Send size={20} />}
                                 </button>
                             )}
                         </div>

@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Spinner from './components/Spinner';
+import { ThemeProvider } from './components/ThemeProvider';
+import { Toaster } from 'sonner';
 
 // Lazy loading des pages
 const AuthPage = lazy(() => import('./components/Auth'));
@@ -28,14 +31,12 @@ import NotificationsProvider from './components/NotificationsProvider';
 import InstallPWABanner from './components/InstallPWABanner';
 import CompleteProfilePopup from './components/CompleteProfilePopup';
 
-// Configuration du cache : Les données restent "fraîches" pendant 5 minutes.
-// Cela empêche le rechargement lors de la navigation rapide.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes de conservation en mémoire
-      refetchOnWindowFocus: false, // Évite de recharger si on change d'onglet
+      staleTime: 1000 * 60 * 5, 
+      gcTime: 1000 * 60 * 30, 
+      refetchOnWindowFocus: false, 
       retry: 1,
     },
   },
@@ -84,7 +85,7 @@ const SearchFilterProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 const PageLoader = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
     <div className="w-12 h-12 border-4 border-isig-blue/10 border-t-isig-blue rounded-full animate-spin"></div>
-    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-300">Chargement...</p>
+    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-300 dark:text-slate-600">Chargement...</p>
   </div>
 );
 
@@ -108,7 +109,6 @@ const AppContent: React.FC = () => {
         return () => clearInterval(interval);
     }, [session]);
 
-    // Scroll en haut lors du changement de page (sauf chat et retour arrière intelligent)
     useEffect(() => {
       if (!isChatConversation) {
         window.scrollTo(0, 0);
@@ -116,7 +116,7 @@ const AppContent: React.FC = () => {
     }, [location.pathname, isChatConversation]);
 
     return (
-        <div className="min-h-screen bg-slate-50 selection:bg-isig-blue selection:text-white transition-colors duration-300">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 selection:bg-isig-blue selection:text-white transition-colors duration-300">
             {showNavBars && <Navbar />}
             <main className={`transition-all duration-500 ease-in-out ${
                 isAuthPage ? "" 
@@ -180,7 +180,7 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-slate-950 p-6">
             <div className="relative mb-8">
                 <img 
                     src="https://i.ibb.co/gLJQF0rn/isig.jpg" 
@@ -189,23 +189,26 @@ const App: React.FC = () => {
                 />
             </div>
             <Spinner />
-            <p className="mt-6 text-slate-400 font-black text-xs uppercase tracking-widest animate-pulse">Chargement de l'espace ISIG...</p>
+            <p className="mt-6 text-slate-400 dark:text-slate-600 font-black text-xs uppercase tracking-widest animate-pulse">Chargement de l'espace ISIG...</p>
         </div>
     );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-        <AuthContext.Provider value={{ session, loading }}>
-            <BrowserRouter>
-                <SearchFilterProvider>
-                    <UnreadMessagesProvider>
-                        <AppContent />
-                    </UnreadMessagesProvider>
-                </SearchFilterProvider>
-            </BrowserRouter>
-        </AuthContext.Provider>
-    </QueryClientProvider>
+    <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+            <AuthContext.Provider value={{ session, loading }}>
+                <BrowserRouter>
+                    <SearchFilterProvider>
+                        <UnreadMessagesProvider>
+                            <AppContent />
+                            <Toaster position="top-center" richColors closeButton theme="system" />
+                        </UnreadMessagesProvider>
+                    </SearchFilterProvider>
+                </BrowserRouter>
+            </AuthContext.Provider>
+        </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

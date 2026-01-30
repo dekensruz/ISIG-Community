@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { User, Shield, Bell, Info, ExternalLink, ChevronRight, LogOut, X, CheckCircle, AlertCircle, MessageSquareText, Lock, LayoutDashboard, ChevronDown, ChevronUp, Scale } from 'lucide-react';
+import { User, Shield, MessageSquareText, LayoutDashboard, ChevronDown, ChevronUp, Scale, LogOut, CheckCircle, AlertCircle, Info, ExternalLink, ChevronRight, Moon, Sun } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Spinner from './Spinner';
+import { useTheme } from './ThemeProvider';
 
 const SettingsPage: React.FC = () => {
   const { session } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -29,11 +31,9 @@ const SettingsPage: React.FC = () => {
     }
   }, [session]);
 
-  // Ouverture automatique si redirection depuis "Mot de passe oublié"
   useEffect(() => {
     if (searchParams.get('view') === 'password') {
         setIsPassExpanded(true);
-        // Optionnel : Scroll vers la section
         const element = document.getElementById('password-section');
         if (element) element.scrollIntoView({ behavior: 'smooth' });
     }
@@ -75,9 +75,9 @@ const SettingsPage: React.FC = () => {
 
   const SettingItem: React.FC<{ icon: React.ReactNode, title: string, subtitle?: string, to?: string, onClick?: () => void, danger?: boolean }> = ({ icon, title, subtitle, to, onClick, danger }) => {
     const content = (
-      <div className={`flex items-center justify-between p-5 hover:bg-slate-50 transition-all ${danger ? 'text-red-600' : 'text-slate-700'}`}>
+      <div className={`flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all ${danger ? 'text-red-600' : 'text-slate-700 dark:text-slate-200'}`}>
         <div className="flex items-center space-x-4">
-          <div className={`p-3 rounded-2xl ${danger ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>
+          <div className={`p-3 rounded-2xl ${danger ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
             {icon}
           </div>
           <div>
@@ -94,26 +94,42 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 animate-fade-in-up">
+    <div className="max-w-2xl mx-auto space-y-8 animate-fade-in-up pb-20">
       <div className="mb-8">
-        <h1 className="text-4xl font-black text-slate-800 tracking-tight italic uppercase">Paramètres</h1>
-        <p className="text-slate-500 font-medium mt-1">Gérez votre compte et vos préférences.</p>
+        <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight italic uppercase">Paramètres</h1>
+        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Gérez votre compte et vos préférences.</p>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+      {/* Theme Toggler */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-soft border border-slate-100 dark:border-slate-800 overflow-hidden p-6 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-2xl bg-isig-blue/10 text-isig-blue">
+                  {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+              </div>
+              <div>
+                  <p className="font-black text-sm uppercase tracking-tight text-slate-800 dark:text-white">Apparence</p>
+                  <p className="text-xs text-slate-400 font-medium">Basculez entre clair et sombre</p>
+              </div>
+          </div>
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-isig-blue' : 'bg-slate-200'}`}
+          >
+              <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-7' : 'translate-x-1'}`} />
+          </button>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-soft border border-slate-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Compte & Sécurité</h2>
         </div>
-        <div className="divide-y divide-slate-50">
+        <div className="divide-y divide-slate-50 dark:divide-slate-800">
             <SettingItem icon={<User size={20}/>} title="Éditer le profil" subtitle="Changer nom, bio et photos" to={`/profile/${session?.user.id}`} />
             
-            <div className="bg-white border-b border-slate-50" id="password-section">
-                <button 
-                    onClick={() => setIsPassExpanded(!isPassExpanded)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
-                >
+            <div className="bg-white dark:bg-slate-900 border-b border-slate-50 dark:border-slate-800" id="password-section">
+                <button onClick={() => setIsPassExpanded(!isPassExpanded)} className="w-full flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-700 dark:text-slate-200">
                     <div className="flex items-center space-x-4">
-                        <div className="p-3 rounded-2xl bg-slate-100 text-slate-500"><Shield size={20}/></div>
+                        <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"><Shield size={20}/></div>
                         <div className="text-left">
                             <p className="font-black text-sm uppercase tracking-tight">Sécurité</p>
                             <p className="text-xs text-slate-400 font-medium">Changer de mot de passe</p>
@@ -123,30 +139,12 @@ const SettingsPage: React.FC = () => {
                 </button>
                 {isPassExpanded && (
                     <div className="px-5 pb-8 animate-fade-in">
-                        <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                        <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700">
                              {passwordError && <p className="text-red-500 text-xs font-bold flex items-center"><AlertCircle size={14} className="mr-2"/>{passwordError}</p>}
                              {passwordSuccess && <p className="text-emerald-500 text-xs font-bold flex items-center"><CheckCircle size={14} className="mr-2"/>Mis à jour avec succès !</p>}
-                             <div>
-                                <input 
-                                    type="password" 
-                                    placeholder="Nouveau mot de passe"
-                                    value={newPassword}
-                                    onChange={e => setNewPassword(e.target.value)}
-                                    className="w-full p-4 bg-white border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm"
-                                />
-                             </div>
-                             <div>
-                                <input 
-                                    type="password" 
-                                    placeholder="Confirmer le mot de passe"
-                                    value={confirmPassword}
-                                    onChange={e => setConfirmPassword(e.target.value)}
-                                    className="w-full p-4 bg-white border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm"
-                                />
-                             </div>
-                             <button type="submit" disabled={loading} className="w-full py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest">
-                                {loading ? <Spinner /> : "Mettre à jour"}
-                             </button>
+                             <input type="password" placeholder="Nouveau mot de passe" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm dark:text-white" />
+                             <input type="password" placeholder="Confirmer le mot de passe" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-isig-blue font-bold text-sm dark:text-white" />
+                             <button type="submit" disabled={loading} className="w-full py-4 bg-isig-blue text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest">{loading ? <Spinner /> : "Mettre à jour"}</button>
                         </form>
                     </div>
                 )}
@@ -160,108 +158,8 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">À propos & Charte</h2>
-        </div>
-        <div className="divide-y divide-slate-50">
-            <div className="p-8">
-                <div className="flex items-center space-x-4 mb-6">
-                    <img src="https://i.ibb.co/gLJQF0rn/isig.jpg" alt="ISIG Logo" className="w-16 h-16 drop-shadow-lg" />
-                    <div>
-                        <h3 className="text-xl font-black text-slate-800 uppercase italic">ISIG Community</h3>
-                    </div>
-                </div>
-                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                    ISIG Community est le réseau social académique exclusif de l'ISIG Goma.
-                </p>
-                <div className="mt-8 pt-8 border-t border-slate-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Créateur</p>
-                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-3xl border border-slate-100 group">
-                        <div className="flex items-center space-x-4">
-                            <img src="https://i.ibb.co/8nMGzv9X/527452060-602830646229470-3538579722418400104-n.jpg" alt="Dekens" className="w-12 h-12 rounded-2xl object-cover shadow-lg ring-2 ring-white"/>
-                            <div>
-                                <p className="font-black text-slate-800 text-sm">Dekens Ruzuba</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase">Software Engineer</p>
-                            </div>
-                        </div>
-                        <a href="http://portfoliodek.netlify.app/" target="_blank" rel="noopener noreferrer" className="p-3 bg-white rounded-xl shadow-sm hover:text-isig-blue transition-all"><ExternalLink size={20} /></a>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white">
-                <button 
-                    onClick={() => setIsRulesExpanded(!isRulesExpanded)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
-                >
-                    <div className="flex items-center space-x-4">
-                        <div className="p-3 rounded-2xl bg-slate-100 text-isig-orange"><Scale size={20}/></div>
-                        <div className="text-left">
-                            <p className="font-black text-sm uppercase tracking-tight">Charte de Bonne Conduite</p>
-                            <p className="text-xs text-slate-400 font-medium">Règles & Courtoisie</p>
-                        </div>
-                    </div>
-                    {isRulesExpanded ? <ChevronUp size={18} className="text-isig-blue" /> : <ChevronDown size={18} className="text-slate-300" />}
-                </button>
-                {isRulesExpanded && (
-                    <div className="px-8 pb-8 animate-fade-in">
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                            <div className="flex items-start space-x-3">
-                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
-                                    <strong className="text-slate-900">Respect mutuel :</strong> Soyez courtois et bienveillants. Les insultes et le harcèlement sont strictement interdits.
-                                </p>
-                            </div>
-                            <div className="flex items-start space-x-3">
-                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
-                                    <strong className="text-slate-900">Contenu académique :</strong> Privilégiez le partage de connaissances, de projets et d'entraide. Ne publiez pas de contenu inapproprié.
-                                </p>
-                            </div>
-                            <div className="flex items-start space-x-3">
-                                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                                <p className="text-sm text-slate-700 font-medium leading-relaxed">
-                                    <strong className="text-slate-900">Propriété intellectuelle :</strong> Respectez le travail de vos pairs. Citez vos sources lors du partage de ressources.
-                                </p>
-                            </div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase text-center mt-4">
-                                Tout manquement à ces règles peut entraîner une suspension de compte.
-                            </p>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="bg-white">
-                <button 
-                    onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all text-slate-700"
-                >
-                    <div className="flex items-center space-x-4">
-                        <div className="p-3 rounded-2xl bg-slate-100 text-slate-500"><Info size={20}/></div>
-                        <div className="text-left">
-                            <p className="font-black text-sm uppercase tracking-tight">Politique de confidentialité</p>
-                            <p className="text-xs text-slate-400 font-medium">Vos données sont protégées</p>
-                        </div>
-                    </div>
-                    {isPrivacyExpanded ? <ChevronUp size={18} className="text-isig-blue" /> : <ChevronDown size={18} className="text-slate-300" />}
-                </button>
-                {isPrivacyExpanded && (
-                    <div className="px-5 pb-6 animate-fade-in">
-                        <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 flex items-center space-x-4">
-                            <div className="bg-emerald-500 text-white p-2 rounded-xl flex-shrink-0">
-                                <CheckCircle size={20} />
-                            </div>
-                            <p className="text-emerald-800 font-bold text-sm leading-relaxed">Vos données sont sauvegardées de manière sécurisée et ne sont jamais partagées avec des tiers.</p>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-[2.5rem] shadow-soft border border-slate-100 overflow-hidden mb-12">
+      {/* --- Footer Links (Identical logic, update styles) --- */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-soft border border-slate-100 dark:border-slate-800 overflow-hidden mb-12">
         <SettingItem icon={<LogOut size={20}/>} title="Déconnexion" subtitle="Quitter votre session actuelle" onClick={handleSignOut} danger />
       </div>
     </div>

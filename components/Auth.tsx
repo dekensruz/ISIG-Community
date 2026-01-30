@@ -2,33 +2,32 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useSearchParams } from 'react-router-dom';
-import { Upload, ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, RefreshCw, AlertCircle, ShieldCheck, ChevronDown, UserRound, ExternalLink } from 'lucide-react';
+import { ArrowRight, Mail, Lock, User, Hash, GraduationCap, Eye, EyeOff, ShieldCheck, ChevronDown, UserRound, ArrowLeft, CheckCircle } from 'lucide-react';
 import Spinner from './Spinner';
+import { toast } from 'sonner';
 
 export const PROMOTIONS = [
-    "Licence 1",
-    "Licence 2",
-    "Licence 3",
-    "Licence 4",
-    "Master 1",
-    "Master 2"
+    "Licence 1", "Licence 2", "Licence 3", "Licence 4", "Master 1", "Master 2"
 ];
 
 const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  
+  // Wizard Steps: 1=Identifiants, 2=Identité, 3=Académique
+  const [step, setStep] = useState(1); 
   const [loading, setLoading] = useState(false);
+  
+  // Form Data
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [major, setMajor] = useState('');
   const [promotion, setPromotion] = useState('');
   const [gender, setGender] = useState<'M' | 'F' | ''>('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const initialMode = searchParams.get('mode');
@@ -37,84 +36,83 @@ const AuthPage: React.FC = () => {
     else setMode('login');
   }, [searchParams]);
 
-  const getFriendlyErrorMessage = (err: any) => {
-    const msg = (err.message || '').toLowerCase();
-    if (msg.includes('invalid login credentials')) return "Email ou mot de passe incorrect.";
-    if (msg.includes('already registered')) return "Cet email est déjà utilisé par un autre étudiant.";
-    // Gestion spécifique pour l'email introuvable lors de la récupération
-    if (msg.includes('user not found') || msg.includes('invalid email')) return "Email introuvable.";
-    return err.message || "Une erreur est survenue. Veuillez réessayer.";
+  const handleNextStep = () => {
+    if (step === 1) {
+        if (!email || !password) return toast.error("Veuillez remplir email et mot de passe.");
+        if (password.length < 6) return toast.error("Le mot de passe doit faire au moins 6 caractères.");
+    }
+    if (step === 2) {
+        if (!fullName || fullName.trim().split(/\s+/).length < 2) return toast.error("Entrez votre Prénom ET Nom.");
+        if (!studentId) return toast.error("Le matricule est obligatoire.");
+    }
+    setStep(step + 1);
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handlePrevStep = () => setStep(step - 1);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setMessage(null);
 
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-      } else if (mode === 'signup') {
-        // Validation du nom complet (au moins deux mots)
-        const nameParts = fullName.trim().split(/\s+/);
-        if (nameParts.length < 2) {
-          throw new Error("Veuillez entrer votre nom complet (Prénom et Nom). Exemple : Dekens Ruzuba");
+        toast.success("Bon retour parmi nous !");
+      } 
+      else if (mode === 'signup') {
+        if (!major || !promotion || !gender) {
+            setLoading(false);
+            return toast.error("Veuillez remplir tous les champs académiques.");
         }
-
-        if (!gender) throw new Error("Veuillez sélectionner votre genre.");
 
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } },
         });
+        
         if (error) throw error;
         
         if(data.user) {
-            let avatarUrl: string | undefined = undefined;
-            if (avatarFile) {
-                const fileName = `avatars/${data.user.id}-${Date.now()}`;
-                await supabase.storage.from('avatars').upload(fileName, avatarFile);
-                const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                avatarUrl = urlData.publicUrl;
-            }
-
+            // Mise à jour immédiate du profil
             await supabase.from('profiles').update({ 
                 student_id: studentId, 
                 full_name: fullName,
                 major: major,
                 promotion: promotion,
                 gender: gender,
-                avatar_url: avatarUrl,
             }).eq('id', data.user.id);
         }
-        setMessage('Vérifiez votre boîte mail pour confirmer votre inscription.');
-      } else {
-        // Mode Récupération de mot de passe
-        // On vérifie d'abord si l'email semble valide (optionnel, Supabase le fait aussi)
-        if (!email) throw new Error("Veuillez entrer votre adresse email.");
-
+        toast.success("Compte créé ! Vérifiez vos emails pour confirmer.", { duration: 5000 });
+      } 
+      else if (mode === 'forgot') {
+        if (!email) throw new Error("Email requis.");
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/settings?view=password`,
         });
-        
         if (error) throw error;
-        setMessage('Lien de récupération envoyé sur votre boîte mail.');
+        toast.success("Email de récupération envoyé.");
       }
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
+      toast.error(err.message || "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isLogin = mode === 'login';
-  const isForgot = mode === 'forgot';
+  // Renderers
+  const renderStepIndicators = () => (
+    <div className="flex justify-center space-x-2 mb-8">
+        {[1, 2, 3].map((s) => (
+            <div key={s} className={`h-2 rounded-full transition-all duration-300 ${step === s ? 'w-8 bg-isig-blue' : step > s ? 'w-2 bg-emerald-400' : 'w-2 bg-slate-200 dark:bg-slate-700'}`} />
+        ))}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      {/* Branding Section */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-dark p-12 flex-col justify-between relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-isig-blue/20 blur-[100px] rounded-full -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-isig-orange/20 blur-[100px] rounded-full -ml-48 -mb-48"></div>
@@ -130,6 +128,7 @@ const AuthPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Form Section */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto">
         <div className="w-full max-w-md space-y-8 animate-fade-in-up py-8">
           <div className="lg:hidden flex justify-center mb-6">
@@ -137,135 +136,136 @@ const AuthPage: React.FC = () => {
           </div>
 
           <div className="text-center">
-            <h2 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">
-              {isForgot ? 'Récupération' : isLogin ? 'Bon retour !' : 'Rejoindre'}
+            <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase">
+              {mode === 'forgot' ? 'Récupération' : mode === 'login' ? 'Connexion' : 'Inscription'}
             </h2>
+            <p className="mt-2 text-slate-500 dark:text-slate-400 font-medium">
+               {mode === 'signup' ? `Étape ${step} sur 3` : "Accédez à votre espace étudiant"}
+            </p>
           </div>
 
-          <form onSubmit={handleAuth} className="mt-8 space-y-4">
-            {error && (
-              <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100 flex items-start animate-fade-in">
-                <AlertCircle size={18} className="mr-2 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-            {message && (
-              <div className="p-4 bg-green-50 text-green-600 rounded-2xl text-sm font-bold border border-green-100 flex items-start">
-                <RefreshCw size={18} className="mr-2 shrink-0 mt-0.5" />
-                <span>{message}</span>
-              </div>
+          {mode === 'signup' && renderStepIndicators()}
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            
+            {/* --- STEP 1: IDENTIFIANTS (Or Login/Forgot Mode) --- */}
+            {(step === 1 || mode !== 'signup') && (
+                <div className="space-y-4 animate-fade-in">
+                    {mode !== 'forgot' && mode === 'signup' && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl mb-4 border border-blue-100 dark:border-blue-900/30">
+                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold">Commencez par sécuriser votre compte.</p>
+                        </div>
+                    )}
+                    
+                    <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                            type="email" 
+                            placeholder="Adresse email" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm dark:text-white" 
+                            required 
+                        />
+                    </div>
+
+                    {mode !== 'forgot' && (
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type={showPassword ? "text" : "password"} 
+                                placeholder="Mot de passe" 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                className="w-full pl-11 pr-12 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm dark:text-white" 
+                                required 
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-isig-blue transition-colors">
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
+                    )}
+
+                    {mode === 'login' && (
+                        <div className="flex justify-end">
+                            <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors">Mot de passe oublié ?</button>
+                        </div>
+                    )}
+                </div>
             )}
 
-            {!isLogin && !isForgot && (
-              <div className="grid grid-cols-1 gap-4">
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+            {/* --- STEP 2: IDENTITÉ (Signup Only) --- */}
+            {mode === 'signup' && step === 2 && (
+                <div className="space-y-4 animate-fade-in">
+                    <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input type="text" placeholder="Nom complet (Prénom Nom)" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm dark:text-white" autoFocus />
+                    </div>
+                    <div className="relative">
+                        <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input type="text" placeholder="Matricule étudiant" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm dark:text-white" />
+                    </div>
                 </div>
+            )}
+
+            {/* --- STEP 3: ACADÉMIQUE (Signup Only) --- */}
+            {mode === 'signup' && step === 3 && (
+                <div className="space-y-4 animate-fade-in">
+                    <div className="relative">
+                        <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                        <select value={gender} onChange={(e) => setGender(e.target.value as any)} className="w-full pl-11 pr-10 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer dark:text-white">
+                            <option value="" disabled>Genre</option>
+                            <option value="M">Homme</option>
+                            <option value="F">Femme</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                    </div>
+                    <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm dark:text-white" />
+                    <div className="relative">
+                        <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                        <select value={promotion} onChange={(e) => setPromotion(e.target.value)} className="w-full pl-11 pr-10 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer dark:text-white">
+                            <option value="" disabled>Promotion</option>
+                            {PROMOTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                    </div>
+                </div>
+            )}
+
+            {/* --- ACTIONS --- */}
+            <div className="flex gap-3 pt-2">
+                {mode === 'signup' && step > 1 && (
+                    <button type="button" onClick={handlePrevStep} className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <ArrowLeft size={20} />
+                    </button>
+                )}
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="Matricule" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
-                  </div>
-                  <div className="relative">
-                    <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
-                    <select 
-                        value={promotion} 
-                        onChange={(e) => setPromotion(e.target.value)} 
-                        className="w-full pl-11 pr-10 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer" 
-                        required
-                    >
-                        <option value="" disabled>Promotion</option>
-                        {PROMOTIONS.map(p => (
-                            <option key={p} value={p}>{p}</option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                   <input type="text" placeholder="Filière (ex: Génie Logiciel)" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
-                   <div className="relative">
-                      <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
-                      <select 
-                          value={gender} 
-                          onChange={(e) => setGender(e.target.value as any)} 
-                          className="w-full pl-11 pr-10 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer" 
-                          required
-                      >
-                          <option value="" disabled>Genre</option>
-                          <option value="M">Homme (M)</option>
-                          <option value="F">Femme (F)</option>
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                   </div>
-                </div>
-              </div>
-            )}
-
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="email" placeholder="Adresse email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
+                {mode === 'signup' && step < 3 ? (
+                    <button type="button" onClick={handleNextStep} className="flex-1 py-4 bg-slate-800 dark:bg-white text-white dark:text-slate-900 font-black rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all active:scale-95 uppercase tracking-widest text-sm">
+                        <span>Suivant</span> <ArrowRight size={20} />
+                    </button>
+                ) : (
+                    <button type="submit" disabled={loading} className="flex-1 py-4 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm hover:bg-blue-600">
+                        <span>{loading ? <Spinner /> : mode === 'forgot' ? 'Récupérer' : mode === 'login' ? 'Se connecter' : "Terminer"}</span>
+                        {!loading && mode !== 'forgot' && (mode === 'signup' ? <CheckCircle size={20} /> : <ArrowRight size={20} />)}
+                    </button>
+                )}
             </div>
 
-            {!isForgot && (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type={showPassword ? "text" : "password"} placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-12 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-isig-blue outline-none transition-all font-bold text-sm shadow-sm" required />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-isig-blue transition-colors">
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-                {isLogin && (
-                    <div className="flex justify-end">
-                        <button 
-                            type="button" 
-                            onClick={() => setMode('forgot')} 
-                            className="text-xs font-bold text-slate-400 hover:text-isig-blue transition-colors"
-                        >
-                            Mot de passe oublié ?
-                        </button>
-                    </div>
-                )}
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} className="w-full py-5 bg-isig-blue text-white font-black rounded-2xl shadow-xl shadow-isig-blue/20 flex items-center justify-center space-x-2 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm">
-              <span>{loading ? <Spinner /> : isForgot ? 'Récupérer' : isLogin ? 'Se connecter' : "S'inscrire"}</span>
-              {!loading && <ArrowRight size={20} />}
-            </button>
           </form>
 
-          <p className="text-center text-slate-500 font-bold">
-            {isForgot ? "Retour à la " : isLogin ? "Nouveau ici ?" : "Déjà un compte ?"}
-            <button onClick={() => setMode(isForgot ? 'login' : isLogin ? 'signup' : 'login')} className="ml-2 text-isig-blue hover:underline">
-                {isForgot ? "Connexion" : isLogin ? "S'inscrire" : "Se connecter"}
+          <p className="text-center text-slate-500 dark:text-slate-400 font-bold text-sm">
+            {mode === 'signup' ? "Déjà un compte ?" : "Pas encore de compte ?"}
+            <button 
+                onClick={() => { 
+                    setMode(mode === 'signup' ? 'login' : 'signup'); 
+                    setStep(1); 
+                }} 
+                className="ml-2 text-isig-blue hover:underline"
+            >
+                {mode === 'signup' ? "Se connecter" : "S'inscrire"}
             </button>
           </p>
-
-          <div className="mt-12 pt-8 border-t border-slate-100/50">
-            <p className="text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Créé par</p>
-            <a 
-              href="http://portfoliodek.netlify.app/" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="flex items-center justify-center p-4 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md hover:border-isig-blue/30 transition-all group"
-            >
-                <img 
-                    src="https://i.ibb.co/YKf7kvx/527452060-602830646229470-3538579722418400104-n.jpg" 
-                    alt="Dekens Ruzuba" 
-                    className="w-10 h-10 rounded-2xl object-cover shadow-sm ring-2 ring-slate-50 group-hover:scale-105 transition-transform" 
-                />
-                <div className="ml-4 text-left">
-                    <p className="font-black text-slate-800 text-xs">Dekens Ruzuba</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide group-hover:text-isig-blue transition-colors">Software Engineer</p>
-                </div>
-                <ExternalLink size={16} className="ml-auto text-slate-300 group-hover:text-isig-blue transition-colors" />
-            </a>
-          </div>
         </div>
       </div>
     </div>
